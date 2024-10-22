@@ -5,7 +5,6 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::anyhow;
 use clap::Parser;
-use edgeless_con::EdgelessConOrcConfig;
 use edgeless_inabox::InABoxConfig;
 use edgeless_node::{EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings};
 use std::fs;
@@ -33,7 +32,6 @@ fn main() -> anyhow::Result<()> {
         log::info!("Generating default templates for one node");
         edgeless_api::util::create_template("node.toml", edgeless_node::edgeless_node_default_conf().as_str())?;
         // edgeless_api::util::create_template("orchestrator.toml", edgeless_orc::edgeless_orc_default_conf().as_str())?;
-        edgeless_api::util::create_template("balancer.toml", edgeless_bal::edgeless_bal_default_conf().as_str())?;
         edgeless_api::util::create_template("controller.toml", edgeless_con::edgeless_con_default_conf().as_str())?;
         return Ok(());
     }
@@ -41,8 +39,6 @@ fn main() -> anyhow::Result<()> {
     let config = match args.num_of_nodes {
         1 => InABoxConfig {
             node_conf_files: vec!["node.toml".to_string()],
-            orc_conf_file: "orchestrator.toml".to_string(),
-            bal_conf_file: "balancer.toml".to_string(),
             con_conf_file: "controller.toml".to_string(),
         },
         _ if args.num_of_nodes >= 2 => match generate_configs(args.num_of_nodes) {
@@ -98,39 +94,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         node_coap_invocation_urls.insert(node_id, next_coap_url());
         node_orc_agent_urls.insert(node_id, next_url());
     }
-
-    // Balancer
-    let bal_conf = edgeless_bal::EdgelessBalSettings {
-        balancer_id: Uuid::new_v4(),
-        invocation_url: next_url(),
-    };
-
-    // // Orchestrator
-    // let orc_conf = edgeless_orc::EdgelessOrcSettings {
-    //     general: edgeless_orc::EdgelessOrcGeneralSettings {
-    //         domain_id: "domain-1".to_string(),
-    //         orchestrator_url: next_url(),
-    //         orchestrator_url_announced: "".to_string(),
-    //         orchestrator_coap_url: None,
-    //         orchestrator_coap_url_announced: None,
-    //         agent_url: next_url(),
-    //         agent_url_announced: "".to_string(),
-    //         invocation_url: next_url(),
-    //         invocation_url_announced: "".to_string(),
-    //     },
-    //     baseline: edgeless_orc::EdgelessOrcBaselineSettings {
-    //         orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
-    //         keep_alive_interval_secs: 2,
-    //     },
-    //     proxy: edgeless_orc::EdgelessOrcProxySettings {
-    //         proxy_type: "None".to_string(),
-    //         redis_url: None,
-    //     },
-    //     collector: edgeless_orc::EdgelessOrcCollectorSettings {
-    //         collector_type: "None".to_string(),
-    //         redis_url: None,
-    //     },
-    // };
 
     // Controller
     let con_conf = edgeless_con::EdgelessConSettings {
@@ -213,7 +176,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     // still not completely safe, might panic)
     // std::fs::write(Path::new(&path).join("orchestrator.toml"), toml::to_string(&orc_conf).expect("Wrong")).ok();
     std::fs::write(Path::new(&path).join("controller.toml"), toml::to_string(&con_conf).expect("Wrong")).ok();
-    std::fs::write(Path::new(&path).join("balancer.toml"), toml::to_string(&bal_conf).expect("Wrong")).ok();
     let mut node_files = vec![];
     for (count, node_conf) in node_confs.into_iter().enumerate() {
         std::fs::write(
@@ -226,8 +188,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
 
     Ok(InABoxConfig {
         node_conf_files: node_files,
-        orc_conf_file: format!("{}/orchestrator.toml", &path),
-        bal_conf_file: format!("{}/balancer.toml", &path),
         con_conf_file: format!("{}/controller.toml", &path),
     })
 }

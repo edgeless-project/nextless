@@ -17,12 +17,6 @@ The initial focus lays on independent and locally-aggregated clusters of devices
 
 ### Minimize resource utilization on constrained nodes.
 
-The system should allow nodes to 
-
-
-
-2) Never 
-
 ## License
 
 The Repository is licensed under the MIT License. Please refer to
