@@ -10,6 +10,7 @@ impl ResourceConfigurationConverters {
         api_spec: &crate::grpc_impl::api::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::resource_configuration::ResourceInstanceSpecification> {
         Ok(crate::resource_configuration::ResourceInstanceSpecification {
+            resource_id: CommonConverters::parse_instance_id(api_spec.resource_id.as_ref().ok_or(anyhow::anyhow!("No Instance Id"))?)?,
             class_type: api_spec.resource_class_type.clone(),
             configuration: api_spec.configuration.clone(),
             output_mapping: api_spec
@@ -41,6 +42,7 @@ impl ResourceConfigurationConverters {
         crate_spec: &crate::resource_configuration::ResourceInstanceSpecification,
     ) -> crate::grpc_impl::api::ResourceInstanceSpecification {
         crate::grpc_impl::api::ResourceInstanceSpecification {
+            resource_id: Some(CommonConverters::serialize_instance_id(&crate_spec.resource_id)),
             resource_class_type: crate_spec.class_type.clone(),
             configuration: crate_spec.configuration.clone(),
             output_mapping: crate_spec

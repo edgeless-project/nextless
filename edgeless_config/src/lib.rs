@@ -65,6 +65,7 @@ fn load_module(file: &std::path::PathBuf) -> starlark::Result<starlark::environm
         .with(crate::resource::edgeless_resource)
         .with(crate::port_class::edgeless_port_spec)
         .with(crate::workflow::edgeless_workflow)
+        .with(crate::port::edgeless_port)
         .with(crate::files::file)
         .build();
 

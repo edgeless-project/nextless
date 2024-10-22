@@ -176,24 +176,42 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             instance_specification.configuration.get("methods"),
         ) {
             // Assign a new component identifier to the newly-created  resource.
-            let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id.clone());
+            // let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id.clone());
+
+            let allow: std::collections::HashSet<_> = methods
+                .split(",")
+                .filter_map(|str_method| match edgeless_http::string_method_to_edgeless(str_method) {
+                    Ok(val) => Some(val),
+                    Err(_) => {
+                        log::warn!("Bad HTTP Method");
+                        None
+                    }
+                })
+                .collect();
+
             lck.active_resources.insert(
-                resource_id.clone(),
+                instance_specification.resource_id.clone(),
                 ResourceDesc {
                     host: host.clone(),
-                    allow: methods
-                        .split(",")
-                        .filter_map(|str_method| match edgeless_http::string_method_to_edgeless(str_method) {
-                            Ok(val) => Some(val),
-                            Err(_) => {
-                                log::warn!("Bad HTTP Method");
-                                None
-                            }
-                        })
-                        .collect(),
+                    allow: allow.clone(),
                 },
             );
-            Ok(edgeless_api::common::StartComponentResponse::InstanceId(resource_id))
+            if let Some(output) = instance_specification
+                .output_mapping
+                .get(&edgeless_api::function_instance::PortId("new_request".to_string()))
+            {
+                if let edgeless_api::common::Output::Single(target, port_id) = output {
+                    lck.interests.push(HTTPIngressInterest {
+                        resource_id: instance_specification.resource_id.clone(),
+                        host: host.to_string(),
+                        allow: allow,
+                        target: target.clone(),
+                        target_port: port_id.clone(),
+                    });
+                }
+            }
+
+            Ok(edgeless_api::common::StartComponentResponse::InstanceId(instance_specification.resource_id))
         } else {
             Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {

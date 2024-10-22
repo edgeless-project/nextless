@@ -267,7 +267,7 @@ pub struct ActorImage {
     pub code: Vec<u8>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct LogicalPorts {
     pub logical_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalOutput>,
     pub logical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalInput>,
@@ -369,7 +369,7 @@ impl WorkflowFunction {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum LogicalInput {
     Direct(Vec<(String, edgeless_api::function_instance::PortId)>),
     Topic(String),
@@ -1017,8 +1017,7 @@ impl ActiveWorkflow {
         }
 
         // Create Outputs
-
-        for (cid, component) in &mut self.components() {
+        for (_cid, component) in &mut self.components() {
             component
                 .borrow_mut()
                 .logical_ports()
@@ -1345,6 +1344,8 @@ impl ActiveWorkflow {
             return Some(component as &std::cell::RefCell<dyn WorkflowComponent>);
         } else if let Some(compoenent) = self.resources.get(component_name) {
             return Some(compoenent as &std::cell::RefCell<dyn WorkflowComponent>);
+        } else if component_name == "__proxy" {
+            return Some(&self.proxy as &std::cell::RefCell<dyn WorkflowComponent>);
         } else {
             return None;
         }

@@ -72,6 +72,15 @@ impl InstanceId {
     }
 }
 
+impl Default for InstanceId {
+    fn default() -> Self {
+        Self {
+            node_id: Default::default(),
+            function_id: Default::default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     #[test]

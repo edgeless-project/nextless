@@ -15,28 +15,28 @@ struct State {
 static INIT_STATE: std::sync::OnceLock<InitState> = std::sync::OnceLock::new();
 static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock::new();
 
-impl EdgeFunction for MessageGenerator {
-    fn handle_cast(src: InstanceId, message: &[u8]) {
+impl MessageGeneratorAPI for MessageGenerator {
+    
+    type STRING = String;
+
+    
+    fn handle_internal(message: &[u8]) {
         let init_state = INIT_STATE.get().unwrap();
         let mut state = STATE.get().unwrap().lock().unwrap();
 
-        cast(
-            "output",
-            format!(
-                "from node_id {} function_id {} [#{}]: {}",
-                uuid::Uuid::from_bytes(src.node_id).to_string(),
-                uuid::Uuid::from_bytes(src.component_id).to_string(),
-                state.counter,
-                &core::str::from_utf8(message).unwrap()
-            )
-            .as_bytes(),
+        let my_id = slf();
+
+        let msg = format!(
+            "from node_id {} function_id {} [#{}]: {}",
+            uuid::Uuid::from_bytes(my_id.node_id).to_string(),
+            uuid::Uuid::from_bytes(my_id.component_id).to_string(),
+            state.counter,
+            &core::str::from_utf8(message).unwrap()
         );
+
+        call_message(&msg);
         state.counter += 1;
         delayed_cast(init_state.period, "self", &message);
-    }
-
-    fn handle_call(_src: InstanceId, _message: &[u8]) -> CallRet {
-        CallRet::NoReply
     }
 
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
@@ -62,4 +62,4 @@ impl EdgeFunction for MessageGenerator {
     }
 }
 
-edgeless_function::export!(MessageGenerator);
+edgeless_function::generate!(MessageGenerator);

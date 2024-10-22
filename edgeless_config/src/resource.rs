@@ -100,7 +100,7 @@ pub fn edgeless_resource(builder: &mut starlark::environment::GlobalsBuilder) {
                         port_id.clone(),
                         crate::port::Port {
                             component_id: id.clone(),
-                            port_id: id.clone(),
+                            port_id: port_id.clone(),
                             klass: port_spec.clone(),
                             mapping: std::rc::Rc::new(std::cell::RefCell::new(crate::port::Mapping::Unmapped)),
                         },
@@ -115,7 +115,7 @@ pub fn edgeless_resource(builder: &mut starlark::environment::GlobalsBuilder) {
                         port_id.clone(),
                         crate::port::Port {
                             component_id: id.clone(),
-                            port_id: id.clone(),
+                            port_id: port_id.clone(),
                             klass: port_spec.clone(),
                             mapping: std::rc::Rc::new(std::cell::RefCell::new(crate::port::Mapping::Unmapped)),
                         },

@@ -2,17 +2,20 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 use edgeless_function::*;
-use edgeless_http::*;
 
 struct RequestorFun;
 
-impl EdgeFunction for RequestorFun {
-    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
-        log::info!("HTTP_Requestor: 'Cast' called, MSG: {:?}", encoded_message);
+edgeless_function::generate!(RequestorFun);
 
-        let res = call(
-            &"http_e",
-            &edgeless_http::request_to_string(&edgeless_http::EdgelessHTTPRequest {
+impl HttpRequestorAPI for RequestorFun {
+    type EDGELESS_HTTP_REQUEST = edgeless_http::EdgelessHTTPRequest;
+    type EDGELESS_HTTP_RESPONSE = edgeless_http::EdgelessHTTPResponse;
+    
+    fn handle_internal(encoded_message: &[u8]) {
+        log::info!("HTTP_Requestor: 'Internal' called, MSG: {:?}", encoded_message);
+
+        let res = call_http_out(
+            &edgeless_http::EdgelessHTTPRequest {
                 protocol: edgeless_http::EdgelessHTTPProtocol::HTTPS,
                 host: "api.github.com:443".to_string(),
                 headers: std::collections::HashMap::<String, String>::from([
@@ -22,22 +25,15 @@ impl EdgeFunction for RequestorFun {
                 body: None,
                 method: edgeless_http::EdgelessHTTPMethod::Get,
                 path: "/users/raphaelhetzel/keys".to_string(),
-            })
-            .as_bytes(),
+            },
         );
 
-        if let edgeless_function::CallRet::Reply(response) = res {
-            let parsed: edgeless_http::EdgelessHTTPResponse = edgeless_http::response_from_string(core::str::from_utf8(&response).unwrap()).unwrap();
-            log::info!("HTTP_requestor: {:?}", std::str::from_utf8(&parsed.body.unwrap()));
+        if let Ok(response) = res {
+            log::info!("HTTP_requestor: {:?}", std::str::from_utf8(&response.body.unwrap()));
         }
     }
 
-    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
-        log::info!("HTTP_Requestor: 'Call' called, MSG: {:?}", encoded_message);
-        CallRet::NoReply
-    }
-
-    fn handle_init(_payload: Option<&[u8]>, serialized_state: Option<&[u8]>) {
+    fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
         log::info!("HTTP_Requestor: 'Init' called");
         delayed_cast(5000, "self", "wakeup".as_bytes());
@@ -47,5 +43,3 @@ impl EdgeFunction for RequestorFun {
         log::info!("HTTP_Requestor: 'Stop' called");
     }
 }
-
-edgeless_function::export!(RequestorFun);

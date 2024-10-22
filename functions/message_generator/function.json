@@ -1,9 +1,26 @@
 {
     "id": "message_generator",
-    "function_type": "RUST_WASM",
     "version": "0.1",
-    "build": "Cargo.toml",
-    "outputs": [
-        "output"
-    ]
+    "inputs": {},
+    "outputs": {
+        "message": {
+            "method": "CALL",
+            "data_type": "String"
+        }
+    },
+    "inner_structure": [
+        {
+            "source": {
+                "type": "SIDE_EFFECT"
+            },
+            "dests": [
+                {
+                    "type": "PORT",
+                    "port_id": "message"
+                }
+            ]
+        }
+    ],
+    "path": "/app/functions/message_generator/message_generator.tar.gz",
+    "code_type": "RUST"
 }

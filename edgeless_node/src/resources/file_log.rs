@@ -53,6 +53,11 @@ impl FileLogResource {
                     }
                 };
 
+                if target_port != edgeless_api::function_instance::PortId("line".to_string()) {
+                    log::warn!("FileLog: Bad Port {:?}", target_port);
+                    continue;
+                }
+
                 let line = match add_timestamp {
                     true => format!("{} {}", chrono::Utc::now().to_rfc3339(), message_data),
                     false => message_data,
@@ -99,8 +104,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         if let Some(filename) = instance_specification.configuration.get("filename") {
             let mut lck = self.inner.lock().await;
 
-            let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-            let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+            let dataplane_handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id.clone()).await;
 
             match FileLogResource::new(
                 dataplane_handle,
@@ -110,8 +114,8 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             .await
             {
                 Ok(resource) => {
-                    lck.instances.insert(new_id.clone(), resource);
-                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
+                    lck.instances.insert(instance_specification.resource_id.clone(), resource);
+                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(instance_specification.resource_id));
                 }
                 Err(err) => {
                     return Ok(edgeless_api::common::StartComponentResponse::ResponseError(

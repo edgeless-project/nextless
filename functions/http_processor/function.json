@@ -1,9 +1,6 @@
 {
     "id": "http_processor",
-    "function_type": "RUST_WASM",
     "version": "0.1",
-    "build": "Cargo.toml",
-    "outputs": {},
     "inputs": {
         "new_req": {
             "method": "CALL",
@@ -11,6 +8,7 @@
             "return_data_type": "edgeless.http.Response"
         }
     },
+    "outputs": {},
     "inner_structure": [
         {
             "source": {
@@ -23,5 +21,7 @@
                 }
             ]
         }
-    ]
+    ],
+    "path": "/app/functions/http_processor/http_processor.tar.gz",
+    "code_type": "RUST"
 }

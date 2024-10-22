@@ -396,6 +396,7 @@ message ResourceInstanceSpecification {
     // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceOutput> output_mapping = 3;
     map<string, InstanceInput> input_mapping = 4;
+    InstanceId resource_id = 5;
 }
 
 message LinkProviderSpecification {

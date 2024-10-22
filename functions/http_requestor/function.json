@@ -1,9 +1,27 @@
 {
     "id": "http_requestor",
-    "function_type": "RUST_WASM",
     "version": "0.1",
-    "build": "Cargo.toml",
-    "outputs": [
-        "http_e"
-    ]
+    "inputs": {},
+    "outputs": {
+        "http_out": {
+            "method": "CALL",
+            "data_type": "edgeless.http.Request",
+            "return_data_type": "edgeless.http.Response"
+        }
+    },
+    "inner_structure": [
+        {
+            "source": {
+                "type": "SIDE_EFFECT"
+            },
+            "dests": [
+                {
+                    "type": "PORT",
+                    "port_id": "http_out"
+                }
+            ]
+        }
+    ],
+    "path": "/app/functions/http_requestor/http_requestor.tar.gz",
+    "code_type": "RUST"
 }

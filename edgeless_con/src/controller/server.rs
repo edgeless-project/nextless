@@ -521,6 +521,7 @@ impl ControllerTask {
             .resource_client(&resource_id.node_id)
             .ok_or(format!("No resource client for node: {}", &resource_id.node_id))?
             .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
+                resource_id: resource_id.clone(),
                 class_type: class_type.clone(),
                 configuration: configurations.clone(),
                 output_mapping: output_mapping.clone(),

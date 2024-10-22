@@ -24,8 +24,12 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-edgeless_function = { path = "../../edgeless_function" }
+edgeless_function = {git = "https://github.com/edgeless-project/edgeless.git", branch = "serverless_ir", package = "edgeless_function" }
+edgeless_function_core = {git = "https://github.com/edgeless-project/edgeless.git", branch = "serverless_ir", package = "edgeless_function_core" }
 serde = {version="1", features=["derive"] }
 serde_json = "1"
 log = "0.4"
 uuid = "1.7.0"
+
+[features]
+output_message = []

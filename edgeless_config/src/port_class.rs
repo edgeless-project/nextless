@@ -62,23 +62,33 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
         }))
     }
 
-    fn call_output(id: String, data: String, return_data: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
+    fn call_output(
+        id: String,
+        data: String,
+        return_data: Option<String>,
+        heap: &'v starlark::values::Heap,
+    ) -> anyhow::Result<starlark::values::Value> {
         Ok(heap.alloc(PortSpec {
             id: id,
             method: Method::Call,
             direction: Direction::Output,
             data_type: data,
-            return_data_type: Some(return_data),
+            return_data_type: return_data,
         }))
     }
 
-    fn call_input(id: String, data: String, return_data: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
+    fn call_input(
+        id: String,
+        data: String,
+        return_data: Option<String>,
+        heap: &'v starlark::values::Heap,
+    ) -> anyhow::Result<starlark::values::Value> {
         Ok(heap.alloc(PortSpec {
             id: id,
             method: Method::Cast,
             direction: Direction::Input,
             data_type: data,
-            return_data_type: Some(return_data),
+            return_data_type: return_data,
         }))
     }
 }

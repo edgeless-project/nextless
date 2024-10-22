@@ -7,6 +7,17 @@ pub enum Mapping {
     Topic(String),
 }
 
+starlark::starlark_simple_value!(Mapping);
+
+#[starlark::values::starlark_value(type = "edgeless_port_mapping_c")]
+impl<'v> starlark::values::StarlarkValue<'v> for Mapping {}
+
+impl std::fmt::Display for Mapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, allocative::Allocative, Clone)]
 pub struct DirectTarget {
     pub target_component: String,
@@ -39,6 +50,7 @@ impl<'v> starlark::values::StarlarkValue<'v> for Port {
         heap: &'v starlark::values::Heap,
     ) -> Result<starlark::values::Value<'v>, starlark::Error> {
         if let Some(port) = starlark::values::ValueLike::downcast_ref::<Port>(other) {
+            log::info!("{}", port.port_id);
             *self.mapping.borrow_mut() = Mapping::Direct(DirectTarget {
                 target_component: port.component_id.clone(),
                 port: port.port_id.clone(),
@@ -60,6 +72,24 @@ impl<'v> starlark::values::StarlarkValue<'v> for Port {
             );
 
             return Ok(other);
+        }
+
+        if let Some(filter) = starlark::values::ValueLike::downcast_ref::<Mapping>(other) {
+            *self.mapping.borrow_mut() = filter.clone();
+
+            return Ok(other);
+        }
+
+        Ok(other)
+    }
+
+    fn left_shift(
+        &self,
+        other: starlark::values::Value<'v>,
+        heap: &'v starlark::values::Heap,
+    ) -> Result<starlark::values::Value<'v>, starlark::Error> {
+        if let Some(filter) = starlark::values::ValueLike::downcast_ref::<Mapping>(other) {
+            *self.mapping.borrow_mut() = filter.clone();
         }
 
         Ok(other)
@@ -100,5 +130,12 @@ impl starlark::values::Freeze for Port {
 unsafe impl<'v> starlark::values::Trace<'v> for Port {
     fn trace(&mut self, tracer: &starlark::values::Tracer<'v>) {
         todo!()
+    }
+}
+
+#[starlark::starlark_module]
+pub fn edgeless_port(builder: &mut starlark::environment::GlobalsBuilder) {
+    fn topic(topic: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
+        Ok(heap.alloc(Mapping::Topic(topic)))
     }
 }
