@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-mod active_workflow;
 pub mod client;
 pub mod server;
 #[cfg(test)]

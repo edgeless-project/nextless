@@ -53,6 +53,20 @@ pub trait Serialize {
     fn serialize(&self) -> Vec<u8>;
 }
 
+// pub enum EdgelessKVValue {
+//     String(String),
+//     Float(f64),
+//     Signed(i64),
+//     Unsigned(u64),
+//     Boolean(bool),
+//     Struct(Box<EdgelessKVValue>)
+// }
+
+// pub trait EdgelessKVType {
+//     fn get(key: &str) -> Option<EdgelessKVValue>;
+//     fn set(key: &str, val: EdgelessKVValue);
+// }
+
 impl Deserialize for std::string::String {
     fn deserialize(raw: &[u8]) -> Self {
         String::from_utf8(raw.to_vec()).unwrap()

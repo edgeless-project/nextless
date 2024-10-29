@@ -403,7 +403,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        let mut request = request;
+        let request = request;
         let f_id = request.instance_id.clone();
         match self.sender.send(AgentRequest::Spawn(request)).await {
             Ok(_) => Ok(edgeless_api::common::StartComponentResponse::InstanceId(f_id)),

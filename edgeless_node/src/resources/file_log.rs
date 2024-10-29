@@ -115,7 +115,9 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             {
                 Ok(resource) => {
                     lck.instances.insert(instance_specification.resource_id.clone(), resource);
-                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(instance_specification.resource_id));
+                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                        instance_specification.resource_id,
+                    ));
                 }
                 Err(err) => {
                     return Ok(edgeless_api::common::StartComponentResponse::ResponseError(

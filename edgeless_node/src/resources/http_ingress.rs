@@ -211,7 +211,9 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 }
             }
 
-            Ok(edgeless_api::common::StartComponentResponse::InstanceId(instance_specification.resource_id))
+            Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                instance_specification.resource_id,
+            ))
         } else {
             Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
