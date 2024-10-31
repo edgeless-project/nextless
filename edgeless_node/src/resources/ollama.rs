@@ -98,7 +98,7 @@ impl OllamaResource {
                         model_name: model_name.clone(),
                         history_id: history_id.clone(),
                         prompt,
-                        resource_id: instance_id.clone(),
+                        resource_id: instance_id,
                         reply_sender,
                     }))
                     .await;
@@ -203,7 +203,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         let mut lck = self.inner.lock().await;
         let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
         // Read configuration
         let model = match instance_specification.configuration.get("model") {
@@ -220,7 +220,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         match OllamaResource::new(dataplane_handle, model.to_string(), new_id, lck.sender.clone()).await {
             Ok(resource) => {
-                lck.instances.insert(new_id.clone(), resource);
+                lck.instances.insert(new_id, resource);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
             }
             Err(err) => {

@@ -25,10 +25,7 @@ impl super::Transformation for TopicConverter {
                 .logical_input_mapping
                 .retain(|port_id, port_mapping| match port_mapping {
                     LogicalInput::Topic(topic) => {
-                        targets
-                            .entry(topic.clone())
-                            .or_insert(Vec::new())
-                            .push((cid.to_string(), port_id.clone()));
+                        targets.entry(topic.clone()).or_default().push((cid.to_string(), port_id.clone()));
                         false
                     }
                     _ => true,

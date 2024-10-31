@@ -21,7 +21,7 @@ impl CoapInvocationServer {
                 root_api: data_plane,
             };
 
-            let mut buffer = vec![0 as u8; 5000];
+            let mut buffer = vec![0_u8; 5000];
 
             let mut received_tokens: std::collections::HashMap<std::net::IpAddr, u8> = std::collections::HashMap::new();
 
@@ -86,9 +86,9 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
             target_port: edgeless_api_core::port::Port(heapless::String::from_str(&event.target_port.0).unwrap()),
             stream_id: event.stream_id,
             data: match &event.data {
-                crate::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(val.as_bytes().into()),
-                crate::invocation::EventData::Call(val) => edgeless_api_core::invocation::EventData::Call(val.as_bytes().into()),
-                crate::invocation::EventData::CallRet(val) => edgeless_api_core::invocation::EventData::CallRet(val.as_bytes().into()),
+                crate::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(val.as_bytes()),
+                crate::invocation::EventData::Call(val) => edgeless_api_core::invocation::EventData::Call(val.as_bytes()),
+                crate::invocation::EventData::CallRet(val) => edgeless_api_core::invocation::EventData::CallRet(val.as_bytes()),
                 crate::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                 crate::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
             },
@@ -96,7 +96,7 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
 
         let mut lck = self.inner.lock().await;
 
-        let mut buffer = vec![0 as u8; 2000];
+        let mut buffer = vec![0_u8; 2000];
 
         let token = lck.next_token;
         lck.next_token = if lck.next_token == u8::MAX { 0 } else { lck.next_token + 1 };

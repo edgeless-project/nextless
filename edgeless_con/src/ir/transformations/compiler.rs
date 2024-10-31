@@ -37,8 +37,8 @@ impl super::Transformation for Compiler {
                     instance.borrow_mut().image = Some(actor::ActorImage {
                         class: function.image.class.clone(),
                         format: "RUST_WASM".to_string(),
-                        enabled_inputs: enabled_inputs.iter().map(|i| i.clone()).collect(),
-                        enabled_outputs: enabled_outputs.iter().map(|o| o.clone()).collect(),
+                        enabled_inputs: enabled_inputs.iter().cloned().collect(),
+                        enabled_outputs: enabled_outputs.iter().cloned().collect(),
                         code: wasm_code.clone(),
                     })
                 }

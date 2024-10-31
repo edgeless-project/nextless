@@ -80,22 +80,22 @@ impl MockSensor {
 
 impl crate::resource::Resource for MockSensor {
     fn provider_id(&self) -> &'static str {
-        return "mock-scd30-sensor-1";
+        "mock-scd30-sensor-1"
     }
 
     fn resource_class(&self) -> &'static str {
-        return "scd30-sensor";
+        "scd30-sensor"
     }
 
     fn outputs(&self) -> &'static [&'static str] {
-        return &["data_out"];
+        &["data_out"]
     }
 
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
 
-        return lck.instance_id == Some(instance_id.clone());
+        lck.instance_id == Some(*instance_id)
     }
 
     async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
@@ -125,7 +125,7 @@ pub async fn mock_sensor_task(
                         .await;
                 }
                 edgeless_api_core::common::Output::Any(ids) => {
-                    let id = ids.0.get(0);
+                    let id = ids.0.first();
                     if let Some(id) = id {
                         dataplane_handle
                             .send(instance_id, id.instance_id, id.port_id.clone(), "800.12345;50.12345;20.12345")
@@ -170,16 +170,16 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         let mut lck = tmp.lock().await;
         log::info!("got Lock Start");
 
-        if let Some(_) = lck.instance_id {
+        if lck.instance_id.is_some() {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Resource Busy",
                 detail: None,
             });
         }
 
-        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
+        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
 
-        lck.instance_id = Some(instance_id.clone());
+        lck.instance_id = Some(instance_id);
         lck.data_out_id = instance_specification.data_out_id;
         lck.delay = instance_specification.delay_s;
         log::info!("End Start");

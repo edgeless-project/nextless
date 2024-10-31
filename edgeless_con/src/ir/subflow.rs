@@ -22,7 +22,7 @@ impl super::LogicalComponent for LogicalSubFlow {
     }
 
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId> {
-        self.instances.iter().map(|i| i.borrow().id.clone()).collect()
+        self.instances.iter().map(|i| i.borrow().id).collect()
     }
 
     fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn super::PhysicalComponent>> {

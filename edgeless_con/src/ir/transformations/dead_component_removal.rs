@@ -42,7 +42,7 @@ impl DeadComponentRemoval {
                     if dests.contains(&this) {
                         match src {
                             edgeless_api::function_instance::MappingNode::Port(port) => {
-                                if ports.logical_input_mapping.contains_key(&port) {
+                                if ports.logical_input_mapping.contains_key(port) {
                                     return true;
                                 }
                                 log::info!("Not an Active Input");
@@ -81,7 +81,7 @@ impl DeadComponentRemoval {
                 if let Some(source_port) = source.logical_ports().logical_input_mapping.get_mut(target_port_id) {
                     if let LogicalInput::Direct(sources) = source_port {
                         sources.retain(|(s_id, s_p_id)| s_id != source_component_id && s_p_id != source_port_id);
-                        if sources.len() == 0 {
+                        if sources.is_empty() {
                             remove = true;
                         }
                     }
@@ -131,12 +131,12 @@ impl DeadComponentRemoval {
                                 .collect(),
                         );
                         changed = true;
-                        return false;
+                        false
                     } else {
-                        return true;
+                        true
                     }
                 } else {
-                    return true;
+                    true
                 }
             });
         }
@@ -154,13 +154,13 @@ impl DeadComponentRemoval {
                         }
                         LogicalOutput::AnyOfTargets(targets) => {
                             targets.retain(|(target_id, target_port_id)| !(target_id == dest_id && target_port_id == dest_port_id));
-                            if targets.len() == 0 {
+                            if targets.is_empty() {
                                 remove = true;
                             }
                         }
                         LogicalOutput::AllOfTargets(targets) => {
                             targets.retain(|(target_id, target_port_id)| !(target_id == dest_id && target_port_id == dest_port_id));
-                            if targets.len() == 0 {
+                            if targets.is_empty() {
                                 remove = true;
                             }
                         }

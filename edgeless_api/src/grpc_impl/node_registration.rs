@@ -108,7 +108,7 @@ fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeReq
         x if x == crate::grpc_impl::api::UpdateNodeRequestType::Register as i32 => {
             let mut resource_providers = vec![];
             for resource_provider in &api_instance.resource_providers {
-                match parse_resource_provider_specification(&resource_provider) {
+                match parse_resource_provider_specification(resource_provider) {
                     Ok(val) => resource_providers.push(val),
                     Err(err) => {
                         return Err(anyhow::anyhow!("Ill-formed resource provider in UpdateNodeRequest message: {}", err));
@@ -230,11 +230,11 @@ fn serialize_resource_provider_specification(
     }
 }
 
-impl Into<crate::grpc_impl::api::LinkProviderSpecification> for crate::node_registration::LinkProviderSpecification {
-    fn into(self) -> crate::grpc_impl::api::LinkProviderSpecification {
+impl From<crate::node_registration::LinkProviderSpecification> for crate::grpc_impl::api::LinkProviderSpecification {
+    fn from(val: crate::node_registration::LinkProviderSpecification) -> Self {
         crate::grpc_impl::api::LinkProviderSpecification {
-            id: Some(self.provider_id.into()),
-            class: Some(self.class.into()),
+            id: Some(val.provider_id.into()),
+            class: Some(val.class.into()),
         }
     }
 }

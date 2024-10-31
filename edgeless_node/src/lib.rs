@@ -191,7 +191,7 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         clock_freq_cpu: user_node_capabilities.clock_freq_cpu.unwrap_or(clock_freq_cpu),
         num_cores: user_node_capabilities.num_cores.unwrap_or(sys.physical_core_count().unwrap_or(1) as u32),
         mem_size: user_node_capabilities.mem_size.unwrap_or(sys.total_memory() as u32 / (1024 * 1024)),
-        labels: user_node_capabilities.labels.unwrap_or(vec![]),
+        labels: user_node_capabilities.labels.unwrap_or_default(),
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
         runtimes,
@@ -214,7 +214,7 @@ pub async fn register_node(
         .await
         .node_registration_api()
         .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
-            settings.node_id.clone(),
+            settings.node_id,
             match settings.agent_url_announced.is_empty() {
                 true => settings.agent_url.clone(),
                 false => settings.agent_url_announced.clone(),
@@ -260,7 +260,7 @@ async fn fill_resources(
                         class_type: class_type.clone(),
                         client: resources::http_ingress::ingress_task(
                             data_plane.clone(),
-                            edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            edgeless_api::function_instance::InstanceId::new(node_id),
                             http_ingress_url.clone(),
                         )
                         .await,
@@ -285,7 +285,7 @@ async fn fill_resources(
                         client: Box::new(
                             resources::http_egress::EgressResourceProvider::new(
                                 data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
                         ),
@@ -310,7 +310,7 @@ async fn fill_resources(
                         client: Box::new(
                             resources::file_log::FileLogResourceProvider::new(
                                 data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
                         ),
@@ -335,7 +335,7 @@ async fn fill_resources(
                         client: Box::new(
                             resources::redis::RedisResourceProvider::new(
                                 data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
                         ),
@@ -358,11 +358,8 @@ async fn fill_resources(
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
                         client: Box::new(
-                            resources::dda::DDAResourceProvider::new(
-                                data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
-                            )
-                            .await,
+                            resources::dda::DDAResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
+                                .await,
                         ),
                     },
                 );
@@ -392,7 +389,7 @@ async fn fill_resources(
                         client: Box::new(
                             resources::ollama::OllamaResourceProvider::new(
                                 data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
                                 &settings.host,
                                 settings.port,
                                 settings.messages_number_limit,
@@ -423,7 +420,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the data plane.
     let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(
-        settings.general.node_id.clone(),
+        settings.general.node_id,
         settings.general.invocation_url.clone(),
         settings.general.invocation_url_coap.clone(),
     )
@@ -432,10 +429,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     // Create the telemetry provider.
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone())
         .await
-        .expect(&format!(
-            "could not build the telemetry provider at URL {}",
-            &settings.general.metrics_url
-        ));
+        .unwrap_or_else(|_| panic!("could not build the telemetry provider at URL {}", &settings.general.metrics_url));
 
     // List of runners supported by this node to be filled below depending on
     // the node's configuration.
@@ -539,7 +533,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the agent.
     let runtimes = runners.keys().map(|x| x.to_string()).collect::<Vec<String>>();
-    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id.clone(), data_plane.clone(), proxy_manager);
+    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id, data_plane.clone(), proxy_manager);
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
 
     // Wait for all the tasks to complete.
@@ -556,10 +550,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                 .link_providers()
                 .await
                 .into_iter()
-                .map(|(class, id)| edgeless_api::node_registration::LinkProviderSpecification {
-                    provider_id: id,
-                    class: class
-                })
+                .map(|(class, id)| edgeless_api::node_registration::LinkProviderSpecification { provider_id: id, class })
                 .collect()
         )
     );

@@ -26,7 +26,7 @@ impl GuestAPIHost {
         self.data_plane
             .send_alias(alias.to_string(), msg.to_string())
             .await
-            .map_err(|e| GuestAPIError::UnknownAlias)
+            .map_err(|_e| GuestAPIError::UnknownAlias)
     }
 
     pub async fn cast_raw(
@@ -42,10 +42,10 @@ impl GuestAPIHost {
     pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
-                return Ok(edgeless_dataplane::core::CallRet::Err);
+                Ok(edgeless_dataplane::core::CallRet::Err)
             },
             call_res = Box::pin(self.data_plane.call_alias(alias.to_string(), msg.to_string()).fuse()) => {
-                return Ok(call_res);
+                Ok(call_res)
             }
         }
     }
@@ -58,10 +58,10 @@ impl GuestAPIHost {
     ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
-                return Ok(edgeless_dataplane::core::CallRet::Err)
+                Ok(edgeless_dataplane::core::CallRet::Err)
             },
             call_res = Box::pin(self.data_plane.call(target, target_port, msg.to_string())).fuse() => {
-                return Ok(call_res)
+                Ok(call_res)
             }
         }
     }
@@ -74,7 +74,7 @@ impl GuestAPIHost {
     }
 
     pub async fn slf(&mut self) -> edgeless_api::function_instance::InstanceId {
-        self.instance_id.clone()
+        self.instance_id
     }
 
     pub async fn delayed_cast(&mut self, delay: u64, target_alias: &str, payload: &str) -> Result<(), GuestAPIError> {

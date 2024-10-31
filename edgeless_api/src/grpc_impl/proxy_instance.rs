@@ -103,26 +103,26 @@ impl crate::grpc_impl::api::proxy_instance_server::ProxyInstance for ProxyInstan
     }
 }
 
-impl Into<crate::grpc_impl::api::ProxyInstanceSpec> for crate::proxy_instance::ProxySpec {
-    fn into(self) -> crate::grpc_impl::api::ProxyInstanceSpec {
+impl From<crate::proxy_instance::ProxySpec> for crate::grpc_impl::api::ProxyInstanceSpec {
+    fn from(val: crate::proxy_instance::ProxySpec) -> Self {
         crate::grpc_impl::api::ProxyInstanceSpec {
-            id: Some(super::common::CommonConverters::serialize_instance_id(&self.instance_id)),
-            internal_inputs: self
+            id: Some(super::common::CommonConverters::serialize_instance_id(&val.instance_id)),
+            internal_inputs: val
                 .inner_inputs
                 .into_iter()
                 .map(|(k, v)| (k.0, super::common::CommonConverters::serialize_input(&v)))
                 .collect(),
-            internal_outputs: self
+            internal_outputs: val
                 .inner_outputs
                 .into_iter()
                 .map(|(k, v)| (k.0, super::common::CommonConverters::serialize_output(&v)))
                 .collect(),
-            external_inputs: self
+            external_inputs: val
                 .external_inputs
                 .into_iter()
                 .map(|(k, v)| (k.0, super::common::CommonConverters::serialize_input(&v)))
                 .collect(),
-            external_outputs: self
+            external_outputs: val
                 .external_outputs
                 .into_iter()
                 .map(|(k, v)| (k.0, super::common::CommonConverters::serialize_output(&v)))

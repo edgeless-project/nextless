@@ -21,7 +21,7 @@ impl super::Transformation for PhysicalConnectionMapper {
             .collect::<std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>>();
 
         for (component_id, _) in &components {
-            let mut component = workflow.get_component(&component_id).unwrap().borrow_mut();
+            let mut component = workflow.get_component(component_id).unwrap().borrow_mut();
             let (logical_ports, physical_instances) = component.split_view();
 
             for (output_id, output) in &logical_ports.logical_output_mapping {
@@ -46,7 +46,7 @@ impl super::Transformation for PhysicalConnectionMapper {
                                     .get(target_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|target| (target.clone(), port_id.clone()))
+                                    .map(|target| (*target, port_id.clone()))
                                     .collect(),
                             )
                         }
@@ -66,7 +66,7 @@ impl super::Transformation for PhysicalConnectionMapper {
                                     .get(target_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|target| (target.clone(), port_id.clone()))
+                                    .map(|target| (*target, port_id.clone()))
                                     .collect(),
                             )
                         }

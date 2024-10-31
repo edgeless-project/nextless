@@ -11,15 +11,20 @@ pub struct MulticastController {
     active: std::collections::HashMap<edgeless_api::link::LinkInstanceId, ActiveMulticastLink>,
 }
 
+impl Default for MulticastController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MulticastController {
     pub fn new() -> MulticastController {
         let pool_free: Vec<_> = std::ops::Range { start: 153, end: 253 }
-            .into_iter()
             .map(|i| std::net::Ipv4Addr::new(224, 0, 0, i))
             .collect();
 
         MulticastController {
-            pool_free: pool_free,
+            pool_free,
             active: std::collections::HashMap::new(),
         }
     }
@@ -35,7 +40,7 @@ impl edgeless_api::link::LinkController for MulticastController {
             self.active.insert(
                 id.clone(),
                 ActiveMulticastLink {
-                    addr: ip.clone(),
+                    addr: ip,
                     active_nodes: nodes,
                 },
             );
@@ -48,7 +53,7 @@ impl edgeless_api::link::LinkController for MulticastController {
     fn config_for(&self, link: edgeless_api::link::LinkInstanceId, _node: edgeless_api::function_instance::NodeId) -> Option<Vec<u8>> {
         if let Some(active_link) = self.active.get(&link) {
             let cfg = crate::common::MulticastConfig {
-                ip: active_link.addr.clone(),
+                ip: active_link.addr,
                 port: 9999,
             };
             Some(serde_json::to_string(&cfg).unwrap().into_bytes())

@@ -18,7 +18,7 @@ impl super::LogicalComponent for LogicalActor {
     }
 
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId> {
-        self.instances.iter().map(|i| i.borrow().id.clone()).collect()
+        self.instances.iter().map(|i| i.borrow().id).collect()
     }
 
     fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn super::PhysicalComponent>> {
@@ -86,18 +86,8 @@ impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
     fn from(function_req: edgeless_api::workflow_instance::WorkflowFunction) -> Self {
         Self {
             image: ActorImage {
-                enabled_inputs: function_req
-                    .function_class_specification
-                    .function_class_inputs
-                    .iter()
-                    .map(|(i, _)| i.clone())
-                    .collect(),
-                enabled_outputs: function_req
-                    .function_class_specification
-                    .function_class_outputs
-                    .iter()
-                    .map(|(o, _)| o.clone())
-                    .collect(),
+                enabled_inputs: function_req.function_class_specification.function_class_inputs.keys().cloned().collect(),
+                enabled_outputs: function_req.function_class_specification.function_class_outputs.keys().cloned().collect(),
                 class: ActorClass {
                     id: ActorIdentifier {
                         id: function_req.function_class_specification.function_class_id,

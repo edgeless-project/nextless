@@ -18,7 +18,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                     match val {
                         crate::common::Output::Single(instance_id, port_id) => {
                             edgeless_api_core::common::Output::Single(edgeless_api_core::common::Target {
-                                instance_id: instance_id.clone(),
+                                instance_id: *instance_id,
                                 port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
                             })
                         }
@@ -28,7 +28,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                                 id_vec
                                     .0
                                     .push(edgeless_api_core::common::Target {
-                                        instance_id: instance_id.clone(),
+                                        instance_id: *instance_id,
                                         port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
                                     })
                                     .unwrap();
@@ -41,7 +41,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                                 id_vec
                                     .0
                                     .push(edgeless_api_core::common::Target {
-                                        instance_id: instance_id.clone(),
+                                        instance_id: *instance_id,
                                         port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
                                     })
                                     .unwrap();
@@ -56,7 +56,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
 
         for (key, val) in &instance_specification.configuration {
             configuration
-                .push((&key, &val))
+                .push((key, val))
                 .map_err(|_| anyhow::anyhow!("Too many configuration options"))?;
         }
 
@@ -104,7 +104,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                 match val {
                     crate::common::Output::Single(instance_id, port_id) => {
                         edgeless_api_core::common::Output::Single(edgeless_api_core::common::Target {
-                            instance_id: instance_id.clone(),
+                            instance_id: *instance_id,
                             port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
                         })
                     }
@@ -114,7 +114,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                             id_vec
                                 .0
                                 .push(edgeless_api_core::common::Target {
-                                    instance_id: instance_id.clone(),
+                                    instance_id: *instance_id,
                                     port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
                                 })
                                 .unwrap();
@@ -127,7 +127,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                             id_vec
                                 .0
                                 .push(edgeless_api_core::common::Target {
-                                    instance_id: instance_id.clone(),
+                                    instance_id: *instance_id,
                                     port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
                                 })
                                 .unwrap();

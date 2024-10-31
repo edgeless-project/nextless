@@ -22,7 +22,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let trait_base: String = parsed_spec
         .id
-        .split("_")
+        .split('_')
         .map(|part| {
             // https://stackoverflow.com/a/69996191
             let mut s = part.to_string().to_lowercase();
@@ -39,9 +39,9 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mut call_inputs = Vec::new();
 
     let handlers : Vec<_> = parsed_spec.inputs.iter().map(|(key, val)| {
-        let type_name = val.data_type.replace(".", "_").to_uppercase();
+        let type_name = val.data_type.replace('.', "_").to_uppercase();
         let type_ident = quote::format_ident!("{}", type_name);
-        types.entry(type_ident.clone()).and_modify(|(input, output)| *input = true).or_insert((true, false));
+        types.entry(type_ident.clone()).and_modify(|(input, _output)| *input = true).or_insert((true, false));
 
         let feature = format!("input_{}", key);
 
@@ -66,9 +66,9 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 // assert!(val.return_data_type.is_some());
 
                 let (return_type_ident, return_statement) = if let Some(rdt) = val.return_data_type.as_ref() {
-                    let return_type_name = rdt.replace(".", "_").to_uppercase();
+                    let return_type_name = rdt.replace('.', "_").to_uppercase();
                     let return_type_ident = quote::format_ident!("{}", return_type_name);
-                    types.entry(return_type_ident.clone()).and_modify(|(input, output)| *output = true).or_insert((false, true));
+                    types.entry(return_type_ident.clone()).and_modify(|(_input, output)| *output = true).or_insert((false, true));
 
                     let return_statement = quote! {
                         let serialized = <<#parsed_ident as #trait_name>::#return_type_ident as edgeless_function_core::Serialize>::serialize(&res);
@@ -115,11 +115,11 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .outputs
         .iter()
         .map(|(output_id, output_spec)| {
-            let type_name = output_spec.data_type.replace(".", "_").to_uppercase();
+            let type_name = output_spec.data_type.replace('.', "_").to_uppercase();
             let type_ident = quote::format_ident!("{}", type_name);
             types
                 .entry(type_ident.clone())
-                .and_modify(|(input, output)| *output = true)
+                .and_modify(|(_input, output)| *output = true)
                 .or_insert((false, true));
 
             let feature = format!("output_{}", output_id);
@@ -140,11 +140,11 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 }
                 PortMethod::CALL => {
                     let (return_type_ident, return_statement) = if let Some(rdt) = output_spec.return_data_type.as_ref() {
-                        let return_type_name = rdt.replace(".", "_").to_uppercase();
+                        let return_type_name = rdt.replace('.', "_").to_uppercase();
                         let return_type_ident = quote::format_ident!("{}", return_type_name);
                         types
                             .entry(return_type_ident.clone())
-                            .and_modify(|(input, output)| *input = true)
+                            .and_modify(|(input, _output)| *input = true)
                             .or_insert((true, false));
 
                         let return_statement = quote! {

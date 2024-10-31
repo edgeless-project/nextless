@@ -41,8 +41,8 @@ pub struct Mapping {
 #[derive(Debug, serde::Deserialize, PartialEq)]
 #[serde(tag = "type", content = "port_id")]
 pub enum MappingNode {
-    PORT(String),
-    SIDE_EFFECT,
+    Port(String),
+    SideEffect,
 }
 
 pub trait Deserialize {

@@ -29,7 +29,7 @@ impl FileLogResource {
     async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, filename: &str, add_timestamp: bool) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
 
-        let mut outfile = std::fs::OpenOptions::new().create(true).write(true).append(true).open(filename)?;
+        let mut outfile = std::fs::OpenOptions::new().create(true).append(true).open(filename)?;
 
         log::info!("FileLogResource created, writing to file: {}", filename);
 
@@ -104,7 +104,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         if let Some(filename) = instance_specification.configuration.get("filename") {
             let mut lck = self.inner.lock().await;
 
-            let dataplane_handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id.clone()).await;
+            let dataplane_handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id).await;
 
             match FileLogResource::new(
                 dataplane_handle,
@@ -114,7 +114,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             .await
             {
                 Ok(resource) => {
-                    lck.instances.insert(instance_specification.resource_id.clone(), resource);
+                    lck.instances.insert(instance_specification.resource_id, resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(
                         instance_specification.resource_id,
                     ));

@@ -34,9 +34,9 @@ impl MulticastLink {
 
             assert!(addr.is_multicast());
 
-            let sock = tokio::net::UdpSocket::bind(sock_addr.clone()).await.unwrap();
+            let sock = tokio::net::UdpSocket::bind(sock_addr).await.unwrap();
             sock.join_multicast_v4(addr, "0.0.0.0".parse().unwrap()).unwrap();
-            let mut buffer = vec![0 as u8; 5000];
+            let mut buffer = vec![0_u8; 5000];
 
             loop {
                 tokio::select! {
@@ -63,10 +63,16 @@ impl MulticastLink {
         });
 
         MulticastLink {
-            reader: reader,
-            writer: Box::new(MulticastWriter { sender: sender }),
+            reader,
+            writer: Box::new(MulticastWriter { sender }),
             task: std::sync::Arc::new(tokio::sync::Mutex::new(task)),
         }
+    }
+}
+
+impl Default for MulticastProvider {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -107,7 +113,7 @@ impl edgeless_api::link::LinkProvider for MulticastProvider {
         self.links
             .lock()
             .await
-            .get_mut(&link_id)
+            .get_mut(link_id)
             .unwrap()
             .as_mut()
             .reader
@@ -116,7 +122,7 @@ impl edgeless_api::link::LinkProvider for MulticastProvider {
             .push(reader);
     }
     async fn get_writer(&mut self, link_id: &edgeless_api::link::LinkInstanceId) -> Option<Box<dyn edgeless_api::link::LinkWriter>> {
-        Some(self.links.lock().await.get_mut(&link_id).unwrap().as_mut().writer.clone())
+        Some(self.links.lock().await.get_mut(link_id).unwrap().as_mut().writer.clone())
     }
 }
 

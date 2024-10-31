@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use toml; // for parse
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -188,7 +187,7 @@ async fn main() -> anyhow::Result<()> {
                                                                 return_data_type: port_spec
                                                                     .return_data_type
                                                                     .clone()
-                                                                    .and_then(|dt| Some(edgeless_api::function_instance::PortDataType(dt))),
+                                                                    .map(edgeless_api::function_instance::PortDataType),
                                                             },
                                                         )
                                                     })
@@ -214,7 +213,7 @@ async fn main() -> anyhow::Result<()> {
                                                                 return_data_type: port_spec
                                                                     .return_data_type
                                                                     .clone()
-                                                                    .and_then(|dt| Some(edgeless_api::function_instance::PortDataType(dt))),
+                                                                    .map(edgeless_api::function_instance::PortDataType),
                                                             },
                                                         )
                                                     })
@@ -318,7 +317,7 @@ async fn main() -> anyhow::Result<()> {
                                         println!("{:?}", err);
                                     }
                                     SpawnWorkflowResponse::WorkflowInstance(val) => {
-                                        println!("{}", val.workflow_id.workflow_id.to_string());
+                                        println!("{}", val.workflow_id.workflow_id);
                                     }
                                 }
                                 log::info!("{:?}", response)

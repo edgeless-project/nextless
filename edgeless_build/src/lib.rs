@@ -31,7 +31,7 @@ pub fn rust_to_wasm(
         config,
         None,
         false,
-        &vec!["wasm32-unknown-unknown".to_string()],
+        &["wasm32-unknown-unknown".to_string()],
         cargo::core::compiler::CompileMode::Build,
     )?;
     build_config.requested_profile = cargo::util::interning::InternedString::new("release");
@@ -40,7 +40,7 @@ pub fn rust_to_wasm(
         features: std::rc::Rc::new(
             enabled_features
                 .iter()
-                .map(|feat| cargo::core::FeatureValue::new(cargo::util::interning::InternedString::new(&feat)))
+                .map(|feat| cargo::core::FeatureValue::new(cargo::util::interning::InternedString::new(feat)))
                 .collect(),
         ),
         all_features: enable_all_features,
@@ -48,7 +48,7 @@ pub fn rust_to_wasm(
     };
 
     let compile_options = cargo::ops::CompileOptions {
-        build_config: build_config,
+        build_config,
         cli_features: feature_settings,
         spec: cargo::ops::Packages::Packages(Vec::new()),
         filter: cargo::ops::CompileFilter::Default {
@@ -69,7 +69,7 @@ pub fn rust_to_wasm(
         .unwrap()
         .to_string();
 
-    let out_file = build_dir.join(format!("function.wasm")).to_str().unwrap().to_string();
+    let out_file = build_dir.join("function.wasm").to_str().unwrap().to_string();
 
     println!(
         "{:?}",

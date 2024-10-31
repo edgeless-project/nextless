@@ -34,14 +34,14 @@ impl MessagingTestAPI for MessagingTest {
         }
     }
 
-    fn handle_call_test_input_reply(_src: InstanceId, message: String) -> String {
+    fn handle_call_test_input_reply(_src: InstanceId, _message: String) -> String {
         "test_reply".to_string()
     }
 
-    fn handle_call_test_input_noreply(_src: InstanceId, message: String){
+    fn handle_call_test_input_noreply(_src: InstanceId, _message: String){
     }
 
-    fn handle_internal(message: &[u8]) {}
+    fn handle_internal(_message: &[u8]) {}
 
     fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();

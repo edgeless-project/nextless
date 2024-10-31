@@ -54,7 +54,7 @@ impl ControllerTask {
         Self {
             request_receiver,
             nodes: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
-            cluster_id: cluster_id,
+            cluster_id,
             peer_clusters: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             link_controllers: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::from([(
                 edgeless_api::link::LinkType("MULTICAST".to_string()),
@@ -153,7 +153,7 @@ impl ControllerTask {
                 .iter()
                 .filter_map(|(id, a)| {
                     let instances: Vec<_> = a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect();
-                    if instances.len() > 0 {
+                    if !instances.is_empty() {
                         Some(edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: id.to_string(),
                             node_ids: instances,
@@ -173,7 +173,7 @@ impl ControllerTask {
             self.stop_workflow(&wf_id).await;
         }
 
-        let reply = match res {
+        match res {
             Ok(_) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(desc)),
             Err(err) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
                 edgeless_api::common::ResponseError {
@@ -181,9 +181,7 @@ impl ControllerTask {
                     detail: Some(err.join(";")),
                 },
             )),
-        };
-
-        reply
+        }
     }
 
     async fn stop_workflow(&mut self, wf_id: &edgeless_api::workflow_instance::WorkflowId) {
@@ -242,7 +240,7 @@ impl ControllerTask {
 
     async fn patch_workflow(&mut self, req: &edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         let id = edgeless_api::workflow_instance::WorkflowId {
-            workflow_id: req.function_id.function_id.clone(),
+            workflow_id: req.function_id.function_id,
         };
         if let Some(wf) = self.active_workflows.get_mut(&id) {
             let required_changes = tokio::task::block_in_place(|| wf.patch_external_links(req.clone()));
@@ -282,7 +280,7 @@ impl ControllerTask {
         };
 
         self.nodes.lock().await.insert(
-            node_id.clone(),
+            node_id,
             WorkerNode {
                 agent_url,
                 invocation_url: invocation_url.clone(),
@@ -307,11 +305,8 @@ impl ControllerTask {
             },
         );
 
-        self.send_peer_updates(vec![edgeless_api::node_management::UpdatePeersRequest::Add(
-            node_id.clone(),
-            invocation_url,
-        )])
-        .await;
+        self.send_peer_updates(vec![edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url)])
+            .await;
 
         // Send information about all nodes to the new node.
         let updates: Vec<_> = self
@@ -322,7 +317,7 @@ impl ControllerTask {
             .filter_map(|(n_id, n_spec)| {
                 if n_id != &node_id {
                     Some(edgeless_api::node_management::UpdatePeersRequest::Add(
-                        n_id.clone(),
+                        *n_id,
                         n_spec.invocation_url.clone(),
                     ))
                 } else {
@@ -348,7 +343,7 @@ impl ControllerTask {
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
         let old_value = self.nodes.lock().await.remove(&node_id);
         if old_value.is_some() {
-            self.handle_node_removal(&std::collections::HashSet::from_iter(vec![node_id.clone()].into_iter()))
+            self.handle_node_removal(&std::collections::HashSet::from_iter(vec![node_id].into_iter()))
                 .await;
             self.send_peer_updates(vec![edgeless_api::node_management::UpdatePeersRequest::Del(node_id)])
                 .await;
@@ -463,7 +458,7 @@ impl ControllerTask {
             }
         }
 
-        if error_msg.len() == 0 {
+        if error_msg.is_empty() {
             Ok(())
         } else {
             Err(error_msg)
@@ -490,7 +485,7 @@ impl ControllerTask {
             .await
             .ok_or(format!("No function client for node: {}", &function_id.node_id))?
             .start(edgeless_api::function_instance::SpawnFunctionRequest {
-                instance_id: function_id.clone(),
+                instance_id: function_id,
                 code: edgeless_api::function_instance::FunctionClassSpecification {
                     function_class_id: image.class.id.id.clone(),
                     function_class_type: image.format.clone(),
@@ -519,15 +514,11 @@ impl ControllerTask {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
                     log::warn!("function instance creation rejected: {}", error);
-                    return Err(format!("function instance creation rejected: {} ", error));
+                    Err(format!("function instance creation rejected: {} ", error))
                 }
-                edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    return Ok(());
-                }
+                edgeless_api::common::StartComponentResponse::InstanceId(id) => Ok(()),
             },
-            Err(err) => {
-                return Err(format!("failed interaction when creating a function instance: {}", err));
-            }
+            Err(err) => Err(format!("failed interaction when creating a function instance: {}", err)),
         }
     }
 
@@ -546,7 +537,7 @@ impl ControllerTask {
             .await
             .ok_or(format!("No resource client for node: {}", &resource_id.node_id))?
             .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
-                resource_id: resource_id.clone(),
+                resource_id,
                 class_type: class_type.clone(),
                 configuration: configurations.clone(),
                 output_mapping: output_mapping.clone(),
@@ -558,16 +549,14 @@ impl ControllerTask {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
                     log::warn!("resource start rejected: {}", error);
-                    return Err(format!("resource start rejected: {} ", error));
+                    Err(format!("resource start rejected: {} ", error))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     log::info!("workflow {} resource {} started with fid {}", wf_id.to_string(), &r_name, &id);
-                    return Ok(());
+                    Ok(())
                 }
             },
-            Err(err) => {
-                return Err(format!("failed interaction when starting a resource: {}", err));
-            }
+            Err(err) => Err(format!("failed interaction when starting a resource: {}", err)),
         }
     }
 
@@ -618,7 +607,7 @@ impl ControllerTask {
         // Second, remove all those nodes from the map of clients.
         for node_id in to_be_disconnected.iter() {
             log::info!("disconnected node not replying to keep-alive: {}", &node_id);
-            let val = self.nodes.lock().await.remove(&node_id);
+            let val = self.nodes.lock().await.remove(node_id);
             assert!(val.is_some());
         }
 
@@ -651,7 +640,7 @@ impl ControllerTask {
                     client_desc.health_status = health_status;
                 }
                 Err(_) => {
-                    dead_nodes.insert(node_id.clone());
+                    dead_nodes.insert(*node_id);
                 }
             };
         }
@@ -662,7 +651,7 @@ impl ControllerTask {
         for wf_id in self
             .active_workflows
             .keys()
-            .map(|k| k.clone())
+            .cloned()
             .collect::<Vec<edgeless_api::workflow_instance::WorkflowId>>()
         {
             self.handle_node_removal_for_workflow(removed_nodes, wf_id.clone()).await;
@@ -703,10 +692,8 @@ impl ControllerTask {
                     })
                     .await
                 {
-                    Ok(_) => return Ok(()),
-                    Err(err) => {
-                        return Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err));
-                    }
+                    Ok(_) => Ok(()),
+                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
                 }
             }
             super::ComponentType::Resource => {
@@ -721,10 +708,8 @@ impl ControllerTask {
                     })
                     .await
                 {
-                    Ok(_) => return Ok(()),
-                    Err(err) => {
-                        return Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err));
-                    }
+                    Ok(_) => Ok(()),
+                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
                 }
             }
             super::ComponentType::SubFlow => {
@@ -739,10 +724,8 @@ impl ControllerTask {
                     })
                     .await
                 {
-                    Ok(_) => return Ok(()),
-                    Err(err) => {
-                        return Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err));
-                    }
+                    Ok(_) => Ok(()),
+                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
                 }
             }
         }
@@ -798,7 +781,7 @@ impl ControllerTask {
                 .create(edgeless_api::link::CreateLinkRequest {
                     id: link_id,
                     provider: link_provider_id,
-                    config: config,
+                    config,
                     direction: edgeless_api::link::LinkDirection::BiDi,
                 })
                 .await
@@ -867,13 +850,13 @@ impl ControllerTask {
     }
 
     async fn get_api_for_url(agent_url: &str) -> Box<dyn edgeless_api::agent::AgentAPI + Send> {
-        let (proto, host, port) = edgeless_api::util::parse_http_host(&agent_url).unwrap();
+        let (proto, host, port) = edgeless_api::util::parse_http_host(agent_url).unwrap();
         match proto {
             edgeless_api::util::Proto::COAP => {
                 let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
                 Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
             }
-            _ => Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await),
+            _ => Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(agent_url).await),
         }
     }
 }

@@ -93,8 +93,8 @@ impl OrchestrationLogic {
                 let mut candidates = vec![];
                 let mut high: f32 = 0.0;
                 for (node_id, node_desc) in node_pool {
-                    if Self::is_node_feasible(compute_type, &reqs, &node_id, &node_desc.capabilities, &node_desc.resource_providers) {
-                        candidates.push((node_id.clone(), node_desc.weight));
+                    if Self::is_node_feasible(compute_type, &reqs, node_id, &node_desc.capabilities, &node_desc.resource_providers) {
+                        candidates.push((*node_id, node_desc.weight));
                         high += &node_desc.weight;
                     }
                 }
@@ -119,10 +119,8 @@ impl OrchestrationLogic {
         if available_runtimes.iter().any(|x| x.as_str() == requested_runtime) {
             return true;
         }
-        if requested_runtime == "RUST" {
-            if available_runtimes.iter().any(|x| x.as_str() == "RUST_WASM") {
-                return true;
-            }
+        if requested_runtime == "RUST" && available_runtimes.iter().any(|x| x.as_str() == "RUST_WASM") {
+            return true;
         }
 
         false

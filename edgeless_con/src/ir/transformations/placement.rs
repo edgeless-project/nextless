@@ -71,32 +71,30 @@ impl super::Transformation for DefaultPlacement {
 
         for (_, subflow) in &mut slf.subflows {
             let mut subflow = subflow.borrow_mut();
-            if subflow.instances.is_empty() {
-                if subflow.instances.is_empty() {
-                    let dst = select_cluster_for_subflow(&subflow, &self.peer_clusters.blocking_lock());
-                    if let Some(dst) = dst {
-                        subflow.instances.push(std::cell::RefCell::new(subflow::PhysicalSubFlow {
-                            id: edgeless_api::function_instance::InstanceId::new(dst),
-                            desired_mapping: PhysicalPorts::default(),
-                            materialized: None,
-                        }))
-                    }
+            if subflow.instances.is_empty() && subflow.instances.is_empty() {
+                let dst = select_cluster_for_subflow(&subflow, &self.peer_clusters.blocking_lock());
+                if let Some(dst) = dst {
+                    subflow.instances.push(std::cell::RefCell::new(subflow::PhysicalSubFlow {
+                        id: edgeless_api::function_instance::InstanceId::new(dst),
+                        desired_mapping: PhysicalPorts::default(),
+                        materialized: None,
+                    }))
                 }
             }
         }
 
         {
             let mut proxy = slf.proxy.borrow_mut();
-            if !proxy.logical_ports.logical_input_mapping.is_empty() || !proxy.logical_ports.logical_output_mapping.is_empty() {
-                if proxy.instances.is_empty() {
-                    let dst = select_node_for_proxy(&proxy, &self.nodes.blocking_lock());
-                    if let Some(dst) = dst {
-                        proxy.instances.push(std::cell::RefCell::new(proxy::PhyiscalProxy {
-                            id: edgeless_api::function_instance::InstanceId::new(dst),
-                            desired_mapping: PhysicalPorts::default(),
-                            materialized: None,
-                        }));
-                    }
+            if (!proxy.logical_ports.logical_input_mapping.is_empty() || !proxy.logical_ports.logical_output_mapping.is_empty())
+                && proxy.instances.is_empty()
+            {
+                let dst = select_node_for_proxy(&proxy, &self.nodes.blocking_lock());
+                if let Some(dst) = dst {
+                    proxy.instances.push(std::cell::RefCell::new(proxy::PhyiscalProxy {
+                        id: edgeless_api::function_instance::InstanceId::new(dst),
+                        desired_mapping: PhysicalPorts::default(),
+                        materialized: None,
+                    }));
                 }
             }
         }
@@ -109,9 +107,9 @@ fn select_node_for_resource(
 ) -> Option<edgeless_api::function_instance::NodeId> {
     if let Some((id, _)) = nodes
         .iter()
-        .find(|(_, n)| n.resource_providers.iter().find(|(_, r)| r.class_type == resource.class).is_some())
+        .find(|(_, n)| n.resource_providers.iter().any(|(_, r)| r.class_type == resource.class))
     {
-        Some(id.clone())
+        Some(*id)
     } else {
         None
     }
@@ -123,19 +121,19 @@ fn select_node_for_proxy(
 ) -> Option<edgeless_api::function_instance::NodeId> {
     for (node_id, node) in nodes {
         if node.is_proxy {
-            return Some(node_id.clone());
+            return Some(*node_id);
         }
     }
-    return None;
+    None
 }
 
 fn select_cluster_for_subflow(
     subflow: &subflow::LogicalSubFlow,
     clusters: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>,
 ) -> Option<edgeless_api::function_instance::NodeId> {
-    for (cluster_id, cluster) in clusters {
-        // TODO Proper Selection
-        return Some(cluster_id.clone());
-    }
-    return None;
+    // for (cluster_id, cluster) in clusters {
+    //     // TODO Proper Selection
+    //     return Some(*cluster_id);
+    // }
+    None
 }

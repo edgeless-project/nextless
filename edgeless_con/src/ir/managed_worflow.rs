@@ -79,7 +79,7 @@ impl ManagedWorkflow {
             for (node, link_provider_id, node_config, node_materialized) in &link.nodes {
                 if !node_materialized {
                     changes.push(super::RequiredChange::CreateLinkOnNode {
-                        node_id: node.clone(),
+                        node_id: *node,
                         provider_id: link_provider_id.clone(),
                         link_id: link_id.clone(),
                         config: node_config.clone(),
@@ -97,7 +97,7 @@ impl ManagedWorkflow {
                         || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
                     {
                         changes.push(super::RequiredChange::PatchFunction {
-                            function_id: current.id.clone(),
+                            function_id: current.id,
                             function_name: f_name.clone(),
                             input_mapping: current.desired_mapping.physical_input_mapping.clone(),
                             output_mapping: current.desired_mapping.physical_output_mapping.clone(),
@@ -105,7 +105,7 @@ impl ManagedWorkflow {
                     }
                 } else {
                     changes.push(super::RequiredChange::StartFunction {
-                        function_id: current.id.clone(),
+                        function_id: current.id,
                         function_name: f_name.clone(),
                         image: if let Some(custom_image) = &current.image {
                             custom_image.clone()
@@ -133,7 +133,7 @@ impl ManagedWorkflow {
                         || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
                     {
                         changes.push(super::RequiredChange::PatchResource {
-                            resource_id: current.id.clone(),
+                            resource_id: current.id,
                             resource_name: r_name.clone(),
                             input_mapping: current.desired_mapping.physical_input_mapping.clone(),
                             output_mapping: current.desired_mapping.physical_output_mapping.clone(),
@@ -141,7 +141,7 @@ impl ManagedWorkflow {
                     }
                 } else {
                     changes.push(super::RequiredChange::StartResource {
-                        resource_id: current.id.clone(),
+                        resource_id: current.id,
                         resource_name: r_name.clone(),
                         class_type: resource.class.clone(),
                         input_mapping: current.desired_mapping.physical_input_mapping.clone(),
@@ -156,7 +156,7 @@ impl ManagedWorkflow {
             }
         }
 
-        for (s_name, subflow) in &mut self.wf.subflows {
+        for (_s_name, subflow) in &mut self.wf.subflows {
             let subflow = subflow.borrow_mut();
             for i in &subflow.instances {
                 let current = i.borrow_mut();
@@ -165,14 +165,14 @@ impl ManagedWorkflow {
                         || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
                     {
                         changes.push(super::RequiredChange::PatchSubflow {
-                            subflow_id: current.id.clone(),
+                            subflow_id: current.id,
                             input_mapping: current.desired_mapping.physical_input_mapping.clone(),
                             output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                         });
                     }
                 } else {
                     changes.push(super::RequiredChange::CreateSubflow {
-                        subflow_id: current.id.clone(),
+                        subflow_id: current.id,
                         spawn_req: edgeless_api::workflow_instance::SpawnWorkflowRequest {
                             workflow_functions: Vec::new(),
                             workflow_resources: Vec::new(),
@@ -182,7 +182,7 @@ impl ManagedWorkflow {
                                 .iter()
                                 .map(|(id, physical_port)| edgeless_api::workflow_instance::WorkflowIngressProxy {
                                     id: id.0.clone(),
-                                    inner_output: subflow.logical_ports.logical_output_mapping.get(&id).unwrap().clone(),
+                                    inner_output: subflow.logical_ports.logical_output_mapping.get(id).unwrap().clone(),
                                     external_input: physical_port.clone(),
                                 })
                                 .collect(),
@@ -192,7 +192,7 @@ impl ManagedWorkflow {
                                 .iter()
                                 .map(|(id, physical_port)| edgeless_api::workflow_instance::WorkflowEgressProxy {
                                     id: id.0.clone(),
-                                    inner_input: match subflow.logical_ports.logical_input_mapping.get(&id).unwrap().clone() {
+                                    inner_input: match subflow.logical_ports.logical_input_mapping.get(id).unwrap().clone() {
                                         super::LogicalInput::Direct(vec) => edgeless_api::workflow_instance::PortMapping::AnyOfTargets(vec),
                                         super::LogicalInput::Topic(topic) => edgeless_api::workflow_instance::PortMapping::Topic(topic),
                                     },
@@ -215,7 +215,7 @@ impl ManagedWorkflow {
                         || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
                     {
                         changes.push(super::RequiredChange::PatchProxy {
-                            proxy_id: current.id.clone(),
+                            proxy_id: current.id,
                             internal_inputs: current.desired_mapping.physical_input_mapping.clone(),
                             internal_outputs: current.desired_mapping.physical_output_mapping.clone(),
                             external_inputs: prx.external_ports.external_input_mapping.clone(),
@@ -223,7 +223,7 @@ impl ManagedWorkflow {
                         })
                     } else {
                         changes.push(super::RequiredChange::CrateProxy {
-                            proxy_id: current.id.clone(),
+                            proxy_id: current.id,
                             internal_inputs: current.desired_mapping.physical_input_mapping.clone(),
                             internal_outputs: current.desired_mapping.physical_output_mapping.clone(),
                             external_inputs: prx.external_ports.external_input_mapping.clone(),

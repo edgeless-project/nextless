@@ -51,7 +51,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         let serialized_state = state_handle.get().await;
 
         let guest_api_host = crate::base_runtime::guest_api::GuestAPIHost {
-            instance_id: instance_id.clone(),
+            instance_id,
             data_plane: data_plane.clone(),
             state_handle,
             telemetry_handle: telemetry_handle.fork(std::collections::BTreeMap::new()),
@@ -67,9 +67,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 spawn_req.code.function_class_code.clone(),
                 data_plane.clone(),
                 serialized_state,
-                spawn_req.annotations.get("init-payload").map(|x| x.clone()),
+                spawn_req.annotations.get("init-payload").cloned(),
                 runtime_api,
-                instance_id.clone(),
+                instance_id,
             )
             .await,
         );
@@ -175,10 +175,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
-            .init(
-                self.init_payload.as_ref().map(|x| x.as_str()),
-                self.serialized_state.as_ref().map(|x| x.as_str()),
-            )
+            .init(self.init_payload.as_deref(), self.serialized_state.as_deref())
             .await?;
 
         self.telemetry_handle.observe(
@@ -218,7 +215,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         target_port: edgeless_api::function_instance::PortId,
     ) -> Result<(), super::FunctionInstanceError> {
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id.clone(), target_port, payload).await,
+            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, target_port, payload).await,
             edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, target_port, payload, channel_id).await,
             _ => {
                 log::debug!("Unprocessed Message");
@@ -293,10 +290,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn exit(&mut self, exit_status: Result<(), super::FunctionInstanceError>) {
         self.runtime_api
-            .send(super::runtime::RuntimeRequest::FunctionExit(
-                self.instance_id.clone(),
-                exit_status.clone(),
-            ))
+            .send(super::runtime::RuntimeRequest::FunctionExit(self.instance_id, exit_status.clone()))
             .await
             .unwrap_or_else(|_| log::error!("FunctionInstance outlived runner."));
 

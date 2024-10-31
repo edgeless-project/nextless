@@ -102,7 +102,7 @@ impl Agent {
                         log::error!("No instance_id provided for SpawnFunctionRequest!");
                         continue;
                     }
-                    component_id_to_class_map.insert(spawn_req.instance_id.clone(), spawn_req.code.function_class_type.clone());
+                    component_id_to_class_map.insert(spawn_req.instance_id, spawn_req.code.function_class_type.clone());
 
                     // Get runner for function_class of spawn_req
                     match runners.get_mut(&spawn_req.code.function_class_type) {
@@ -221,7 +221,7 @@ impl Agent {
                                 id.node_id,
                                 id.function_id
                             );
-                            resource_instances.insert(id.clone(), provider_id.clone());
+                            resource_instances.insert(id, provider_id.clone());
                             responder
                                 .send(Ok(edgeless_api::common::StartComponentResponse::InstanceId(id)))
                                 .unwrap_or_else(|_| log::warn!("Responder Send Error"));
@@ -352,7 +352,7 @@ impl Agent {
         Box::new(AgentClient {
             function_instance_client: Box::new(FunctionInstanceNodeClient {
                 sender: self.sender.clone(),
-                node_id: self.node_id.clone(),
+                node_id: self.node_id,
             }),
             node_management_client: Box::new(NodeManagementClient { sender: self.sender.clone() }),
             resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
@@ -403,8 +403,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        let request = request;
-        let f_id = request.instance_id.clone();
+        let f_id = request.instance_id;
         match self.sender.send(AgentRequest::Spawn(request)).await {
             Ok(_) => Ok(edgeless_api::common::StartComponentResponse::InstanceId(f_id)),
             Err(err) => Err(anyhow::anyhow!(

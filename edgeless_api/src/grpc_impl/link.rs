@@ -93,14 +93,14 @@ impl TryFrom<crate::grpc_impl::api::CreateLinkInstanceRequest> for crate::link::
     }
 }
 
-impl Into<crate::grpc_impl::api::CreateLinkInstanceRequest> for crate::link::CreateLinkRequest {
-    fn into(self) -> crate::grpc_impl::api::CreateLinkInstanceRequest {
-        let direction: crate::grpc_impl::api::LinkDirection = self.direction.into();
+impl From<crate::link::CreateLinkRequest> for crate::grpc_impl::api::CreateLinkInstanceRequest {
+    fn from(val: crate::link::CreateLinkRequest) -> Self {
+        let direction: crate::grpc_impl::api::LinkDirection = val.direction.into();
 
         crate::grpc_impl::api::CreateLinkInstanceRequest {
-            id: Some(self.id.into()),
-            provider_id: Some(self.provider.into()),
-            config: self.config,
+            id: Some(val.id.into()),
+            provider_id: Some(val.provider.into()),
+            config: val.config,
             direction: direction as i32,
         }
     }
@@ -114,9 +114,9 @@ impl TryFrom<crate::grpc_impl::api::LinkProviderId> for crate::link::LinkProvide
     }
 }
 
-impl Into<crate::grpc_impl::api::LinkInstanceId> for crate::link::LinkInstanceId {
-    fn into(self) -> crate::grpc_impl::api::LinkInstanceId {
-        crate::grpc_impl::api::LinkInstanceId { id: self.0.to_string() }
+impl From<crate::link::LinkInstanceId> for crate::grpc_impl::api::LinkInstanceId {
+    fn from(val: crate::link::LinkInstanceId) -> Self {
+        crate::grpc_impl::api::LinkInstanceId { id: val.0.to_string() }
     }
 }
 
@@ -132,9 +132,9 @@ impl TryFrom<crate::grpc_impl::api::LinkDirection> for crate::link::LinkDirectio
     }
 }
 
-impl Into<crate::grpc_impl::api::LinkDirection> for crate::link::LinkDirection {
-    fn into(self) -> crate::grpc_impl::api::LinkDirection {
-        match self {
+impl From<crate::link::LinkDirection> for crate::grpc_impl::api::LinkDirection {
+    fn from(val: crate::link::LinkDirection) -> Self {
+        match val {
             crate::link::LinkDirection::Read => super::api::LinkDirection::Read,
             crate::link::LinkDirection::Write => super::api::LinkDirection::Write,
             crate::link::LinkDirection::BiDi => super::api::LinkDirection::BiDi,
@@ -150,9 +150,9 @@ impl TryFrom<crate::grpc_impl::api::LinkInstanceId> for crate::link::LinkInstanc
     }
 }
 
-impl Into<crate::grpc_impl::api::LinkProviderId> for crate::link::LinkProviderId {
-    fn into(self) -> crate::grpc_impl::api::LinkProviderId {
-        crate::grpc_impl::api::LinkProviderId { id: self.0.to_string() }
+impl From<crate::link::LinkProviderId> for crate::grpc_impl::api::LinkProviderId {
+    fn from(val: crate::link::LinkProviderId) -> Self {
+        crate::grpc_impl::api::LinkProviderId { id: val.0.to_string() }
     }
 }
 
@@ -164,8 +164,8 @@ impl TryFrom<crate::grpc_impl::api::LinkType> for crate::link::LinkType {
     }
 }
 
-impl Into<crate::grpc_impl::api::LinkType> for crate::link::LinkType {
-    fn into(self) -> crate::grpc_impl::api::LinkType {
-        crate::grpc_impl::api::LinkType { r#type: self.0.to_string() }
+impl From<crate::link::LinkType> for crate::grpc_impl::api::LinkType {
+    fn from(val: crate::link::LinkType) -> Self {
+        crate::grpc_impl::api::LinkType { r#type: val.0.to_string() }
     }
 }

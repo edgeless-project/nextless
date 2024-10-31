@@ -6,6 +6,12 @@ pub struct ProxyManager {
     join_handle: std::sync::Arc<tokio::task::JoinHandle<()>>,
 }
 
+impl Drop for ProxyManager {
+    fn drop(&mut self) {
+        self.join_handle.abort();
+    }
+}
+
 pub struct ProxyManagerTask {
     receiver: tokio::sync::mpsc::UnboundedReceiver<ProxyManagerRequest>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, ProxyInstance>,
@@ -15,6 +21,11 @@ pub struct ProxyManagerTask {
 pub struct ProxyInstance {
     sender: tokio::sync::mpsc::UnboundedSender<ProxyInstanceRequest>,
     join_handle: tokio::task::JoinHandle<()>,
+}
+impl Drop for ProxyInstance {
+    fn drop(&mut self) {
+        self.join_handle.abort();
+    }
 }
 
 pub struct ProxyInstanceTask {
@@ -45,7 +56,9 @@ impl ProxyInstanceTask {
                     internal_message = self.internal_dataplane.receive_next().fuse() => {
                         match internal_message.message {
                             edgeless_dataplane::core::Message::Cast(msg) => {
-                                self.external_dataplane.send_alias(internal_message.target_port.0, msg).await;
+                                if let Err(e) = self.external_dataplane.send_alias(internal_message.target_port.0, msg).await {
+                                    log::error!("Proxy External Send Error: {}", e);
+                                }
                             },
                             edgeless_dataplane::core::Message::Call(msg) => {
                                 let reply = self.external_dataplane.call_alias(internal_message.target_port.0, msg).await;
@@ -61,7 +74,9 @@ impl ProxyInstanceTask {
                     external_message = self.external_dataplane.receive_next().fuse() => {
                         match external_message.message {
                             edgeless_dataplane::core::Message::Cast(msg) => {
-                                self.internal_dataplane.send_alias(external_message.target_port.0, msg).await;
+                                if let Err(e) = self.internal_dataplane.send_alias(external_message.target_port.0, msg).await {
+                                    log::error!("Proxy Internal Send Error: {}", e);
+                                }
                             },
                             edgeless_dataplane::core::Message::Call(msg) => {
                                 let reply = self.internal_dataplane.call_alias(external_message.target_port.0, msg).await;
@@ -77,8 +92,8 @@ impl ProxyInstanceTask {
                         if let Some(control_request) = control_request {
                             match control_request {
                                 ProxyInstanceRequest::Update(proxy_spec) => {
-                                    self.internal_dataplane.update_mapping(proxy_spec.inner_inputs.clone(), proxy_spec.inner_outputs.clone());
-                                    self.external_dataplane.update_mapping(proxy_spec.external_inputs.clone(), proxy_spec.external_outputs.clone());
+                                    let _internal_mapping_changes = self.internal_dataplane.update_mapping(proxy_spec.inner_inputs.clone(), proxy_spec.inner_outputs.clone()).await;
+                                    let _external_mapping_changes = self.external_dataplane.update_mapping(proxy_spec.external_inputs.clone(), proxy_spec.external_outputs.clone()).await;
                                     self.inner_inputs = proxy_spec.inner_inputs;
                                     self.inner_outputs = proxy_spec.inner_outputs;
                                     self.external_inputs  = proxy_spec.external_inputs;
@@ -105,8 +120,8 @@ impl ProxyInstance {
 
         let task = ProxyInstanceTask {
             control_receiver: receiver,
-            internal_dataplane: internal_dataplane,
-            external_dataplane: external_dataplane,
+            internal_dataplane,
+            external_dataplane,
             inner_outputs: spec.inner_outputs,
             inner_inputs: spec.inner_inputs,
             external_outputs: spec.external_outputs,
@@ -146,12 +161,12 @@ impl ProxyManagerTask {
                     match req {
                         ProxyManagerRequest::Start(proxy_spec) => {
                             self.instances.insert(
-                                proxy_spec.instance_id.clone(),
+                                proxy_spec.instance_id,
                                 ProxyInstance::create(
                                     proxy_spec.clone(),
                                     self.dataplane_provider.get_handle_for(proxy_spec.instance_id).await,
                                     self.dataplane_provider
-                                        .get_handle_for(edgeless_api::function_instance::InstanceId::new(proxy_spec.instance_id.node_id.clone()))
+                                        .get_handle_for(edgeless_api::function_instance::InstanceId::new(proxy_spec.instance_id.node_id))
                                         .await,
                                 )
                                 .await,

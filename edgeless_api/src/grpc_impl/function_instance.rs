@@ -119,10 +119,7 @@ impl FunctonInstanceConverters {
                 }
             },
             data_type: crate::function_instance::PortDataType(api_port.data_type.clone()),
-            return_data_type: api_port
-                .return_data_type
-                .clone()
-                .and_then(|dt| Some(crate::function_instance::PortDataType(dt))),
+            return_data_type: api_port.return_data_type.clone().map(crate::function_instance::PortDataType),
         })
     }
 
@@ -214,7 +211,7 @@ impl FunctonInstanceConverters {
                 crate::function_instance::PortMethod::Call => 1,
             },
             data_type: crate_port.data_type.0.clone(),
-            return_data_type: crate_port.return_data_type.as_ref().and_then(|dt| Some(dt.0.clone())),
+            return_data_type: crate_port.return_data_type.as_ref().map(|dt| dt.0.clone()),
         }
     }
 }

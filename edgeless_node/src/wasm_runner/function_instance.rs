@@ -185,8 +185,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
             memory: instance
                 .get_memory(&mut store, "memory")
-                .ok_or_else(|| (crate::base_runtime::FunctionInstanceError::BadCode))?,
-            store: store,
+                .ok_or(crate::base_runtime::FunctionInstanceError::BadCode)?,
+            store,
         }))
     }
 

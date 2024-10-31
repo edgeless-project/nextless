@@ -7,6 +7,12 @@ pub struct AliasMapping {
     mapping: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, edgeless_api::common::Output>>>,
 }
 
+impl Default for AliasMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AliasMapping {
     pub fn new() -> Self {
         AliasMapping {
@@ -15,7 +21,7 @@ impl AliasMapping {
     }
 
     pub async fn get_mapping(&self, alias: &str) -> Option<edgeless_api::common::Output> {
-        self.mapping.lock().await.get(alias).and_then(|a| Some(a.clone()))
+        self.mapping.lock().await.get(alias).cloned()
     }
 
     pub async fn update(&mut self, new_mapping: std::collections::HashMap<String, edgeless_api::common::Output>) {

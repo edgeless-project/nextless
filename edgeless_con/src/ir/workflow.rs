@@ -26,7 +26,7 @@ impl ActiveWorkflow {
 
         ActiveWorkflow {
             // state: WorkflowState::New,
-            id: id,
+            id,
             original_request: request.clone(),
             functions: request
                 .workflow_functions
@@ -73,7 +73,7 @@ impl ActiveWorkflow {
 
     pub(crate) fn get_component(&self, component_name: &str) -> Option<&std::cell::RefCell<dyn LogicalComponent>> {
         if let Some(component) = self.functions.get(component_name) {
-            return Some(component as &std::cell::RefCell<dyn LogicalComponent>);
+            Some(component as &std::cell::RefCell<dyn LogicalComponent>)
         } else if let Some(compoenent) = self.resources.get(component_name) {
             return Some(compoenent as &std::cell::RefCell<dyn LogicalComponent>);
         } else if component_name == "__proxy" {

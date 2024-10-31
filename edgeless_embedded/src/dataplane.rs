@@ -15,9 +15,9 @@ impl EmbeddedDataplaneHandle {
         msg: &str,
     ) {
         let event = edgeless_api_core::invocation::Event::<&[u8]> {
-            target: target,
+            target,
             source: slf,
-            target_port: target_port,
+            target_port,
             stream_id: 0,
             data: edgeless_api_core::invocation::EventData::Cast(msg.as_bytes()),
         };
