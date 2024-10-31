@@ -340,7 +340,7 @@ async fn main() -> anyhow::Result<()> {
                         Ok(instances) => {
                             for instance in instances.iter() {
                                 println!("workflow: {}", instance.workflow_id.to_string());
-                                for function in instance.domain_mapping.iter() {
+                                for function in instance.node_mapping.iter() {
                                     println!("\t{:?}", function);
                                 }
                             }

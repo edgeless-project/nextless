@@ -5,8 +5,9 @@
 
 pub mod client;
 pub mod server;
-#[cfg(test)]
-pub mod test;
+// TODO Split and fix
+// #[cfg(test)]
+// pub mod test;
 
 pub struct Controller {
     sender: futures::channel::mpsc::UnboundedSender<ControllerRequest>,

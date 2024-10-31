@@ -85,7 +85,7 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
     ) -> anyhow::Result<starlark::values::Value> {
         Ok(heap.alloc(PortSpec {
             id: id,
-            method: Method::Cast,
+            method: Method::Call,
             direction: Direction::Input,
             data_type: data,
             return_data_type: return_data,

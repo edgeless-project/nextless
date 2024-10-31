@@ -107,7 +107,6 @@ pub fn package_rust(function_source_dir: String) -> anyhow::Result<String> {
         .map(|x| (x, x.strip_prefix(cargo_project_path.clone()).unwrap()))
         .collect();
     for (src_src, src_dest) in sources {
-        println!("{:?} {:?}", src_src, src_dest);
         tar.append_path_with_name(src_src, src_dest).unwrap();
     }
 

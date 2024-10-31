@@ -85,11 +85,11 @@ impl WorkflowInstanceConverters {
     }
 
     pub fn parse_workflow_function_mapping(
-        api_mapping: &crate::grpc_impl::api::WorkflowFunctionMapping,
+        api_mapping: &crate::grpc_impl::api::WorkflowComponentMapping,
     ) -> anyhow::Result<crate::workflow_instance::WorkflowFunctionMapping> {
         Ok(crate::workflow_instance::WorkflowFunctionMapping {
             name: api_mapping.name.to_string(),
-            domain_id: api_mapping.domain_id.to_string(),
+            node_ids: api_mapping.node_ids.clone(),
         })
     }
 
@@ -127,8 +127,8 @@ impl WorkflowInstanceConverters {
                     return Err(anyhow::anyhow!("WorkflowId Missing"));
                 }
             })?,
-            domain_mapping: api_instance
-                .domain_mapping
+            node_mapping: api_instance
+                .node_mapping
                 .iter()
                 .map(WorkflowInstanceConverters::parse_workflow_function_mapping)
                 .filter_map(|x| match x {
@@ -244,8 +244,8 @@ impl WorkflowInstanceConverters {
     pub fn serialize_workflow_instance(crate_instance: &crate::workflow_instance::WorkflowInstance) -> crate::grpc_impl::api::WorkflowInstanceStatus {
         crate::grpc_impl::api::WorkflowInstanceStatus {
             workflow_id: Some(Self::serialize_workflow_id(&crate_instance.workflow_id)),
-            domain_mapping: crate_instance
-                .domain_mapping
+            node_mapping: crate_instance
+                .node_mapping
                 .iter()
                 .map(Self::serialize_workflow_function_mapping)
                 .collect(),
@@ -260,10 +260,10 @@ impl WorkflowInstanceConverters {
 
     pub fn serialize_workflow_function_mapping(
         crate_mapping: &crate::workflow_instance::WorkflowFunctionMapping,
-    ) -> crate::grpc_impl::api::WorkflowFunctionMapping {
-        crate::grpc_impl::api::WorkflowFunctionMapping {
+    ) -> crate::grpc_impl::api::WorkflowComponentMapping {
+        crate::grpc_impl::api::WorkflowComponentMapping {
             name: crate_mapping.name.to_string(),
-            domain_id: crate_mapping.domain_id.to_string(),
+            node_ids: crate_mapping.node_ids.clone(),
         }
     }
 
@@ -673,6 +673,8 @@ mod tests {
                 input_mapping: HashMap::new(),
                 configurations: HashMap::from([("conf1".to_string(), "val1".to_string()), ("conf2".to_string(), "val2".to_string())]),
             }],
+            workflow_ingress_proxies: vec![],
+            workflow_egress_proxies: vec![],
         }];
 
         for msg in messages {
@@ -687,7 +689,7 @@ mod tests {
     fn serialize_deserialize_workflow_function_mapping() {
         let messages = vec![WorkflowFunctionMapping {
             name: "fun1".to_string(),
-            domain_id: "domain1".to_string(),
+            node_ids: vec!["node1".to_string()],
         }];
 
         for msg in messages {
@@ -705,14 +707,14 @@ mod tests {
             workflow_id: WorkflowId {
                 workflow_id: uuid::Uuid::new_v4(),
             },
-            domain_mapping: vec![
+            node_mapping: vec![
                 WorkflowFunctionMapping {
                     name: "fun1".to_string(),
-                    domain_id: "domain1".to_string(),
+                    node_ids: vec!["node1".to_string()],
                 },
                 WorkflowFunctionMapping {
                     name: "fun2".to_string(),
-                    domain_id: "domain2".to_string(),
+                    node_ids: vec!["node2".to_string()],
                 },
             ],
         }];
@@ -731,14 +733,14 @@ mod tests {
             workflow_id: WorkflowId {
                 workflow_id: uuid::Uuid::new_v4(),
             },
-            domain_mapping: vec![
+            node_mapping: vec![
                 WorkflowFunctionMapping {
                     name: "fun1".to_string(),
-                    domain_id: "domain1".to_string(),
+                    node_ids: vec!["node1".to_string()],
                 },
                 WorkflowFunctionMapping {
                     name: "fun2".to_string(),
-                    domain_id: "domain2".to_string(),
+                    node_ids: vec!["node2".to_string()],
                 },
             ],
         })];
@@ -757,14 +759,14 @@ mod tests {
             workflow_id: WorkflowId {
                 workflow_id: uuid::Uuid::new_v4(),
             },
-            domain_mapping: vec![
+            node_mapping: vec![
                 WorkflowFunctionMapping {
                     name: "fun1".to_string(),
-                    domain_id: "domain1".to_string(),
+                    node_ids: vec!["node1".to_string()],
                 },
                 WorkflowFunctionMapping {
                     name: "fun2".to_string(),
-                    domain_id: "domain2".to_string(),
+                    node_ids: vec!["node2".to_string()],
                 },
             ],
         }]];

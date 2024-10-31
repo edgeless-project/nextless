@@ -25,4 +25,19 @@ crate-type = ["cdylib"]
 
 [dependencies]
 edgeless_function = { path = "../../edgeless_function" }
+edgeless_function_core ={ path = "../../edgeless_function_core"}
 log = "0.4"
+
+[features]
+default = [
+    "input_test_cast_input",
+    "input_test_input_reply",
+    "input_test_input_noreply",
+    "output_test_cast",
+    "output_test_call"
+]
+input_test_cast_input = []
+input_test_input_reply = []
+input_test_input_noreply = []
+output_test_cast = []
+output_test_call = []

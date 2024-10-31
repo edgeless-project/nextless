@@ -23,7 +23,6 @@ pub enum GuestAPIError {
 
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
-        log::info!("dp send");
         self.data_plane
             .send_alias(alias.to_string(), msg.to_string())
             .await
@@ -41,7 +40,14 @@ impl GuestAPIHost {
     }
 
     pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
-        Ok(self.data_plane.call_alias(alias.to_string(), msg.to_string()).await)
+        futures::select! {
+            _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
+                return Ok(edgeless_dataplane::core::CallRet::Err);
+            },
+            call_res = Box::pin(self.data_plane.call_alias(alias.to_string(), msg.to_string()).fuse()) => {
+                return Ok(call_res);
+            }
+        }
     }
 
     pub async fn call_raw(

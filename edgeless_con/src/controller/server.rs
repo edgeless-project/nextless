@@ -143,7 +143,28 @@ impl ControllerTask {
             self.peer_clusters.clone(),
             self.link_controllers.clone(),
         );
-        let required_changes = wf.initial_spawn();
+        let required_changes = tokio::task::block_in_place(|| wf.initial_spawn());
+
+        let desc = edgeless_api::workflow_instance::WorkflowInstance {
+            workflow_id: wf_id.clone(),
+            node_mapping: wf
+                .wf
+                .components()
+                .iter()
+                .filter_map(|(id, a)| {
+                    let instances: Vec<_> = a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect();
+                    if instances.len() > 0 {
+                        Some(edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                            name: id.to_string(),
+                            node_ids: instances,
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        };
+
         self.active_workflows.insert(wf_id.clone(), wf);
 
         let res = self.materialize(wf_id.clone(), required_changes).await;
@@ -153,12 +174,7 @@ impl ControllerTask {
         }
 
         let reply = match res {
-            Ok(_) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(
-                edgeless_api::workflow_instance::WorkflowInstance {
-                    workflow_id: wf_id.clone(),
-                    domain_mapping: Vec::new(),
-                },
-            )),
+            Ok(_) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(desc)),
             Err(err) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
                 edgeless_api::common::ResponseError {
                     summary: "Workflow creation failed".to_string(),
@@ -189,40 +205,39 @@ impl ControllerTask {
         &mut self,
         workflow_id: &edgeless_api::workflow_instance::WorkflowId,
     ) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>> {
-        // let mut ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = vec![];
-        // if let Some(w_id) = workflow_id.is_valid() {
-        //     if let Some(wf) = self.active_workflows.get(w_id) {
-        //         ret = vec![edgeless_api::workflow_instance::WorkflowInstance {
-        //             workflow_id: w_id.clone(),
-        //             domain_mapping: wf
-        //                 .domain_mapping
-        //                 .iter()
-        //                 .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-        //                     name: component.name.to_string(),
-        //                     domain_id: component.fid.node_id.to_string(),
-        //                 })
-        //                 .collect(),
-        //         }];
-        //     }
-        // } else {
-        //     ret = self
-        //         .active_workflows
-        //         .iter()
-        //         .map(|(w_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
-        //             workflow_id: w_id.clone(),
-        //             domain_mapping: wf
-        //                 .domain_mapping
-        //                 .iter()
-        //                 .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-        //                     name: component.name.to_string(),
-        //                     domain_id: component.fid.node_id.to_string(),
-        //                 })
-        //                 .collect(),
-        //         })
-        //         .collect();
-        // }
-        // Ok(ret)
-        Ok(vec![])
+        let mut ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = vec![];
+        if let Some(wf) = self.active_workflows.get(workflow_id) {
+            ret = vec![edgeless_api::workflow_instance::WorkflowInstance {
+                workflow_id: workflow_id.clone(),
+                node_mapping: wf
+                    .wf
+                    .components()
+                    .iter()
+                    .map(|(id, a)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                        name: id.to_string(),
+                        node_ids: a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect(),
+                    })
+                    .collect(),
+            }];
+        } else {
+            ret = self
+                .active_workflows
+                .iter()
+                .map(|(wf_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
+                    workflow_id: wf_id.clone(),
+                    node_mapping: wf
+                        .wf
+                        .components()
+                        .iter()
+                        .map(|(id, a)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                            name: id.to_string(),
+                            node_ids: a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect(),
+                        })
+                        .collect(),
+                })
+                .collect();
+        }
+        Ok(ret)
     }
 
     async fn patch_workflow(&mut self, req: &edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
@@ -230,7 +245,7 @@ impl ControllerTask {
             workflow_id: req.function_id.function_id.clone(),
         };
         if let Some(wf) = self.active_workflows.get_mut(&id) {
-            let required_changes = wf.patch_external_links(req.clone());
+            let required_changes = tokio::task::block_in_place(|| wf.patch_external_links(req.clone()));
             if let Err(errs) = self.materialize(id.clone(), required_changes).await {
                 log::info!("Failures while stopping workflow: {}", errs.join(";"));
             };
@@ -660,13 +675,7 @@ impl ControllerTask {
         wf_id: edgeless_api::workflow_instance::WorkflowId,
     ) {
         if let Some(wf) = self.active_workflows.get_mut(&wf_id) {
-            let required_changes = wf.node_removal(
-                removed_nodes,
-                // &mut self.orchestration_logic,
-                // &self.nodes,
-                // &self.peer_clusters,
-                // &mut self.link_controllers,
-            );
+            let required_changes = tokio::task::block_in_place(|| wf.node_removal(removed_nodes));
             if let Err(errs) = self.materialize(wf_id, required_changes).await {
                 log::error!("Failures Handling Node Removal: {}", errs.join(";"));
             }

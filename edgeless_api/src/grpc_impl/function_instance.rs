@@ -403,10 +403,33 @@ mod tests {
         in_port_spec_1.id = crate::function_instance::PortId("in".to_string());
 
         let messages = vec![SpawnFunctionRequest {
-            instance_id: Some(InstanceId {
+            instance_id: InstanceId {
                 node_id: uuid::Uuid::new_v4(),
                 function_id: uuid::Uuid::new_v4(),
-            }),
+            },
+            input_mapping: std::collections::HashMap::new(),
+            output_mapping: std::collections::HashMap::from([
+                (
+                    crate::function_instance::PortId("out".to_string()),
+                    crate::common::Output::Single(
+                        InstanceId {
+                            node_id: uuid::Uuid::nil(),
+                            function_id: uuid::Uuid::new_v4(),
+                        },
+                        crate::function_instance::PortId("test".to_string()),
+                    ),
+                ),
+                (
+                    crate::function_instance::PortId("err".to_string()),
+                    crate::common::Output::Single(
+                        InstanceId {
+                            node_id: uuid::Uuid::nil(),
+                            function_id: uuid::Uuid::new_v4(),
+                        },
+                        crate::function_instance::PortId("test".to_string()),
+                    ),
+                ),
+            ]),
             code: FunctionClassSpecification {
                 function_class_id: "my-func-id".to_string(),
                 function_class_type: "WASM".to_string(),

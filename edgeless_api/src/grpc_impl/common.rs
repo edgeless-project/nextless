@@ -258,10 +258,10 @@ mod tests {
     fn serialize_deserialize_patch_request() {
         let messages = vec![
             PatchRequest {
-                function_id: uuid::Uuid::new_v4(),
+                function_id: crate::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
                 output_mapping: std::collections::HashMap::from([
                     (
-                        "out".to_string(),
+                        crate::function_instance::PortId("out".to_string()),
                         crate::common::Output::Single(
                             InstanceId {
                                 node_id: uuid::Uuid::new_v4(),
@@ -271,7 +271,7 @@ mod tests {
                         ),
                     ),
                     (
-                        "err".to_string(),
+                        crate::function_instance::PortId("err".to_string()),
                         crate::common::Output::Single(
                             InstanceId {
                                 node_id: uuid::Uuid::new_v4(),
@@ -281,12 +281,13 @@ mod tests {
                         ),
                     ),
                 ]),
+                input_mapping: std::collections::HashMap::new(),
             },
             PatchRequest {
-                function_id: uuid::Uuid::new_v4(),
+                function_id: crate::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
                 output_mapping: std::collections::HashMap::from([
                     (
-                        "out".to_string(),
+                        crate::function_instance::PortId("out".to_string()),
                         crate::common::Output::Single(
                             InstanceId {
                                 node_id: uuid::Uuid::nil(),
@@ -296,7 +297,7 @@ mod tests {
                         ),
                     ),
                     (
-                        "err".to_string(),
+                        crate::function_instance::PortId("err".to_string()),
                         crate::common::Output::Single(
                             InstanceId {
                                 node_id: uuid::Uuid::nil(),
@@ -306,6 +307,7 @@ mod tests {
                         ),
                     ),
                 ]),
+                input_mapping: std::collections::HashMap::new(),
             },
         ];
         for msg in messages {

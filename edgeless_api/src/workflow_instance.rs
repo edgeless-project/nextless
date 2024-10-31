@@ -38,13 +38,13 @@ impl WorkflowId {
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorkflowFunctionMapping {
     pub name: String,
-    pub domain_id: String,
+    pub node_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorkflowInstance {
     pub workflow_id: WorkflowId,
-    pub domain_mapping: Vec<WorkflowFunctionMapping>,
+    pub node_mapping: Vec<WorkflowFunctionMapping>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, PartialEq)]

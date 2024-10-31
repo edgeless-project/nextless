@@ -6,9 +6,13 @@ use log;
 
 struct MessagingTest;
 
-impl EdgeFunction for MessagingTest {
-    fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]) {
-        match core::str::from_utf8(encoded_message).unwrap() {
+edgeless_function::generate!(MessagingTest);
+
+impl MessagingTestAPI for MessagingTest {
+    type STRING = String;
+    
+    fn handle_cast_test_cast_input(src: InstanceId, message: String) {
+        match message.as_str() {
             "test_cast_raw_output" => {
                 cast_raw(src, "test", "cast_raw_output".as_bytes());
             }
@@ -16,13 +20,13 @@ impl EdgeFunction for MessagingTest {
                 let _res = call_raw(src, "test", "call_raw_output".as_bytes());
             }
             "test_delayed_cast_output" => {
-                delayed_cast(100, "test", "delayed_cast_output".as_bytes());
+                delayed_cast(100, "test_cast", "delayed_cast_output".as_bytes());
             }
             "test_cast_output" => {
-                cast("test", "cast_output".as_bytes());
+                cast_test_cast(&"cast_output".to_string());
             }
             "test_call_output" => {
-                let _res = call("test", "call_output".as_bytes());
+                let _res = call_test_call(&"call_output".to_string());
             }
             _ => {
                 log::info!("Unprocessed Message");
@@ -30,22 +34,21 @@ impl EdgeFunction for MessagingTest {
         }
     }
 
-    fn handle_call(_src: InstanceId, port: &str, encoded_message: &[u8]) -> CallRet {
-        match core::str::from_utf8(encoded_message).unwrap() {
-            "test_err" => CallRet::Err,
-            "test_ret" => CallRet::Reply(edgeless_function::OwnedByteBuff::new_from_slice("test_reply".as_bytes())),
-            _ => CallRet::NoReply,
-        }
+    fn handle_call_test_input_reply(_src: InstanceId, message: String) -> String {
+        "test_reply".to_string()
     }
+
+    fn handle_call_test_input_noreply(_src: InstanceId, message: String){
+    }
+
+    fn handle_internal(message: &[u8]) {}
 
     fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
-        log::info!("Messaging Test Init");
+        log::error!("Messaging Test Init");
     }
 
     fn handle_stop() {
         log::info!("Messaging Test Stop");
     }
 }
-
-edgeless_function::export!(MessagingTest);

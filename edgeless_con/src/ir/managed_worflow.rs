@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: MIT
 
 pub struct ManagedWorkflow {
-    wf: super::workflow::ActiveWorkflow,
-    pipeline: super::transformations::TransformationPipeline,
+    pub wf: super::workflow::ActiveWorkflow,
+    pub pipeline: super::transformations::TransformationPipeline,
 }
 
 impl ManagedWorkflow {

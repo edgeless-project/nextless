@@ -45,7 +45,7 @@ impl DeadComponentRemoval {
                                 if ports.logical_input_mapping.contains_key(&port) {
                                     return true;
                                 }
-                                log::debug!("Not an Active Input");
+                                log::info!("Not an Active Input");
                             }
                             edgeless_api::function_instance::MappingNode::SideEffect => {
                                 return true;

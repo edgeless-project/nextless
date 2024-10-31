@@ -155,14 +155,12 @@ impl DataplaneHandle {
 
         for (added_i_id, i) in added_inputs {
             if let edgeless_api::common::Input::Link(l) = i {
-                log::info!("I Link");
                 self.add_incomming_link(edgeless_api::function_instance::PortId(added_i_id), &l).await;
             }
         }
 
         for (added_o_id, o) in added_outputs {
             if let edgeless_api::common::Output::Link(l) = o {
-                log::info!("O Link");
                 self.add_outgoing_link(edgeless_api::function_instance::PortId(added_o_id), &l).await;
             }
         }
@@ -188,7 +186,6 @@ impl DataplaneHandle {
     }
 
     pub async fn send_alias(&mut self, target: String, msg: String) -> anyhow::Result<()> {
-        log::info!("Send alias: {}", msg);
         if target == "self" {
             self.send(
                 self.slf.clone(),
@@ -211,13 +208,11 @@ impl DataplaneHandle {
                     }
                 }
                 edgeless_api::common::Output::All(ids) => {
-                    log::info!("Send all {:?}", ids);
                     for (instance_id, port_id) in ids {
                         self.send(instance_id, port_id.clone(), msg.to_string()).await;
                     }
                 }
                 edgeless_api::common::Output::Link(link_id) => {
-                    log::info!("Send Link");
                     self.send_to_link(&link_id, msg.to_string().into_bytes()).await;
                 }
             }
@@ -281,7 +276,6 @@ impl DataplaneHandle {
         target_port: edgeless_api::function_instance::PortId,
         msg: String,
     ) {
-        log::info!("Send Raw");
         self.send_inner(target, Message::Cast(msg), target_port, 0).await;
     }
 

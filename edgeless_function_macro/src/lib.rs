@@ -63,7 +63,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 }
             },
             PortMethod::CALL => {
-                assert!(val.return_data_type.is_some());
+                // assert!(val.return_data_type.is_some());
 
                 let (return_type_ident, return_statement) = if let Some(rdt) = val.return_data_type.as_ref() {
                     let return_type_name = rdt.replace(".", "_").to_uppercase();
@@ -94,7 +94,6 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         let res = <#parsed_ident as #trait_name>::#method_name(src, param);
                         #return_statement
                     }
-                    return edgeless_function::CallRet::NoReply;
                 });
 
                 if let Some(return_type_ident) = return_type_ident {

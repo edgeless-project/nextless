@@ -281,6 +281,7 @@ mod test {
                     has_tpm: true,
                     runtimes: vec!["RUST_WASM".to_string()],
                 },
+                vec![],
             ),
             UpdateNodeRequest::Registration(
                 uuid::Uuid::new_v4(),
@@ -288,6 +289,7 @@ mod test {
                 "http://127.0.0.1:10001".to_string(),
                 vec![],
                 NodeCapabilities::empty(),
+                vec![],
             ),
             UpdateNodeRequest::Deregistration(uuid::Uuid::new_v4()),
         ];
