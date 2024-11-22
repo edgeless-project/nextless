@@ -142,7 +142,7 @@ impl DDAResource {
                                         //TODO: In future, this should be iterated upon since multiple outputs might be mapped
                                         if let Some((target_id, target_port)) = inner.output_mapping.get(&dda_sub.cast_mapping.to_string()) {
                                             log::info!("target id for data {} from subscription is {}", str, target_id);
-                                            dataplane_handle.send(*target_id, target_port.clone(), str.to_string()).await;
+                                            dataplane_handle.send(*target_id, target_port.clone(), str.to_string(), opentelemetry::Context::new()).await;
                                         } else {
                                             log::info!("target id unknwon for data {} from subscription", str);
                                         }
@@ -176,6 +176,7 @@ impl DDAResource {
                     channel_id,
                     message,
                     target_port,
+                    context
                 } = dataplane_handle.receive_next().await;
 
                 let mut need_reply = false;

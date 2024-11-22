@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 use futures::{FutureExt, SinkExt};
+use opentelemetry::{trace::{TraceContextExt, Tracer}};
+use opentelemetry::trace::Span;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry::trace::TracerProvider;
 use std::marker::PhantomData;
 
 use super::{FunctionInstance, FunctionInstanceError};
@@ -31,6 +35,12 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     init_payload: Option<String>,
     runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
     instance_id: edgeless_api::function_instance::InstanceId,
+    tracer_provider: opentelemetry_sdk::trace::TracerProvider,
+    tracing_context: std::sync::Arc<tokio::sync::Mutex<TracingContext>>,
+}
+pub struct TracingContext {
+    pub tracer: opentelemetry_sdk::trace::Tracer,
+    pub parent_context: opentelemetry::Context
 }
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInstanceType> {
@@ -40,15 +50,47 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
+        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>
     ) -> Self {
         let instance_id = spawn_req.instance_id;
         let mut telemetry_handle = telemetry_handle;
         let mut state_handle = state_handle;
+        let mut data_plane = data_plane;
 
-        // alias_mapping.update(spawn_req.output_mapping).await;
         let (poison_pill_sender, poison_pill_receiver) = tokio::sync::broadcast::channel::<()>(1);
         let serialized_state = state_handle.get().await;
+
+        let exporter = opentelemetry_otlp::SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint("http://otelco:4317")
+            .with_timeout(std::time::Duration::from_secs(3))
+            .build().unwrap();
+        
+        let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
+            .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+            .with_config(
+                opentelemetry_sdk::trace::Config::default()
+                .with_resource(opentelemetry_sdk::Resource::new(vec![
+                    opentelemetry::KeyValue::new("service.name", spawn_req.code.function_class_id),
+                    opentelemetry::KeyValue::new("component.instance_id", spawn_req.instance_id.function_id.to_string()),
+                    opentelemetry::KeyValue::new("component.node_id", spawn_req.instance_id.node_id.to_string()),
+                    opentelemetry::KeyValue::new("component.type", "actor"),
+                    opentelemetry::KeyValue::new("actor.version", spawn_req.code.function_class_version.to_string()),
+                    opentelemetry::KeyValue::new("actor.runtime", spawn_req.code.function_class_type.to_string())
+                ]))
+            )
+            .build();
+
+        let tracer = tracer_provider.tracer("actor_runtime");
+
+        let tracing_context = std::sync::Arc::new(tokio::sync::Mutex::new(
+            TracingContext {
+                tracer: tracer.clone(),
+                parent_context: opentelemetry::Context::new(),
+            }
+        ));
+
+        data_plane.set_tracer(tracer);
 
         let guest_api_host = crate::base_runtime::guest_api::GuestAPIHost {
             instance_id,
@@ -56,6 +98,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
             state_handle,
             telemetry_handle: telemetry_handle.fork(std::collections::BTreeMap::new()),
             poison_pill_receiver: poison_pill_sender.subscribe(),
+            tracing_context: tracing_context.clone()
         };
 
         let task = Box::new(
@@ -70,6 +113,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 spawn_req.annotations.get("init-payload").cloned(),
                 runtime_api,
                 instance_id,
+                tracer_provider,
+                tracing_context
             )
             .await,
         );
@@ -114,6 +159,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         init_param: Option<String>,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         instance_id: edgeless_api::function_instance::InstanceId,
+        tracer_provider: opentelemetry_sdk::trace::TracerProvider,
+        tracing_context: std::sync::Arc<tokio::sync::Mutex<TracingContext>>,
     ) -> Self {
         Self {
             poison_pill_receiver,
@@ -127,6 +174,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             init_payload: init_param,
             runtime_api,
             instance_id,
+            tracer_provider,
+            tracing_context,
         }
     }
 
@@ -146,7 +195,10 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     }
 
     async fn instantiate(&mut self) -> Result<(), super::FunctionInstanceError> {
+        // self.data_plane.set_tracer(self.tracing_context.lock().await.tracer.clone());
+
         let start = tokio::time::Instant::now();
+        let mut span = self.tracing_context.lock().await.tracer.start("instantiate");
 
         let runtime_configuration;
         {
@@ -161,6 +213,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.function_instance =
             Some(FunctionInstanceType::instantiate(&self.instance_id, runtime_configuration, &mut self.guest_api_host.take(), &self.code).await?);
 
+        span.end();
+
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
             std::collections::BTreeMap::new(),
@@ -171,12 +225,15 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn init(&mut self) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
+        let mut span = self.tracing_context.lock().await.tracer.start("init");
 
         self.function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
             .init(self.init_payload.as_deref(), self.serialized_state.as_deref())
             .await?;
+
+        span.end();
 
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInit(start.elapsed()),
@@ -195,12 +252,17 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
-                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port, context: span_context} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                    // let mut context = opentelemetry::Context::new();
+                    // context = context.with_remote_span_context(span_context);
+                    // context = context.with_value(opentelemetry::KeyValue::new("actor.id", self.instance_id.to_string()));
+                    //  context);
                     self.process_message(
                         source_id,
                         channel_id,
                         message,
-                        target_port
+                        target_port,
+                        span_context
                     ).await?;
                 }
             }
@@ -213,10 +275,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         channel_id: u64,
         message: edgeless_dataplane::core::Message,
         target_port: edgeless_api::function_instance::PortId,
+        context: opentelemetry::trace::SpanContext
     ) -> Result<(), super::FunctionInstanceError> {
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, target_port, payload).await,
-            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, target_port, payload, channel_id).await,
+            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, target_port, payload, context).await,
+            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, target_port, payload, channel_id, context).await,
             _ => {
                 log::debug!("Unprocessed Message");
                 Ok(())
@@ -229,8 +292,13 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         source_id: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
         payload: String,
+        span_context: opentelemetry::trace::SpanContext
     ) -> Result<(), super::FunctionInstanceError> {
+        
         let start = tokio::time::Instant::now();
+        let mut span = self.span(format!("process_cast_{}", target_port.0), span_context, Some(target_port.clone())).await;
+        let context = opentelemetry::Context::with_span(&opentelemetry::Context::new(), span );
+        self.tracing_context.lock().await.parent_context = context;
 
         self.function_instance
             .as_mut()
@@ -238,6 +306,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             .cast(&source_id, target_port.0.as_str(), &payload)
             .await?;
 
+        // span.end();
+        self.tracing_context.lock().await.parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(start.elapsed()),
             std::collections::BTreeMap::from([("EVENT_TYPE".to_string(), "CAST".to_string())]),
@@ -251,8 +321,12 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         target_port: edgeless_api::function_instance::PortId,
         payload: String,
         channel_id: u64,
+        span_context: opentelemetry::trace::SpanContext
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
+
+        let span = self.span(format!("process_call_{}", target_port.0), span_context, Some(target_port.clone())).await;
+        self.tracing_context.lock().await.parent_context = opentelemetry::Context::with_span(&opentelemetry::Context::new(), span );
 
         let res = self
             .function_instance
@@ -261,6 +335,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             .call(&source_id, target_port.0.as_str(), &payload)
             .await?;
 
+        self.tracing_context.lock().await.parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(start.elapsed()),
             std::collections::BTreeMap::from([("EVENT_TYPE".to_string(), "CALL".to_string())]),
@@ -273,6 +348,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn stop(&mut self) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
+        let mut span = self.span("process_stop".to_string(), opentelemetry::trace::SpanContext::empty_context(), None).await;
 
         self.function_instance
             .as_mut()
@@ -304,5 +380,31 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             }),
             std::collections::BTreeMap::new(),
         );
+    }
+
+    async fn span(
+        &mut self,
+        span_id: String,
+        parent: opentelemetry::trace::SpanContext,
+        input_port: Option<edgeless_api::function_instance::PortId>
+    ) -> opentelemetry_sdk::trace::Span {
+        let tracer = self.tracing_context.lock().await.tracer.clone();
+        let context = opentelemetry::Context::current();
+        let mut span = if parent.is_valid() {
+            assert!(parent.is_sampled());
+            let context = context.with_remote_span_context(parent);
+            context.span().add_event("msg_received", Vec::new());
+            context.span().end();
+            tracer.start_with_context(span_id, &context)
+        } else {
+            assert!(false);
+            tracer.start(span_id)
+        };
+        span.add_event("test", vec![]);
+        if let Some(input_port) = &input_port {
+            span.set_attribute(opentelemetry::KeyValue::new("component.input_port", input_port.0.clone()));
+        }
+        // span.set_attribute(opentelemetry::KeyValue::new("actor.id", "example2"));
+        span
     }
 }

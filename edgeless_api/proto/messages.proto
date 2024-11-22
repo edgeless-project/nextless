@@ -375,6 +375,15 @@ message Event {
     EventData msg     = 4;
 
     string target_port = 5;
+
+    SpanContext span_context = 6;
+
+}
+
+message SpanContext {
+    bytes trace_id = 1;
+    bytes span_id = 2;
+    uint32 trace_flags = 3;
 }
 
 // Resource provider specification.

@@ -4,7 +4,7 @@ ARG USERNAME=edgeless
 ARG USER_UID=1000
 ARG USER_GID=1000
 
-RUN dnf -y install sudo wget vim git iputils dnsutils net-tools telnet iproute curl lldb openssl openssl-devel protobuf protobuf-compiler protobuf-devel clang systemd-devel perl mold
+RUN dnf -y install sudo wget vim git iputils dnsutils net-tools telnet iproute curl lldb openssl openssl-devel protobuf protobuf-compiler protobuf-devel clang systemd-devel perl mold tmux
 RUN groupadd --gid ${USER_GID} ${USERNAME} 
 RUN useradd -rm -d /home/$USERNAME -s /bin/bash -G wheel -u $USER_UID -g $USER_GID $USERNAME
 RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers

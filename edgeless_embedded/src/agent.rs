@@ -157,6 +157,11 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
                         edgeless_api_core::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
                     },
                     target_port: event.target_port,
+                    span_context: edgeless_api_core::invocation::SpanContext {
+                        trace_id: [0; 16],
+                        span_id: [0; 8],
+                        trace_flags: 0
+                    }
                 };
             self.upstream_sender.send(AgentEvent::Invocation(new_event)).await;
             Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)

@@ -56,12 +56,12 @@ impl ProxyInstanceTask {
                     internal_message = self.internal_dataplane.receive_next().fuse() => {
                         match internal_message.message {
                             edgeless_dataplane::core::Message::Cast(msg) => {
-                                if let Err(e) = self.external_dataplane.send_alias(internal_message.target_port.0, msg).await {
+                                if let Err(e) = self.external_dataplane.send_alias(internal_message.target_port.0, msg, opentelemetry::Context::new()).await {
                                     log::error!("Proxy External Send Error: {}", e);
                                 }
                             },
                             edgeless_dataplane::core::Message::Call(msg) => {
-                                let reply = self.external_dataplane.call_alias(internal_message.target_port.0, msg).await;
+                                let reply = self.external_dataplane.call_alias(internal_message.target_port.0, msg, opentelemetry::Context::new()).await;
                                 self.internal_dataplane.reply(internal_message.source_id, internal_message.channel_id, reply).await;
                             },
                             _ => {
@@ -74,12 +74,12 @@ impl ProxyInstanceTask {
                     external_message = self.external_dataplane.receive_next().fuse() => {
                         match external_message.message {
                             edgeless_dataplane::core::Message::Cast(msg) => {
-                                if let Err(e) = self.internal_dataplane.send_alias(external_message.target_port.0, msg).await {
+                                if let Err(e) = self.internal_dataplane.send_alias(external_message.target_port.0, msg, opentelemetry::Context::new()).await {
                                     log::error!("Proxy Internal Send Error: {}", e);
                                 }
                             },
                             edgeless_dataplane::core::Message::Call(msg) => {
-                                let reply = self.internal_dataplane.call_alias(external_message.target_port.0, msg).await;
+                                let reply = self.internal_dataplane.call_alias(external_message.target_port.0, msg, opentelemetry::Context::new()).await;
                                 self.external_dataplane.reply(external_message.source_id, external_message.channel_id, reply).await;
                             },
                             _ => {

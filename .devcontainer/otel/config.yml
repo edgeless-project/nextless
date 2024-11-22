@@ -1,0 +1,41 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  batch:
+exporters:
+  debug:
+    verbosity: detailed
+  otlp/jaeger:
+    endpoint: http://jaeger:4317
+    tls:
+      insecure: true
+  prometheusremotewrite:
+    endpoint: http://prom:9090/api/v1/write
+    target_info:
+      enabled: true
+connectors:
+  spanmetrics:
+    namespace: span.metrics
+    histogram:
+      explicit:
+        buckets: [10us, 100us, 500us, 1ms, 5ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 5s, 10s]
+service:
+  extensions: []
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, otlp/jaeger, spanmetrics]
+    metrics:
+      receivers: [spanmetrics]
+      processors: [batch]
+      exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

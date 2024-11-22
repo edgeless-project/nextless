@@ -49,6 +49,13 @@ impl CoapInvocationServer {
                                 edgeless_api_core::invocation::EventData::Err => crate::invocation::EventData::Err,
                             },
                             target_port: crate::function_instance::PortId(String::from_str(invocation_event.target_port.0.as_str()).unwrap()),
+                            context: opentelemetry::trace::SpanContext::new(
+                                opentelemetry::trace::TraceId::from_bytes(invocation_event.span_context.trace_id),
+                                opentelemetry::trace::SpanId::from_bytes(invocation_event.span_context.span_id),
+                                opentelemetry::trace::TraceFlags::new(invocation_event.span_context.trace_flags),
+                                true,
+                                opentelemetry::trace::TraceState::NONE
+                            )
                         };
 
                         let key_entry = received_tokens.entry(sender.ip());
@@ -92,6 +99,7 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
                 crate::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                 crate::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
             },
+            span_context: edgeless_api_core::invocation::SpanContext { trace_id: event.context.trace_id().to_bytes(), span_id: event.context.span_id().to_bytes(), trace_flags: event.context.trace_flags().to_u8() }
         };
 
         let mut lck = self.inner.lock().await;

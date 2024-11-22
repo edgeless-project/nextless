@@ -18,6 +18,7 @@ impl InvocationConverters {
             target_port: crate::function_instance::PortId(api_event.target_port.clone()),
             stream_id: api_event.stream_id,
             data: Self::parse_api_event_data(api_event.msg.as_ref().unwrap())?,
+            context: api_event.span_context.as_ref().unwrap().try_into()?,
         })
     }
 
@@ -38,6 +39,7 @@ impl InvocationConverters {
             target_port: crate_event.target_port.0.clone(),
             stream_id: crate_event.stream_id,
             msg: Some(Self::encode_crate_event_data(&crate_event.data)),
+            span_context: Some(crate_event.context.clone().into()),
         }
     }
 
@@ -63,6 +65,26 @@ impl InvocationConverters {
             payload: payload_buffer,
             event_type: event as i32,
         }
+    }
+}
+
+impl From<opentelemetry::trace::SpanContext> for crate::grpc_impl::api::SpanContext {
+    fn from(value: opentelemetry::trace::SpanContext) -> Self {
+        Self {
+            trace_id: value.trace_id().to_bytes().to_vec(),
+            span_id: value.span_id().to_bytes().to_vec(),
+            trace_flags: value.trace_flags().to_u8() as u32
+        }
+    }
+}
+
+impl TryInto<opentelemetry::trace::SpanContext> for &crate::grpc_impl::api::SpanContext {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<opentelemetry::trace::SpanContext, Self::Error> {
+        let trace_id = opentelemetry::trace::TraceId::from_bytes(self.trace_id.clone().try_into().map_err(|e| anyhow::anyhow!("{:?}", e))?);
+        let span_id = opentelemetry::trace::SpanId::from_bytes(self.span_id.clone().try_into().map_err(|e| anyhow::anyhow!("{:?}", e))?);
+        Ok(opentelemetry::trace::SpanContext::new(trace_id, span_id, opentelemetry::trace::TraceFlags::new(self.trace_flags as u8), true, opentelemetry::trace::TraceState::NONE))
     }
 }
 

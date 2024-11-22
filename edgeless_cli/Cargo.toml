@@ -38,3 +38,4 @@ tokio-util = "0.7.10"
 mailparse="0.15.0"
 edgeless_build = {path = "../edgeless_build" }
 edgeless_config = { path  = "../edgeless_config" }
+opentelemetry = "0.27"

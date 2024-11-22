@@ -42,6 +42,7 @@ impl RedisResource {
                     channel_id,
                     message,
                     target_port,
+                    context
                 } = dataplane_handle.receive_next().await;
 
                 let mut need_reply = false;

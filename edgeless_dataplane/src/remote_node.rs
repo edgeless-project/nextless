@@ -20,6 +20,7 @@ impl DataPlaneLink for RemoteLink {
         src: &edgeless_api::function_instance::InstanceId,
         stream_id: u64,
         target_port: edgeless_api::function_instance::PortId,
+        context: opentelemetry::trace::SpanContext
     ) -> LinkProcessingResult {
         return self
             .remotes
@@ -37,6 +38,7 @@ impl DataPlaneLink for RemoteLink {
                     Message::Err => edgeless_api::invocation::EventData::Err,
                 },
                 target_port,
+                context
             })
             .await
             .unwrap();

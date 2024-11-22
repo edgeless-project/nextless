@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use futures::FutureExt;
+use opentelemetry::trace::Tracer;
 
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
@@ -12,6 +13,7 @@ pub struct GuestAPIHost {
     pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
     pub telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     pub poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
+    pub tracing_context: std::sync::Arc<tokio::sync::Mutex<super::function_instance_runner::TracingContext>>
 }
 
 /// Errors to be reported by the host side of the guest binding.
@@ -24,7 +26,7 @@ pub enum GuestAPIError {
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
         self.data_plane
-            .send_alias(alias.to_string(), msg.to_string())
+            .send_alias(alias.to_string(), msg.to_string(), self.tracing_context.lock().await.parent_context.clone())
             .await
             .map_err(|_e| GuestAPIError::UnknownAlias)
     }
@@ -35,7 +37,7 @@ impl GuestAPIHost {
         target_port: edgeless_api::function_instance::PortId,
         msg: &str,
     ) -> Result<(), GuestAPIError> {
-        self.data_plane.send(target, target_port, msg.to_string()).await;
+        self.data_plane.send(target, target_port, msg.to_string(), self.tracing_context.lock().await.parent_context.clone()).await;
         Ok(())
     }
 
@@ -44,7 +46,7 @@ impl GuestAPIHost {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
                 Ok(edgeless_dataplane::core::CallRet::Err)
             },
-            call_res = Box::pin(self.data_plane.call_alias(alias.to_string(), msg.to_string()).fuse()) => {
+            call_res = Box::pin(self.data_plane.call_alias(alias.to_string(), msg.to_string(), self.tracing_context.lock().await.parent_context.clone()).fuse()) => {
                 Ok(call_res)
             }
         }
@@ -60,7 +62,7 @@ impl GuestAPIHost {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
                 Ok(edgeless_dataplane::core::CallRet::Err)
             },
-            call_res = Box::pin(self.data_plane.call(target, target_port, msg.to_string())).fuse() => {
+            call_res = Box::pin(self.data_plane.call(target, target_port, msg.to_string(), self.tracing_context.lock().await.parent_context.clone())).fuse() => {
                 Ok(call_res)
             }
         }
@@ -82,9 +84,13 @@ impl GuestAPIHost {
         let cloned_msg = payload.to_string();
         let cloned_alias = target_alias.to_string();
 
+        // let cloned_context = self.tracing_context.lock().await.parent_context.clone();
+        let cloned_tracer = self.tracing_context.lock().await.tracer.clone();
+
         tokio::spawn(async move {
+            let span = cloned_tracer.start("wait");
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-            cloned_plane.send_alias(cloned_alias, cloned_msg).await.unwrap();
+            cloned_plane.send_alias(cloned_alias, cloned_msg, opentelemetry::Context::new()).await.unwrap();
         });
 
         Ok(())

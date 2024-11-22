@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 use futures::{SinkExt, StreamExt};
+use opentelemetry::trace::TraceContextExt;
+use opentelemetry::trace::Tracer;
 
 use crate::core::*;
 use crate::node_local::*;
@@ -27,6 +29,7 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
                 target_port: self.target_port.clone(),
                 channel_id: 0,
                 message: crate::core::Message::Cast(String::from_utf8(msg).unwrap()),
+                context: opentelemetry::trace::SpanContext::empty_context(),
             })
             .await
             .unwrap();
@@ -47,6 +50,7 @@ pub struct DataplaneHandle {
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
+    tracer: Option<opentelemetry_sdk::trace::Tracer>,
 }
 
 impl DataplaneHandle {
@@ -74,6 +78,7 @@ impl DataplaneHandle {
                     channel_id,
                     message,
                     target_port,
+                    context
                 }) = receiver.next().await
                 {
                     if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
@@ -92,6 +97,7 @@ impl DataplaneHandle {
                             channel_id,
                             message,
                             target_port,
+                            context
                         })
                         .await
                     {
@@ -115,6 +121,7 @@ impl DataplaneHandle {
             links: std::collections::HashMap::new(),
             receiver_overwrites,
             next_id: 1,
+            tracer: None
         }
     }
 
@@ -127,6 +134,7 @@ impl DataplaneHandle {
                 channel_id,
                 message,
                 target_port: target_channel,
+                context
             }) = self.receiver.lock().await.next().await
             {
                 if std::mem::discriminant(&message) == std::mem::discriminant(&Message::Cast("".to_string()))
@@ -137,6 +145,7 @@ impl DataplaneHandle {
                         channel_id,
                         message,
                         target_port: target_channel,
+                        context
                     };
                 }
                 log::error!("Unprocesses other message {:?}", message);
@@ -185,27 +194,38 @@ impl DataplaneHandle {
         }
     }
 
-    pub async fn send_alias(&mut self, target: String, msg: String) -> anyhow::Result<()> {
+    pub fn set_tracer(&mut self, tracer: opentelemetry_sdk::trace::Tracer) {
+        self.tracer = Some(tracer);
+    }
+
+    pub async fn send_alias(&mut self, target: String, msg: String, context: opentelemetry::Context) -> anyhow::Result<()> {
+        let context = if let Some(tracer) = &self.tracer {
+            let call_handler_span = tracer.start_with_context(format!("send_{}", target), &context);
+            opentelemetry::Context::current_with_span(call_handler_span)
+        } else {
+            log::info!("Missing Tracer");
+            context
+        };
         if target == "self" {
-            self.send(self.slf, edgeless_api::function_instance::PortId("INTERNAL".to_string()), msg.to_string())
+            self.send_inner(self.slf, Message::Cast(msg.to_string()), edgeless_api::function_instance::PortId("INTERNAL".to_string()), 0, context)
                 .await;
             Ok(())
         } else if let Some(target) = self.alias_mapping.get_mapping(&target).await {
             match target {
                 edgeless_api::common::Output::Single(instance_id, port_id) => {
-                    self.send(instance_id, port_id.clone(), msg.to_string()).await;
+                    self.send_inner(instance_id,Message::Cast(msg.to_string()),  port_id.clone(), 0, context.clone()).await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
                     let id = ids.choose(&mut rand::thread_rng());
                     if let Some((instance_id, port_id)) = id {
-                        self.send(*instance_id, port_id.clone(), msg.to_string()).await;
+                        self.send_inner(*instance_id, Message::Cast(msg.to_string()), port_id.clone(),0, context.clone()).await;
                     } else {
                         return Err(anyhow::anyhow!("Unknown Alias"));
                     }
                 }
                 edgeless_api::common::Output::All(ids) => {
                     for (instance_id, port_id) in ids {
-                        self.send(instance_id, port_id.clone(), msg.to_string()).await;
+                        self.send_inner(instance_id, Message::Cast(msg.to_string()), port_id.clone(), 0, context.clone()).await;
                     }
                 }
                 edgeless_api::common::Output::Link(link_id) => {
@@ -218,9 +238,15 @@ impl DataplaneHandle {
         }
     }
 
-    pub async fn call_alias(&mut self, alias: String, msg: String) -> CallRet {
+    pub async fn call_alias(&mut self, alias: String, msg: String, context: opentelemetry::Context) -> CallRet {
+        let context = if let Some(tracer) = &self.tracer {
+            let call_handler_span = tracer.start_with_context(format!("call_{}", alias), &context);
+            opentelemetry::Context::current_with_span(call_handler_span)
+        } else {
+            context
+        };
         if alias == "self" {
-            self.call(self.slf, edgeless_api::function_instance::PortId("INTERNAL".to_string()), msg)
+            self.call_raw(self.slf, edgeless_api::function_instance::PortId("INTERNAL".to_string()), msg, context)
                 .await
             // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.alias_mapping.get_mapping(&alias).await {
@@ -228,13 +254,13 @@ impl DataplaneHandle {
             match target {
                 edgeless_api::common::Output::Single(instance_id, port_id) => {
                     // self.data_plane.send(id, msg.to_string()).await;
-                    return self.call(instance_id, port_id, msg).await;
+                    return self.call_raw(instance_id, port_id, msg, context).await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
                     let id = ids.choose(&mut rand::thread_rng());
                     if let Some((instance_id, port_id)) = id {
                         // self.data_plane.send(id.clone(), msg.to_string()).await;
-                        return self.call(*instance_id, port_id.clone(), msg).await;
+                        return self.call_raw(*instance_id, port_id.clone(), msg, context).await;
                     } else {
                         // return Err(GuestAPIError::UnknownAlias);
                         return CallRet::Err;
@@ -270,8 +296,15 @@ impl DataplaneHandle {
         target: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
         msg: String,
+        context: opentelemetry::Context
     ) {
-        self.send_inner(target, Message::Cast(msg), target_port, 0).await;
+        let context = if let Some(tracer) = &self.tracer {
+            let call_handler_span = tracer.start_with_context("send", &context);
+            opentelemetry::Context::current_with_span(call_handler_span)
+        } else {
+            context
+        };
+        self.send_inner(target, Message::Cast(msg), target_port, 0,context).await;
     }
 
     // Send a `call` event and wait for the return event.
@@ -281,13 +314,31 @@ impl DataplaneHandle {
         target: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
         msg: String,
+        context: opentelemetry::Context
+    ) -> CallRet {
+        let context = if let Some(tracer) = &self.tracer {
+            let call_handler_span = tracer.start_with_context("call", &context);
+            opentelemetry::Context::current_with_span(call_handler_span)
+        } else {
+            log::info!("No Tracer");
+            context
+        };
+        self.call_raw(target, target_port, msg, context).await
+    }
+
+    pub async fn call_raw(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        target_port: edgeless_api::function_instance::PortId,
+        msg: String,
+        context: opentelemetry::Context
     ) -> CallRet {
         let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
         let channel_id = self.next_id;
         self.next_id += 1;
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
-        self.send_inner(target, Message::Call(msg), target_port, channel_id).await;
+        self.send_inner(target, Message::Call(msg), target_port, channel_id, context.clone()).await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
@@ -309,6 +360,7 @@ impl DataplaneHandle {
             },
             edgeless_api::function_instance::PortId("reply".to_string()),
             channel_id,
+            opentelemetry::Context::new()
         )
         .await;
     }
@@ -319,10 +371,11 @@ impl DataplaneHandle {
         msg: Message,
         target_port: edgeless_api::function_instance::PortId,
         channel_id: u64,
+        context: opentelemetry::Context
     ) {
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
-            if link.handle_send(&target, msg.clone(), &self.slf, channel_id, target_port.clone()).await == LinkProcessingResult::FINAL {
+            if link.handle_send(&target, msg.clone(), &self.slf, channel_id, target_port.clone(), context.span().span_context().clone()).await == LinkProcessingResult::FINAL {
                 return;
             }
         }

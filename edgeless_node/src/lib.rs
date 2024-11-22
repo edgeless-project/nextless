@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_api::controller::ControllerAPI;
+use opentelemetry_otlp::WithExportConfig;
 
 pub mod agent;
 pub mod base_runtime;
@@ -426,6 +427,22 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     )
     .await;
 
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint("http://otelco:4317")
+        .with_timeout(std::time::Duration::from_secs(3))
+        .build().unwrap();
+    
+    let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
+        .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+        .with_config(
+            opentelemetry_sdk::trace::Config::default()
+            .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new("service.name", "edgeless_node")]))
+        )
+        .build();
+
+    opentelemetry::global::set_tracer_provider(tracer_provider);
+    opentelemetry::global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
     // Create the telemetry provider.
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone())
         .await

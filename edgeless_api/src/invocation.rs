@@ -30,6 +30,7 @@ pub struct Event {
     pub target_port: crate::function_instance::PortId,
     pub stream_id: u64,
     pub data: EventData,
+    pub context: opentelemetry::trace::SpanContext
 }
 
 impl std::fmt::Display for Event {

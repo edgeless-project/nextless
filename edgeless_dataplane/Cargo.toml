@@ -24,4 +24,8 @@ clap = { version = "4.3", features=["derive"] }
 toml = "0.7"
 edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
 edgeless_link_multicast = {path = "../edgeless_link_multicast"}
+
+opentelemetry = "0.27"
+opentelemetry_sdk = {version = "0.27", features = ["rt-tokio"]}
+
 rand = "0.8"

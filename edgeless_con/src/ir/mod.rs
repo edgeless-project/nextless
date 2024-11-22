@@ -30,17 +30,23 @@ pub trait MaterializedComponent {
 }
 
 pub trait ComponentStatistics {
-    fn invocation_latency(&self) -> &dyn Metric;
+    fn processing_duration(&self) -> &dyn ProcessingMetric;
 }
 
-pub trait Metric {
-    fn count(&self) -> u64;
-    fn median(&self) -> f64;
-    fn p95(&self) -> f64;
-    fn p99(&self) -> f64;
-    fn min(&self) -> f64;
-    fn max(&self) -> f64;
+pub trait ProcessingMetric {
+    fn invocations(&self, period: Option<std::time::Duration>) -> u64;
+    fn invocations_by_port(&self, period: Option<std::time::Duration>) -> Vec<(edgeless_api::function_instance::PortId, u64)>;
+    fn mean_duration_ms(&self, period: Option<std::time::Duration>) -> f64;
+    fn soft_limit_score(&self, period: Option<std::time::Duration>) -> f64;
+    fn hard_limit_score(&self, period: Option<std::time::Duration>) -> f64;
 }
+
+
+
+// pub trait PortMetric {
+//     fn triggers(&self);
+//     fn mean_latency(&self);
+// }
 
 #[derive(Default, Debug)]
 pub struct LogicalPorts {

@@ -81,6 +81,7 @@ impl OllamaResource {
                     channel_id: _,
                     message,
                     target_port,
+                    context
                 } = dataplane_handle.receive_next().await;
 
                 // Ignore any non-cast messages.
@@ -106,7 +107,7 @@ impl OllamaResource {
                 match reply_receiver.await {
                     Ok(response) => match response {
                         Ok((target, response)) => {
-                            let _ = dataplane_handle.send(target, target_port, response).await;
+                            let _ = dataplane_handle.send(target, target_port, response, opentelemetry::Context::new()).await;
                         }
                         Err(err) => {
                             log::warn!("Error from ollama: {}", err)
