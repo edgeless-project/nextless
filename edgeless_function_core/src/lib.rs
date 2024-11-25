@@ -78,3 +78,15 @@ impl Serialize for std::string::String {
         self.as_bytes().to_vec()
     }
 }
+
+impl Serialize for () {
+    fn serialize(&self) -> Vec<u8> {
+        Vec::new()
+    }
+}
+
+impl Deserialize for () {
+    fn deserialize(raw: &[u8]) -> Self {
+        ()
+    }
+}
