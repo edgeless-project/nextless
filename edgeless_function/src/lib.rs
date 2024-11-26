@@ -36,6 +36,7 @@ pub enum CallRet {
     Err,
 }
 
+#[derive(Clone, Copy)]
 pub struct InstanceId {
     /// UUID node_id
     pub node_id: [u8; 16],

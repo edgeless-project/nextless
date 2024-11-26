@@ -53,7 +53,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     #[cfg(feature = #feature)]
                     if port == #key {
                         let param = <<#parsed_ident as #trait_name>::#cloned_ident as edgeless_function_core::Deserialize>::deserialize(encoded_message);
-                        <#parsed_ident as #trait_name>::#method_name(src, param);
+                        <#parsed_ident as #trait_name>::#method_name(src.clone(), param);
                     }
 
                 });
