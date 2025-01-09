@@ -28,7 +28,6 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     function_instance: Option<Box<FunctionInstanceType>>,
     guest_api_host: Option<super::guest_api::GuestAPIHost>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
     code: Vec<u8>,
     data_plane: edgeless_dataplane::handle::DataplaneHandle,
     serialized_state: Option<String>,
@@ -50,7 +49,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>
     ) -> Self {
         let instance_id = spawn_req.instance_id;
         let mut telemetry_handle = telemetry_handle;
@@ -105,7 +103,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
             FunctionInstanceTask::<FunctionInstanceType>::new(
                 poison_pill_receiver,
                 telemetry_handle,
-                guest_api_host_register,
                 guest_api_host,
                 spawn_req.code.function_class_code.clone(),
                 data_plane.clone(),
@@ -151,7 +148,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     pub async fn new(
         poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
         guest_api_host: super::guest_api::GuestAPIHost,
         code: Vec<u8>,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
@@ -167,7 +163,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             function_instance: None,
             guest_api_host: Some(guest_api_host),
             telemetry_handle,
-            guest_api_host_register,
             code,
             data_plane,
             serialized_state,
@@ -183,14 +178,12 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     /// Always calls the exit handler (with the exit status)
     pub async fn run(&mut self) {
         let mut res = self.instantiate().await;
-        assert!(self.guest_api_host.is_none());
         if res.is_ok() {
             res = self.init().await;
         }
         if res.is_ok() {
             res = self.processing_loop().await;
         }
-        self.guest_api_host_register.lock().await.deregister_guest_api_host(&self.instance_id);
         self.exit(res).await;
     }
 
@@ -200,16 +193,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         let start = tokio::time::Instant::now();
         let mut span = self.tracing_context.lock().await.tracer.start("instantiate");
 
-        let runtime_configuration;
-        {
-            // Register this function instance, if needed by the runtime.
-            let mut register = self.guest_api_host_register.lock().await;
-            if register.needs_to_register() {
-                register.register_guest_api_host(&self.instance_id, self.guest_api_host.take().unwrap());
-            }
-            runtime_configuration = register.configuration();
-        }
-
+        let runtime_configuration= std::collections::HashMap::new();
         self.function_instance =
             Some(FunctionInstanceType::instantiate(&self.instance_id, runtime_configuration, &mut self.guest_api_host.take(), &self.code).await?);
 
