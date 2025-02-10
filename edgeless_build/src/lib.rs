@@ -14,7 +14,7 @@ pub fn rust_to_wasm(
 
     let build_dir = std::env::temp_dir().join(format!("edgeless-{}", uuid::Uuid::new_v4()));
 
-    let config = &cargo::util::config::Config::default()?;
+    let config = &cargo::util::context::GlobalContext::default()?;
     let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
@@ -58,7 +58,7 @@ pub fn rust_to_wasm(
         target_rustc_args: None,
         target_rustc_crate_types: None,
         rustdoc_document_private_items: false,
-        honor_rust_version: true,
+        honor_rust_version: Some(true),
     };
 
     cargo::ops::compile(&ws, &compile_options)?;
@@ -85,13 +85,13 @@ pub fn package_rust(function_source_dir: String) -> anyhow::Result<String> {
     let cargo_project_path = std::fs::canonicalize(function_source_dir.clone())?;
     let cargo_manifest = cargo_project_path.join("Cargo.toml");
 
-    let config = &cargo::util::config::Config::default()?;
+    let config = &cargo::util::context::GlobalContext::default()?;
     let ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
 
     let pack = ws.current()?;
 
-    let mut sources = cargo::sources::path::PathSource::new(pack.root(), pack.package_id().source_id(), ws.config());
-    sources.update().unwrap();
+    let mut sources = cargo::sources::path::PathSource::new(pack.root(), pack.package_id().source_id(), ws.gctx());
+    sources.load().unwrap();
 
     let source_files = sources.list_files(pack).unwrap();
 
