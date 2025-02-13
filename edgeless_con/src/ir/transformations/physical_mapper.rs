@@ -81,6 +81,16 @@ impl super::Transformation for PhysicalConnectionMapper {
                     LogicalOutput::Topic(_) => {}
                 }
             }
+
+            for (input_id, input) in &logical_ports.logical_input_mapping {
+                for c_instance in &physical_instances {
+                    c_instance
+                        .borrow_mut()
+                        .physical_ports()
+                        .physical_input_mapping
+                        .insert(input_id.clone(), edgeless_api::common::Input::Stub);
+                }
+            }
         }
     }
 }

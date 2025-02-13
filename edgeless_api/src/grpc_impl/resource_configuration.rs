@@ -53,7 +53,7 @@ impl ResourceConfigurationConverters {
             input_mapping: crate_spec
                 .input_mapping
                 .iter()
-                .map(|(name, input)| (name.0.to_string(), CommonConverters::serialize_input(input)))
+                .filter_map(|(name, input)| CommonConverters::serialize_input(input).map(|v| (name.0.to_string(), v)))
                 .collect(),
         }
     }

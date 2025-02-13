@@ -46,7 +46,7 @@ impl super::LogicalComponent for LogicalSubFlow {
 pub struct PhysicalSubFlow {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
     pub(crate) desired_mapping: super::PhysicalPorts,
-    pub(crate) materialized: Option<super::PhysicalPorts>,
+    pub(crate) materialized: Option<std::cell::RefCell<MaterializedSubflow>>,
 }
 
 impl super::PhysicalComponent for PhysicalSubFlow {
@@ -54,8 +54,25 @@ impl super::PhysicalComponent for PhysicalSubFlow {
         &mut self.desired_mapping
     }
 
-    fn materialized_state(&mut self) -> &mut dyn super::MaterializedComponent {
-        todo!()
+    fn materialized_state(&self) -> Option<&std::cell::RefCell<dyn super::MaterializedComponent>> {
+        self.materialized
+            .as_ref()
+            .map(|v| v as &std::cell::RefCell<dyn super::MaterializedComponent>)
+    }
+}
+
+pub struct MaterializedSubflow {
+    pub(crate) mapping: super::MaterializedPorts,
+    pub(crate) runtime_statistics: Option<Box<dyn super::ComponentRuntimeStatistics>>,
+}
+
+impl super::MaterializedComponent for MaterializedSubflow {
+    fn materialized_ports(&mut self) -> &mut super::MaterializedPorts {
+        &mut self.mapping
+    }
+
+    fn runtime_statistics(&self) -> Option<&dyn super::ComponentRuntimeStatistics> {
+        self.runtime_statistics.as_deref()
     }
 }
 

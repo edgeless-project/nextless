@@ -24,6 +24,7 @@ pub enum Output {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Input {
+    Stub, // Signals presence of an input (with Materialized Repr). Not used outside of the controller as messaging is sender driven.
     Link(crate::link::LinkInstanceId),
 }
 

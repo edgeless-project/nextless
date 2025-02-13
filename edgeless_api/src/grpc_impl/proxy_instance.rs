@@ -110,7 +110,7 @@ impl From<crate::proxy_instance::ProxySpec> for crate::grpc_impl::api::ProxyInst
             internal_inputs: val
                 .inner_inputs
                 .into_iter()
-                .map(|(k, v)| (k.0, super::common::CommonConverters::serialize_input(&v)))
+                .filter_map(|(k, v)| super::common::CommonConverters::serialize_input(&v).map(|v| (k.0, v)))
                 .collect(),
             internal_outputs: val
                 .inner_outputs
@@ -120,7 +120,7 @@ impl From<crate::proxy_instance::ProxySpec> for crate::grpc_impl::api::ProxyInst
             external_inputs: val
                 .external_inputs
                 .into_iter()
-                .map(|(k, v)| (k.0, super::common::CommonConverters::serialize_input(&v)))
+                .filter_map(|(k, v)| super::common::CommonConverters::serialize_input(&v).map(|v| (k.0, v)))
                 .collect(),
             external_outputs: val
                 .external_outputs

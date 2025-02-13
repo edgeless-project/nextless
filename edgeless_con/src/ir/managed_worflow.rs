@@ -6,6 +6,7 @@
 pub struct ManagedWorkflow {
     pub wf: super::workflow::ActiveWorkflow,
     pub pipeline: super::transformations::TransformationPipeline,
+    pub telemetry_provider: Option<Box<dyn super::TelemetryProvider>>,
 }
 
 impl ManagedWorkflow {
@@ -22,15 +23,22 @@ impl ManagedWorkflow {
         link_controllers: std::sync::Arc<
             tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
         >,
+        telementry_provider: Option<Box<dyn super::TelemetryProvider>>,
     ) -> Self {
         Self {
             wf: super::workflow::ActiveWorkflow::new(request, id),
             pipeline: super::transformations::TransformationPipeline::new_default(orchestration_logic, nodes, peer_clusters, link_controllers),
+            telemetry_provider: telementry_provider,
         }
     }
 
     pub fn initial_spawn(&mut self) -> Vec<super::RequiredChange> {
         self.pipeline.apply_all(&mut self.wf);
+        self.materialize()
+    }
+
+    pub fn periodic_optimize(&mut self) -> Vec<super::RequiredChange> {
+        self.pipeline.apply_placement(&mut self.wf);
         self.materialize()
     }
 
@@ -93,15 +101,50 @@ impl ManagedWorkflow {
             for i in function.instances.iter() {
                 let mut current = i.borrow_mut();
                 if let Some(materialized) = &current.materialized {
-                    if materialized.physical_input_mapping != current.desired_mapping.physical_input_mapping
-                        || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
-                    {
+                    let mut materialized = materialized.borrow_mut();
+                    if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
                         changes.push(super::RequiredChange::PatchFunction {
                             function_id: current.id,
                             function_name: f_name.clone(),
                             input_mapping: current.desired_mapping.physical_input_mapping.clone(),
                             output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                         });
+                        materialized.mapping = super::MaterializedPorts {
+                            materialized_inputs: current
+                                .desired_mapping
+                                .physical_input_mapping
+                                .iter()
+                                .map(|(k, v)| {
+                                    (
+                                        k.clone(),
+                                        super::MaterializedInput {
+                                            mapping: v.clone(),
+                                            port_statistics: self
+                                                .telemetry_provider
+                                                .as_ref()
+                                                .and_then(|t| Some(t.input_port_statistics_for(&current.id, k))),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                            materialized_outputs: current
+                                .desired_mapping
+                                .physical_output_mapping
+                                .iter()
+                                .map(|(k, v)| {
+                                    (
+                                        k.clone(),
+                                        super::MaterializedOutput {
+                                            mapping: v.clone(),
+                                            port_statistics: self
+                                                .telemetry_provider
+                                                .as_ref()
+                                                .and_then(|t| Some(t.output_port_statistics_for(&current.id, k))),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                        };
                     }
                 } else {
                     changes.push(super::RequiredChange::StartFunction {
@@ -116,10 +159,48 @@ impl ManagedWorkflow {
                         output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                         annotations: function.annotations.clone(),
                     });
-                    current.materialized = Some(super::PhysicalPorts {
-                        physical_input_mapping: current.desired_mapping.physical_input_mapping.clone(),
-                        physical_output_mapping: current.desired_mapping.physical_output_mapping.clone(),
-                    });
+                    current.materialized = Some(std::cell::RefCell::new(super::actor::MaterializedActor {
+                        mapping: super::MaterializedPorts {
+                            materialized_inputs: current
+                                .desired_mapping
+                                .physical_input_mapping
+                                .iter()
+                                .map(|(k, v)| {
+                                    (
+                                        k.clone(),
+                                        super::MaterializedInput {
+                                            mapping: v.clone(),
+                                            port_statistics: self
+                                                .telemetry_provider
+                                                .as_ref()
+                                                .and_then(|t| Some(t.input_port_statistics_for(&current.id, k))),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                            materialized_outputs: current
+                                .desired_mapping
+                                .physical_output_mapping
+                                .iter()
+                                .map(|(k, v)| {
+                                    (
+                                        k.clone(),
+                                        super::MaterializedOutput {
+                                            mapping: v.clone(),
+                                            port_statistics: self
+                                                .telemetry_provider
+                                                .as_ref()
+                                                .and_then(|t| Some(t.output_port_statistics_for(&current.id, k))),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                        },
+                        runtime_statistics: self
+                            .telemetry_provider
+                            .as_ref()
+                            .and_then(|t| Some(t.component_statistics_for(&current.id))),
+                    }))
                 }
             }
         }
@@ -129,9 +210,8 @@ impl ManagedWorkflow {
             for i in &resource.instances {
                 let mut current = i.borrow_mut();
                 if let Some(materialized) = &current.materialized {
-                    if materialized.physical_input_mapping != current.desired_mapping.physical_input_mapping
-                        || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
-                    {
+                    let materialized = materialized.borrow_mut();
+                    if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
                         changes.push(super::RequiredChange::PatchResource {
                             resource_id: current.id,
                             resource_name: r_name.clone(),
@@ -148,10 +228,48 @@ impl ManagedWorkflow {
                         output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                         configuration: resource.configurations.clone(),
                     });
-                    current.materialized = Some(super::PhysicalPorts {
-                        physical_input_mapping: current.desired_mapping.physical_input_mapping.clone(),
-                        physical_output_mapping: current.desired_mapping.physical_output_mapping.clone(),
-                    });
+                    current.materialized = Some(std::cell::RefCell::new(super::resource::MaterializedResource {
+                        mapping: super::MaterializedPorts {
+                            materialized_inputs: current
+                                .desired_mapping
+                                .physical_input_mapping
+                                .iter()
+                                .map(|(k, v)| {
+                                    (
+                                        k.clone(),
+                                        super::MaterializedInput {
+                                            mapping: v.clone(),
+                                            port_statistics: self
+                                                .telemetry_provider
+                                                .as_ref()
+                                                .and_then(|t| Some(t.input_port_statistics_for(&current.id, k))),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                            materialized_outputs: current
+                                .desired_mapping
+                                .physical_output_mapping
+                                .iter()
+                                .map(|(k, v)| {
+                                    (
+                                        k.clone(),
+                                        super::MaterializedOutput {
+                                            mapping: v.clone(),
+                                            port_statistics: self
+                                                .telemetry_provider
+                                                .as_ref()
+                                                .and_then(|t| Some(t.output_port_statistics_for(&current.id, k))),
+                                        },
+                                    )
+                                })
+                                .collect(),
+                        },
+                        runtime_statistics: self
+                            .telemetry_provider
+                            .as_ref()
+                            .and_then(|t| Some(t.component_statistics_for(&current.id))),
+                    }))
                 }
             }
         }
@@ -161,9 +279,8 @@ impl ManagedWorkflow {
             for i in &subflow.instances {
                 let current = i.borrow_mut();
                 if let Some(materialized) = &current.materialized {
-                    if materialized.physical_input_mapping != current.desired_mapping.physical_input_mapping
-                        || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
-                    {
+                    let materialized = materialized.borrow_mut();
+                    if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
                         changes.push(super::RequiredChange::PatchSubflow {
                             subflow_id: current.id,
                             input_mapping: current.desired_mapping.physical_input_mapping.clone(),
@@ -211,9 +328,8 @@ impl ManagedWorkflow {
             for i in &prx.instances {
                 let current = i.borrow_mut();
                 if let Some(materialized) = &current.materialized {
-                    if materialized.physical_input_mapping != current.desired_mapping.physical_input_mapping
-                        || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
-                    {
+                    let materialized = materialized.borrow_mut();
+                    if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
                         changes.push(super::RequiredChange::PatchProxy {
                             proxy_id: current.id,
                             internal_inputs: current.desired_mapping.physical_input_mapping.clone(),

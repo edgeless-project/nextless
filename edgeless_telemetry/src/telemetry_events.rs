@@ -43,9 +43,14 @@ pub enum TelemetryEvent {
     FunctionInstantiate(std::time::Duration),
     FunctionInit(std::time::Duration),
     FunctionLogEntry(TelemetryLogLevel, String, String), // (_, target, msg)
-    FunctionInvocationCompleted(std::time::Duration),
+    FunctionInvocationCompleted {
+        duration: std::time::Duration,
+        error: bool,
+        under_duration_soft_limit: bool,
+    },
     FunctionStop(std::time::Duration),
     FunctionExit(FunctionExitStatus),
+    MessageReceived(u64),
 }
 
 #[derive(Clone)]
@@ -142,7 +147,7 @@ impl TelemetryProcessor {
 
                 let inner = TelemetryProcessorInner {
                     processing_chain: vec![
-                        // Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
+                        Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
                         Box::new(EventLogger {}),
                     ],
                     receiver,

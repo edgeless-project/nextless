@@ -42,11 +42,13 @@ impl TransformationPipeline {
                 Box::new(workflow_spitter::WorkflowSplitter::new()),
                 Box::new(dead_component_removal::DeadComponentRemoval::new()),
             ],
-            placement: vec![
-                Box::new(placement::DefaultPlacement::new(orchestration_logic, nodes.clone(), peer_clusters)),
-                Box::new(physical_mapper::PhysicalConnectionMapper::new()),
-            ],
+            placement: vec![Box::new(placement::DefaultPlacement::new(
+                orchestration_logic,
+                nodes.clone(),
+                peer_clusters,
+            ))],
             physical_pipeline: vec![
+                Box::new(physical_mapper::PhysicalConnectionMapper::new()),
                 Box::new(pipe_generator::PipeGenerator::new(nodes.clone(), link_controllers.clone())),
                 Box::new(compiler::Compiler::new()),
             ],
@@ -57,6 +59,15 @@ impl TransformationPipeline {
         for t in &mut self.logical_pipeline {
             t.apply(workflow);
         }
+        for t in &mut self.placement {
+            t.apply(workflow);
+        }
+        for t in &mut self.physical_pipeline {
+            t.apply(workflow);
+        }
+    }
+
+    pub fn apply_placement(&mut self, workflow: &mut super::workflow::ActiveWorkflow) {
         for t in &mut self.placement {
             t.apply(workflow);
         }

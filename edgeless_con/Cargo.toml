@@ -30,3 +30,4 @@ serde_json = "1"
 clap = { version = "4.3", features=["derive"] }
 toml = "0.7"
 rand = { version = "0.8" }
+prometheus-http-query = "0.8.3"

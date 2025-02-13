@@ -142,6 +142,7 @@ impl ControllerTask {
             self.nodes.clone(),
             self.peer_clusters.clone(),
             self.link_controllers.clone(),
+            Some(Box::new(super::prometheus_telemetry_provider::PrometheusTelemetryProvider {})),
         );
         let required_changes = tokio::task::block_in_place(|| wf.initial_spawn());
 
@@ -604,6 +605,10 @@ impl ControllerTask {
         // because they failed to reply to a keep-alive.
         let to_be_disconnected = self.find_dead_nodes().await;
 
+        if to_be_disconnected.is_empty() {
+            return self.optimize().await;
+        }
+
         // Second, remove all those nodes from the map of clients.
         for node_id in to_be_disconnected.iter() {
             log::info!("disconnected node not replying to keep-alive: {}", &node_id);
@@ -667,6 +672,26 @@ impl ControllerTask {
             let required_changes = tokio::task::block_in_place(|| wf.node_removal(removed_nodes));
             if let Err(errs) = self.materialize(wf_id, required_changes).await {
                 log::error!("Failures Handling Node Removal: {}", errs.join(";"));
+            }
+        }
+    }
+
+    async fn optimize(&mut self) {
+        for wf_id in self
+            .active_workflows
+            .keys()
+            .cloned()
+            .collect::<Vec<edgeless_api::workflow_instance::WorkflowId>>()
+        {
+            self.optimize_workflow(wf_id.clone()).await;
+        }
+    }
+
+    async fn optimize_workflow(&mut self, wf_id: edgeless_api::workflow_instance::WorkflowId) {
+        if let Some(wf) = self.active_workflows.get_mut(&wf_id) {
+            let required_changes = tokio::task::block_in_place(|| wf.periodic_optimize());
+            if let Err(errs) = self.materialize(wf_id, required_changes).await {
+                log::error!("Failures Handling Periodic Optimization: {}", errs.join(";"));
             }
         }
     }

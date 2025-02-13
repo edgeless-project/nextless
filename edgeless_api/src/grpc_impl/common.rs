@@ -229,13 +229,14 @@ impl CommonConverters {
         }
     }
 
-    pub fn serialize_input(crate_input: &crate::common::Input) -> super::api::InstanceInput {
+    pub fn serialize_input(crate_input: &crate::common::Input) -> Option<super::api::InstanceInput> {
         match crate_input {
-            crate::common::Input::Link(link_instance_id) => super::api::InstanceInput {
+            crate::common::Input::Link(link_instance_id) => Some(super::api::InstanceInput {
                 input_type: Some(super::api::instance_input::InputType::Link(CommonConverters::serialize_link_instance_id(
                     link_instance_id,
                 ))),
-            },
+            }),
+            crate::common::Input::Stub => None,
         }
     }
 

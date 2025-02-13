@@ -182,7 +182,7 @@ impl FunctonInstanceConverters {
             input_mapping: req
                 .input_mapping
                 .iter()
-                .map(|(id, spec)| (id.0.clone(), CommonConverters::serialize_input(spec)))
+                .filter_map(|(id, spec)| CommonConverters::serialize_input(spec).map(|v| (id.0.clone(), v)))
                 .collect(),
             output_mapping: req
                 .output_mapping

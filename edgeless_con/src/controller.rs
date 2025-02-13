@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 pub mod client;
+pub mod prometheus_telemetry_provider;
 pub mod server;
 // TODO Split and fix
 // #[cfg(test)]

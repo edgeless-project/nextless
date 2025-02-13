@@ -52,6 +52,73 @@ impl super::Transformation for DefaultPlacement {
                 } else {
                     log::info!("Found no viable node for {} in {}", &f_id, slf.id.workflow_id);
                 }
+            } else {
+                // This is a test that shows the use of the Materialized Representation
+                for i in &function.instances() {
+                    let instance = i.borrow_mut();
+                    if let Some(materialized) = &instance.materialized_state() {
+                        let mut materialized = materialized.borrow_mut();
+                        if let Some(v) = materialized
+                            .runtime_statistics()
+                            .and_then(|s| s.invocation_rate_abs(std::time::Duration::from_secs(120)))
+                        {
+                            log::debug!("Invocation Rate: {}", v)
+                        }
+                        if let Some(v) = materialized
+                            .runtime_statistics()
+                            .and_then(|s| Some(s.invocations_rate_abs_by_port(std::time::Duration::from_secs(120))))
+                        {
+                            log::debug!("Invocation Rate By Port: {:?}", v);
+                        }
+
+                        if let Some(v) = materialized
+                            .runtime_statistics()
+                            .and_then(|s| s.duration_mean_secs(std::time::Duration::from_secs(120)))
+                        {
+                            log::debug!("Mean Duration MS: {}", v * 1000.0);
+                        }
+                        if let Some(v) = materialized
+                            .runtime_statistics()
+                            .and_then(|s| s.duration_soft_limit_rate_rel(std::time::Duration::from_secs(120)))
+                        {
+                            log::debug!("Duration Soft Limit Score: {}", v);
+                        }
+
+                        if let Some(v) = materialized
+                            .runtime_statistics()
+                            .and_then(|s| s.error_rate_rel(std::time::Duration::from_secs(120)))
+                        {
+                            log::debug!("Error Rate {}", v);
+                        }
+
+                        for (p_id, p) in &materialized.materialized_ports().materialized_inputs {
+                            if let Some(v) = p
+                                .runtime_statistics()
+                                .and_then(|s| s.message_rate_abs(std::time::Duration::from_secs(120)))
+                            {
+                                log::debug!("Port Rate {}: {}", p_id.0, v);
+                            }
+                            if let Some(v) = p
+                                .runtime_statistics()
+                                .and_then(|s| Some(s.message_rate_abs_by_peer(std::time::Duration::from_secs(120))))
+                            {
+                                log::debug!("Port By Peer Rate {}: {:?}", p_id.0, v);
+                            }
+                            if let Some(v) = p
+                                .runtime_statistics()
+                                .and_then(|s| s.message_size_mean_bytes(std::time::Duration::from_secs(120)))
+                            {
+                                log::debug!("Port Size {}: {}", p_id.0, v);
+                            }
+                            if let Some(v) = p
+                                .runtime_statistics()
+                                .and_then(|s| Some(s.message_size_mean_byte_by_peer(std::time::Duration::from_secs(120))))
+                            {
+                                log::debug!("Port By Peer Size {}: {:?}", p_id.0, v);
+                            }
+                        }
+                    }
+                }
             }
         }
 

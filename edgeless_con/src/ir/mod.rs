@@ -21,32 +21,62 @@ pub trait LogicalComponent {
 
 pub trait PhysicalComponent {
     fn physical_ports(&mut self) -> &mut PhysicalPorts;
-    fn materialized_state(&mut self) -> &mut dyn MaterializedComponent;
+    fn materialized_state(&self) -> Option<&std::cell::RefCell<dyn MaterializedComponent>>;
 }
 
 pub trait MaterializedComponent {
-    fn materialized_ports(&mut self) -> &mut PhysicalPorts;
-    fn runtime_statistics(&mut self) -> &mut dyn ComponentStatistics;
+    fn materialized_ports(&mut self) -> &mut MaterializedPorts;
+    fn runtime_statistics(&self) -> Option<&dyn ComponentRuntimeStatistics>;
 }
 
-pub trait ComponentStatistics {
-    fn processing_duration(&self) -> &dyn ProcessingMetric;
+pub trait ComponentRuntimeStatistics: Sync + Send {
+    fn invocation_rate_abs(&self, period: std::time::Duration) -> Option<f64>;
+    fn invocations_rate_abs_by_port(&self, period: std::time::Duration) -> Vec<(edgeless_api::function_instance::PortId, f64)>;
+    fn duration_mean_secs(&self, period: std::time::Duration) -> Option<f64>;
+    fn duration_soft_limit_rate_rel(&self, period: std::time::Duration) -> Option<f64>;
+    fn error_rate_rel(&self, period: std::time::Duration) -> Option<f64>;
+
+    // TODO(raphael) Add Memory Tracking
+    // fn memory_top_mean_bytes(&self, period: std::time::Duration) -> Option<f64>;
+    // fn memory_soft_limit_rate_rel(&self, period: std::time::Duration) -> Option<f64>;
 }
 
-pub trait ProcessingMetric {
-    fn invocations(&self, period: Option<std::time::Duration>) -> u64;
-    fn invocations_by_port(&self, period: Option<std::time::Duration>) -> Vec<(edgeless_api::function_instance::PortId, u64)>;
-    fn mean_duration_ms(&self, period: Option<std::time::Duration>) -> f64;
-    fn soft_limit_score(&self, period: Option<std::time::Duration>) -> f64;
-    fn hard_limit_score(&self, period: Option<std::time::Duration>) -> f64;
+pub trait PortStatistics: Sync + Send {
+    fn message_rate_abs(&self, period: std::time::Duration) -> Option<f64>;
+    fn message_rate_abs_by_peer(&self, period: std::time::Duration) -> Vec<(edgeless_api::function_instance::InstanceId, f64)>;
+    fn message_size_mean_bytes(&self, period: std::time::Duration) -> Option<f64>;
+    fn message_size_mean_byte_by_peer(&self, period: std::time::Duration) -> Vec<(edgeless_api::function_instance::InstanceId, f64)>;
+
+    // TODO: Probably no great way to meaure this (one-way latencies)
+    // fn latency_mean_secs(&self, period: Option<std::time::Duration>) -> f64;
+    // fn latency_by_peer_mean_secs(&self, period: Option<std::time::Duration>) -> Vec<(edgeless_api::function_instance::InstanceId, f64)>;
 }
 
+// Read-only view of a node's state
+pub trait Node {
+    // fn capabilities(&self) -> &edgeless_api::node_registration::NodeCapabilities;
+    // Available Hardware Resources
+    // Available Software (Runtimes, Resources)
+    // Available Links
+    // Usage
+}
 
+// Read-only view of a peer-cluster's state
+pub trait Cluster {}
 
-// pub trait PortMetric {
-//     fn triggers(&self);
-//     fn mean_latency(&self);
-// }
+pub trait TelemetryProvider: Sync + Send {
+    fn component_statistics_for(&self, component_id: &edgeless_api::function_instance::InstanceId) -> Box<dyn ComponentRuntimeStatistics>;
+    fn input_port_statistics_for(
+        &self,
+        component_id: &edgeless_api::function_instance::InstanceId,
+        port_id: &edgeless_api::function_instance::PortId,
+    ) -> Box<dyn PortStatistics>;
+    fn output_port_statistics_for(
+        &self,
+        component_id: &edgeless_api::function_instance::InstanceId,
+        port_id: &edgeless_api::function_instance::PortId,
+    ) -> Box<dyn PortStatistics>;
+}
 
 #[derive(Default, Debug)]
 pub struct LogicalPorts {
@@ -60,6 +90,49 @@ pub struct PhysicalPorts {
     pub physical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
 }
 
+pub struct MaterializedPorts {
+    pub materialized_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, MaterializedOutput>,
+    pub materialized_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, MaterializedInput>,
+}
+
+impl MaterializedPorts {
+    fn is_current_mapping(&self, other: &PhysicalPorts) -> bool {
+        if self.materialized_outputs.len() != other.physical_output_mapping.len()
+            || self.materialized_inputs.len() != other.physical_input_mapping.len()
+        {
+            return false;
+        }
+
+        for (k, v) in &self.materialized_outputs {
+            match other.physical_output_mapping.get(k) {
+                Some(ov) => {
+                    if v.mapping != *ov {
+                        return false;
+                    }
+                }
+                _ => {
+                    return false;
+                }
+            }
+        }
+
+        for (k, v) in &self.materialized_inputs {
+            match other.physical_input_mapping.get(k) {
+                Some(ov) => {
+                    if v.mapping != *ov {
+                        return false;
+                    }
+                }
+                _ => {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+
 #[derive(Default)]
 pub struct ExternalPorts {
     pub external_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
@@ -69,6 +142,28 @@ pub struct ExternalPorts {
 pub struct InternalPorts {
     pub internal_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalOutput>,
     pub internal_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalInput>,
+}
+
+pub struct MaterializedInput {
+    pub(crate) mapping: edgeless_api::common::Input,
+    port_statistics: Option<Box<dyn PortStatistics>>,
+}
+
+impl MaterializedInput {
+    fn runtime_statistics(&self) -> Option<&dyn PortStatistics> {
+        self.port_statistics.as_deref()
+    }
+}
+
+pub struct MaterializedOutput {
+    pub(crate) mapping: edgeless_api::common::Output,
+    port_statistics: Option<Box<dyn PortStatistics>>,
+}
+
+impl MaterializedOutput {
+    fn runtime_statistics(&self) -> Option<&dyn PortStatistics> {
+        self.port_statistics.as_deref()
+    }
 }
 
 #[derive(Debug)]
