@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 pub mod client;
-pub mod prometheus_telemetry_provider;
 pub mod server;
 // TODO Split and fix
 // #[cfg(test)]
@@ -45,27 +44,21 @@ impl Controller {
     pub async fn new_from_config(
         controller_settings: crate::EdgelessConSettings,
     ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
-        // Connect to all orchestrators.
-        // let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>::new();
-        // for orc in &controller_settings.orchestrators {
-        //     match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url, Some(1)).await {
-        //         Ok(val) => {
-        //             orc_clients.insert(orc.domain_id.to_string(), Box::new(val));
-        //         }
-        //         Err(err) => {
-        //             log::error!("Could not connect to e-ORC {}: {}", &orc.orchestrator_url, err);
-        //         }
-        //     }
-        // }
-
-        Self::new()
+        if let Some(prometheus_url) = &controller_settings.prometheus_url {
+            let tp = Box::new(crate::prometheus_telemetry_provider::PrometheusTelemetryProvider::new(
+                prometheus_url.clone(),
+            ));
+            Self::new(Some(tp))
+        } else {
+            Self::new(None)
+        }
     }
 
-    fn new() -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
+    fn new(telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            let mut controller_task = server::ControllerTask::new(uuid::Uuid::new_v4(), receiver);
+            let mut controller_task = server::ControllerTask::new(uuid::Uuid::new_v4(), receiver, telemetry_provider);
             controller_task.run().await;
         });
 

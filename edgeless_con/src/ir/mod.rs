@@ -64,7 +64,7 @@ pub trait Node {
 // Read-only view of a peer-cluster's state
 pub trait Cluster {}
 
-pub trait TelemetryProvider: Sync + Send {
+pub trait TelemetryProvider: TelemetryProviderClone + Sync + Send {
     fn component_statistics_for(&self, component_id: &edgeless_api::function_instance::InstanceId) -> Box<dyn ComponentRuntimeStatistics>;
     fn input_port_statistics_for(
         &self,
@@ -76,6 +76,24 @@ pub trait TelemetryProvider: Sync + Send {
         component_id: &edgeless_api::function_instance::InstanceId,
         port_id: &edgeless_api::function_instance::PortId,
     ) -> Box<dyn PortStatistics>;
+}
+
+// https://stackoverflow.com/a/30353928
+pub trait TelemetryProviderClone {
+    fn clone_box(&self) -> Box<dyn TelemetryProvider>;
+}
+impl<T> TelemetryProviderClone for T
+where
+    T: 'static + TelemetryProvider + Clone,
+{
+    fn clone_box(&self) -> Box<dyn TelemetryProvider> {
+        Box::new(self.clone())
+    }
+}
+impl Clone for Box<dyn TelemetryProvider> {
+    fn clone(&self) -> Box<dyn TelemetryProvider> {
+        self.clone_box()
+    }
 }
 
 #[derive(Default, Debug)]

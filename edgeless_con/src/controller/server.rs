@@ -20,6 +20,7 @@ pub struct ControllerTask {
         std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::super::ir::managed_worflow::ManagedWorkflow>,
     orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
+    telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
 }
 pub struct WorkerNode {
     pub agent_url: String,
@@ -50,6 +51,7 @@ impl ControllerTask {
     pub fn new(
         cluster_id: edgeless_api::function_instance::NodeId,
         request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
+        telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
     ) -> Self {
         Self {
             request_receiver,
@@ -64,6 +66,7 @@ impl ControllerTask {
             orchestration_logic: std::sync::Arc::new(tokio::sync::Mutex::new(crate::orchestration_logic::OrchestrationLogic::new(
                 crate::orchestration_utils::OrchestrationStrategy::Random,
             ))),
+            telemetry_provider,
         }
     }
 
@@ -142,7 +145,7 @@ impl ControllerTask {
             self.nodes.clone(),
             self.peer_clusters.clone(),
             self.link_controllers.clone(),
-            Some(Box::new(super::prometheus_telemetry_provider::PrometheusTelemetryProvider {})),
+            self.telemetry_provider.clone(),
         );
         let required_changes = tokio::task::block_in_place(|| wf.initial_spawn());
 

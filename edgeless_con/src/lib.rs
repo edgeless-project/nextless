@@ -6,6 +6,7 @@ mod controller;
 mod ir;
 mod orchestration_logic;
 mod orchestration_utils;
+pub mod prometheus_telemetry_provider;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConOrcConfig {
@@ -16,7 +17,8 @@ pub struct EdgelessConOrcConfig {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConSettings {
     pub controller_url: String,
-    pub orchestrators: Vec<EdgelessConOrcConfig>,
+    pub prometheus_url: Option<String>,
+    // pub orchestrators: Vec<EdgelessConOrcConfig>,
 }
 
 pub async fn edgeless_con_main(settings: EdgelessConSettings) {
@@ -34,9 +36,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
 pub fn edgeless_con_default_conf() -> String {
     String::from(
         r##"controller_url = "http://127.0.0.1:7001"
-orchestrators = [
-    { domain_id = "domain-1", orchestrator_url="http://127.0.0.1:7011" }
-]
+            prometheus_url = "http://127.0.0.1:9090"
 "##,
     )
 }

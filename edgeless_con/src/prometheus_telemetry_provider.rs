@@ -1,8 +1,19 @@
-pub struct PrometheusTelemetryProvider {}
+use std::str::FromStr;
+
+#[derive(Clone)]
+pub struct PrometheusTelemetryProvider {
+    url: String,
+}
+
+impl PrometheusTelemetryProvider {
+    pub fn new(url: String) -> Self {
+        Self { url }
+    }
+}
 
 impl crate::ir::TelemetryProvider for PrometheusTelemetryProvider {
     fn component_statistics_for(&self, component_id: &edgeless_api::function_instance::InstanceId) -> Box<dyn crate::ir::ComponentRuntimeStatistics> {
-        Box::new(PrometheusComponentRuntimeStatistics::new(component_id.clone()))
+        Box::new(PrometheusComponentRuntimeStatistics::new(component_id.clone(), &self.url))
     }
 
     fn input_port_statistics_for(
@@ -10,7 +21,12 @@ impl crate::ir::TelemetryProvider for PrometheusTelemetryProvider {
         component_id: &edgeless_api::function_instance::InstanceId,
         port_id: &edgeless_api::function_instance::PortId,
     ) -> Box<dyn crate::ir::PortStatistics> {
-        Box::new(PrometheusPortStatistics::new(component_id.clone(), port_id.clone(), PortDirection::Input))
+        Box::new(PrometheusPortStatistics::new(
+            component_id.clone(),
+            port_id.clone(),
+            PortDirection::Input,
+            &self.url,
+        ))
     }
 
     fn output_port_statistics_for(
@@ -22,6 +38,7 @@ impl crate::ir::TelemetryProvider for PrometheusTelemetryProvider {
             component_id.clone(),
             port_id.clone(),
             PortDirection::Output,
+            &self.url,
         ))
     }
 }
@@ -44,10 +61,10 @@ enum PortDirection {
 }
 
 impl PrometheusComponentRuntimeStatistics {
-    fn new(component_id: edgeless_api::function_instance::InstanceId) -> Self {
+    fn new(component_id: edgeless_api::function_instance::InstanceId, url: &str) -> Self {
         PrometheusComponentRuntimeStatistics {
             component_id: component_id.clone(),
-            client: prometheus_http_query::Client::default(),
+            client: prometheus_http_query::Client::from_str(url).expect("Critical Prometheus Configuration Error"),
         }
     }
 }
@@ -143,9 +160,10 @@ impl PrometheusPortStatistics {
         component_id: edgeless_api::function_instance::InstanceId,
         port_id: edgeless_api::function_instance::PortId,
         direction: PortDirection,
+        url: &str,
     ) -> Self {
         PrometheusPortStatistics {
-            client: prometheus_http_query::Client::default(),
+            client: prometheus_http_query::Client::from_str(url).expect("Critical Prometheus Configuration Error"),
             component_id,
             port_id,
             direction,
