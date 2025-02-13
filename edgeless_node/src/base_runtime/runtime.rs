@@ -35,13 +35,7 @@ pub fn create<FunctionInstanceType: super::FunctionInstance>(
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
 ) -> (RuntimeClient, RuntimeTask<FunctionInstanceType>) {
     let (sender, receiver) = futures::channel::mpsc::unbounded();
-    let task: RuntimeTask<FunctionInstanceType> = RuntimeTask::new(
-        receiver,
-        data_plane_provider,
-        state_manager,
-        telemetry_handle,
-        sender.clone(),
-    );
+    let task: RuntimeTask<FunctionInstanceType> = RuntimeTask::new(receiver, data_plane_provider, state_manager, telemetry_handle, sender.clone());
 
     let client = RuntimeClient::new(sender);
 

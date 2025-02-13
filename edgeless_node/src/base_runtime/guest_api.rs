@@ -13,7 +13,7 @@ pub struct GuestAPIHost {
     pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
     pub telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     pub poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
-    pub tracing_context: std::sync::Arc<tokio::sync::Mutex<super::function_instance_runner::TracingContext>>
+    pub tracing_context: std::sync::Arc<tokio::sync::Mutex<super::function_instance_runner::TracingContext>>,
 }
 
 /// Errors to be reported by the host side of the guest binding.
@@ -26,7 +26,11 @@ pub enum GuestAPIError {
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
         self.data_plane
-            .send_alias(alias.to_string(), msg.to_string(), self.tracing_context.lock().await.parent_context.clone())
+            .send_alias(
+                alias.to_string(),
+                msg.to_string(),
+                self.tracing_context.lock().await.parent_context.clone(),
+            )
             .await
             .map_err(|_e| GuestAPIError::UnknownAlias)
     }
@@ -37,7 +41,14 @@ impl GuestAPIHost {
         target_port: edgeless_api::function_instance::PortId,
         msg: &str,
     ) -> Result<(), GuestAPIError> {
-        self.data_plane.send(target, target_port, msg.to_string(), self.tracing_context.lock().await.parent_context.clone()).await;
+        self.data_plane
+            .send(
+                target,
+                target_port,
+                msg.to_string(),
+                self.tracing_context.lock().await.parent_context.clone(),
+            )
+            .await;
         Ok(())
     }
 
@@ -90,7 +101,10 @@ impl GuestAPIHost {
         tokio::spawn(async move {
             let span = cloned_tracer.start("wait");
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-            cloned_plane.send_alias(cloned_alias, cloned_msg, opentelemetry::Context::new()).await.unwrap();
+            cloned_plane
+                .send_alias(cloned_alias, cloned_msg, opentelemetry::Context::new())
+                .await
+                .unwrap();
         });
 
         Ok(())

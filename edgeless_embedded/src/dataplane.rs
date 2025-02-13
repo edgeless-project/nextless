@@ -22,9 +22,9 @@ impl EmbeddedDataplaneHandle {
             data: edgeless_api_core::invocation::EventData::Cast(msg.as_bytes()),
             span_context: edgeless_api_core::invocation::SpanContext {
                 trace_id: [0; 16],
-                span_id: [0;8],
+                span_id: [0; 8],
                 trace_flags: 0,
-            }
+            },
         };
         self.reg.handle(event).await.unwrap();
     }

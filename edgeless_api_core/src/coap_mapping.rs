@@ -25,7 +25,7 @@ impl COAPEncoder {
                 crate::invocation::EventData::CallNoRet => crate::invocation::EventData::CallNoRet,
                 crate::invocation::EventData::Err => crate::invocation::EventData::Err,
             },
-            span_context: event.span_context.clone()
+            span_context: event.span_context.clone(),
         };
         minicbor::encode(&new_event, &mut buffer[..]).unwrap();
         let len = minicbor::len(&event);

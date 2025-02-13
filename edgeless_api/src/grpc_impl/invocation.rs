@@ -73,7 +73,7 @@ impl From<opentelemetry::trace::SpanContext> for crate::grpc_impl::api::SpanCont
         Self {
             trace_id: value.trace_id().to_bytes().to_vec(),
             span_id: value.span_id().to_bytes().to_vec(),
-            trace_flags: value.trace_flags().to_u8() as u32
+            trace_flags: value.trace_flags().to_u8() as u32,
         }
     }
 }
@@ -84,7 +84,13 @@ impl TryInto<opentelemetry::trace::SpanContext> for &crate::grpc_impl::api::Span
     fn try_into(self) -> Result<opentelemetry::trace::SpanContext, Self::Error> {
         let trace_id = opentelemetry::trace::TraceId::from_bytes(self.trace_id.clone().try_into().map_err(|e| anyhow::anyhow!("{:?}", e))?);
         let span_id = opentelemetry::trace::SpanId::from_bytes(self.span_id.clone().try_into().map_err(|e| anyhow::anyhow!("{:?}", e))?);
-        Ok(opentelemetry::trace::SpanContext::new(trace_id, span_id, opentelemetry::trace::TraceFlags::new(self.trace_flags as u8), true, opentelemetry::trace::TraceState::NONE))
+        Ok(opentelemetry::trace::SpanContext::new(
+            trace_id,
+            span_id,
+            opentelemetry::trace::TraceFlags::new(self.trace_flags as u8),
+            true,
+            opentelemetry::trace::TraceState::NONE,
+        ))
     }
 }
 

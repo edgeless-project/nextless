@@ -430,13 +430,16 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         .with_tonic()
         .with_endpoint("http://otelco:4317")
         .with_timeout(std::time::Duration::from_secs(3))
-        .build().unwrap();
-    
+        .build()
+        .unwrap();
+
     let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
         .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
         .with_config(
-            opentelemetry_sdk::trace::Config::default()
-            .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new("service.name", "edgeless_node")]))
+            opentelemetry_sdk::trace::Config::default().with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
+                "service.name",
+                "edgeless_node",
+            )])),
         )
         .build();
 

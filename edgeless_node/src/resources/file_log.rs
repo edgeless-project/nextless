@@ -31,8 +31,6 @@ impl FileLogResource {
 
         let mut outfile = std::fs::OpenOptions::new().create(true).append(true).open(filename)?;
 
-
-        
         log::info!("FileLogResource created, writing to file: {}", filename);
 
         let handle = tokio::spawn(async move {
@@ -42,7 +40,7 @@ impl FileLogResource {
                     channel_id,
                     message,
                     target_port,
-                    context
+                    context,
                 } = dataplane_handle.receive_next().await;
 
                 let mut need_reply = false;

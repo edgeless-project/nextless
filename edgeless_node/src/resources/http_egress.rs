@@ -35,7 +35,7 @@ impl EgressResource {
                     channel_id,
                     message,
                     target_port,
-                    context
+                    context,
                 } = dataplane_handle.receive_next().await;
                 let message_data = match message {
                     Message::Call(data) => data,

@@ -27,17 +27,17 @@ pub struct Event<T> {
     #[n(4)]
     pub target_port: super::port::Port<32>,
     #[n(5)]
-    pub span_context: SpanContext
+    pub span_context: SpanContext,
 }
 
-#[derive(Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen)] 
+#[derive(Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen)]
 pub struct SpanContext {
     #[n(0)]
     pub trace_id: [u8; 16],
     #[n(1)]
     pub span_id: [u8; 8],
     #[n(2)]
-    pub trace_flags: u8
+    pub trace_flags: u8,
 }
 
 #[derive(Debug, PartialEq, Eq)]

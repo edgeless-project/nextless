@@ -81,7 +81,7 @@ impl OllamaResource {
                     channel_id: _,
                     message,
                     target_port,
-                    context
+                    context,
                 } = dataplane_handle.receive_next().await;
 
                 // Ignore any non-cast messages.
