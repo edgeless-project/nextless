@@ -21,6 +21,7 @@ pub trait Sensor {
 }
 
 pub struct SCD30SensorConfiguration {
+    pub instance_id: edgeless_api_core::instance_id::InstanceId,
     pub data_out_id: Option<edgeless_api_core::common::Output>,
 }
 
@@ -48,7 +49,10 @@ impl SCD30Sensor {
             }
         }
 
-        Ok(SCD30SensorConfiguration { data_out_id: out_id })
+        Ok(SCD30SensorConfiguration {
+            data_out_id: out_id,
+            instance_id: data.instance_id,
+        })
     }
 
     pub async fn new(
@@ -201,12 +205,10 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
             });
         }
 
-        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
-
-        lck.instance_id = Some(instance_id);
+        lck.instance_id = Some(instance_specification.instance_id);
         lck.data_out_id = instance_specification.data_out_id;
         log::info!("Start Sensor");
-        Ok(instance_id)
+        Ok(instance_specification.instance_id)
     }
 
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {

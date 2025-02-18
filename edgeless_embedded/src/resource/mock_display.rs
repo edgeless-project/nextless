@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
-pub struct MockDisplayInstanceConfiguration {}
+pub struct MockDisplayInstanceConfiguration {
+    instance_id: edgeless_api_core::instance_id::InstanceId,
+}
 
 pub struct MockDisplay {
     pub instance_id: Option<edgeless_api_core::instance_id::InstanceId>,
@@ -12,7 +14,9 @@ impl MockDisplay {
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
         if data.class_type == "epaper-display" {
-            Ok(MockDisplayInstanceConfiguration {})
+            Ok(MockDisplayInstanceConfiguration {
+                instance_id: data.instance_id,
+            })
         } else {
             Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource class type.",
@@ -88,8 +92,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
         log::info!("Display Start");
-
-        let _instance_specification = Self::parse_configuration(instance_specification).await?;
+        let instance_specification = Self::parse_configuration(instance_specification).await?;
 
         if self.instance_id.is_some() {
             return Err(edgeless_api_core::common::ErrorResponse {
@@ -98,11 +101,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
             });
         }
 
-        let id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
+        self.instance_id = Some(instance_specification.instance_id);
 
-        self.instance_id = Some(id);
-
-        Ok(id)
+        Ok(instance_specification.instance_id)
     }
 
     async fn patch(

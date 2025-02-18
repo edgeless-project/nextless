@@ -3,6 +3,7 @@ use core::str::FromStr;
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 pub struct EPaperDisplayInstanceConfiguration {
+    instance_id: edgeless_api_core::instance_id::InstanceId,
     header_text: Option<[u8; 128]>,
 }
 
@@ -38,7 +39,10 @@ impl EPaperDisplay {
                 }
             }
 
-            Ok(EPaperDisplayInstanceConfiguration { header_text: config })
+            Ok(EPaperDisplayInstanceConfiguration {
+                header_text: config,
+                instance_id: data.instance_id,
+            })
         } else {
             Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource ProviderId",
@@ -143,7 +147,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
             });
         }
 
-        self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID));
+        self.instance_id = Some(instance_specification.instance_id);
 
         self.header = instance_specification.header_text;
 

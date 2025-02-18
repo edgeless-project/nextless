@@ -30,7 +30,28 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
     let server_task =
         edgeless_api::grpc_impl::controller::WorkflowInstanceAPIServer::run(controller.get_api_client(), settings.controller_url.clone());
 
-    futures::join!(controller_task, server_task);
+    let coap_server_task = if let Some(url) = Some("coap://0.0.0.0:7001") {
+        if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
+            if proto != edgeless_api::util::Proto::COAP {
+                log::warn!("Wrong protocol for the CoAP node register ({}): assuming coap://", url);
+            }
+            if address != "0.0.0.0" {
+                log::warn!("CoAP node register requested to be bound at {}: ignored, using 0.0.0.0 instead", address);
+            }
+            log::info!("Start Controller COAP: {}:{}", address, port);
+            edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
+                controller.get_api_client().node_registration_api(),
+                std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
+            )
+        } else {
+            log::error!("Wrong URL for the CoAP node register: {}", url);
+            Box::pin(async {})
+        }
+    } else {
+        Box::pin(async {})
+    };
+
+    futures::join!(controller_task, server_task, coap_server_task);
 }
 
 pub fn edgeless_con_default_conf() -> String {

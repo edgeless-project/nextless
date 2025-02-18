@@ -430,7 +430,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             context.span().end();
             tracer.start_with_context(span_id, &context)
         } else {
-            assert!(false);
+            // assert!(false);
             tracer.start(span_id)
         };
         span.add_event("test", vec![]);

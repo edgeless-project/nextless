@@ -8,6 +8,7 @@ pub struct MockSensorInner {
 }
 
 pub struct MockSensorConfiguration {
+    pub instance_id: edgeless_api_core::instance_id::InstanceId,
     pub data_out_id: Option<edgeless_api_core::common::Output>,
     pub delay_s: u8,
 }
@@ -57,6 +58,7 @@ impl MockSensor {
         }
 
         Ok(MockSensorConfiguration {
+            instance_id: data.instance_id,
             data_out_id: out_id,
             delay_s: delay,
         })
@@ -177,7 +179,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
             });
         }
 
-        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
+        let instance_id = instance_specification.instance_id;
 
         lck.instance_id = Some(instance_id);
         lck.data_out_id = instance_specification.data_out_id;

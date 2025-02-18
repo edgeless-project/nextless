@@ -78,6 +78,7 @@
             ];
             buildInputs = with pkgs; [
               openssl #TODO Unify OpenSSL Usage
+              toolchain
             ];
           };
         };

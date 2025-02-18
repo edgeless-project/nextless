@@ -61,6 +61,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         }
 
         let encoded_resource_spec = edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
+            instance_id: instance_specification.resource_id,
             class_type: &instance_specification.class_type,
             output_mapping: outputs,
             configuration,

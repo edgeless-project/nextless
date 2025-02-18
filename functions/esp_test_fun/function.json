@@ -1,7 +1,0 @@
-{
-    "id": "esp_test_fun",
-    "function_type": "RUST_WASM",
-    "version": "0.1",
-    "build": "Cargo.toml",
-    "outputs": []
-}

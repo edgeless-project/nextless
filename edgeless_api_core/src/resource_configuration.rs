@@ -4,6 +4,7 @@
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct EncodedResourceInstanceSpecification<'a> {
+    pub instance_id: crate::instance_id::InstanceId,
     pub class_type: &'a str,
     pub output_mapping: heapless::Vec<(&'a str, crate::common::Output), 16>,
     pub configuration: heapless::Vec<(&'a str, &'a str), 16>,
@@ -17,7 +18,8 @@ pub struct EncodedPatchRequest<'a> {
 
 impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
     fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
-        let mut e = e.str(self.class_type)?;
+        let mut e = e.encode(self.instance_id)?;
+        e = e.str(self.class_type)?;
         {
             e = e.array(self.output_mapping.len() as u64)?;
             for data in &self.output_mapping {
@@ -37,7 +39,9 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
 
 impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let id = d.str()?;
+        let instance_id = d.decode::<crate::instance_id::InstanceId>()?;
+
+        let class_type = d.str()?;
         let mut outputs = heapless::Vec::<(&'b str, crate::common::Output), 16>::new();
         let mut configuration = heapless::Vec::<(&'b str, &'b str), 16>::new();
 
@@ -54,7 +58,8 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
         }
 
         Ok(EncodedResourceInstanceSpecification {
-            class_type: id,
+            instance_id,
+            class_type,
             output_mapping: outputs,
             configuration,
         })
@@ -63,7 +68,8 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
 
 impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let mut len: usize = self.class_type.cbor_len(ctx);
+        let mut len: usize = self.instance_id.cbor_len(ctx);
+        len += self.class_type.cbor_len(ctx);
 
         len += self.output_mapping[..self.output_mapping.len()].cbor_len(ctx);
 
@@ -141,6 +147,7 @@ mod test {
             .unwrap();
 
         let id = super::EncodedResourceInstanceSpecification {
+            instance_id: crate::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
             class_type: "class-1",
             output_mapping: outputs,
             configuration,
