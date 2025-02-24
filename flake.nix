@@ -43,12 +43,14 @@
               toolchain
               makeWrapper
               gcc
+              binaryen
             ];
             postInstall = ''
               wrapProgram $out/bin/edgeless_cli \
                 --set PATH ${pkgs.lib.makeBinPath [
                   toolchain
                   pkgs.gcc
+                  pkgs.binaryen
                 ]}
             '';
           };
@@ -96,15 +98,17 @@
               toolchain
               makeWrapper
               gcc
+              binaryen
             ];
             postInstall = ''
               wrapProgram $out/bin/edgeless_con_d \
                 --set PATH ${pkgs.lib.makeBinPath [
                   toolchain
                   pkgs.gcc
+                  pkgs.binaryen
                 ]}
             '';
-          };
+            };
         };
 
 
@@ -116,6 +120,7 @@
             toolchain
             mold
             gcc
+            binaryen
           ];
         };
       }

@@ -1894,6 +1894,7 @@ dependencies = [
  "static_cell",
  "ufmt",
  "uuid",
+ "wasmi 0.40.0",
 ]
 
 [[package]]
@@ -2019,7 +2020,7 @@ dependencies = [
  "tonic 0.10.2",
  "tonic-build 0.10.2",
  "uuid",
- "wasmi",
+ "wasmi 0.31.2",
  "wasmtime 18.0.4",
 ]
 
@@ -4814,6 +4815,12 @@ dependencies = [
  "spin",
  "version_check",
 ]
+
+[[package]]
+name = "multi-stash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "685a9ac4b61f4e728e1d2c6a7844609c16527aeb5e6c865915c08e619c16410f"
 
 [[package]]
 name = "multimap"
@@ -7749,8 +7756,24 @@ dependencies = [
  "smallvec",
  "spin",
  "wasmi_arena",
- "wasmi_core",
+ "wasmi_core 0.13.0",
  "wasmparser-nostd",
+]
+
+[[package]]
+name = "wasmi"
+version = "0.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a19af97fcb96045dd1d6b4d23e2b4abdbbe81723dbc5c9f016eb52145b320063"
+dependencies = [
+ "arrayvec",
+ "multi-stash",
+ "smallvec",
+ "spin",
+ "wasmi_collections",
+ "wasmi_core 0.40.0",
+ "wasmi_ir",
+ "wasmparser 0.221.3",
 ]
 
 [[package]]
@@ -7758,6 +7781,12 @@ name = "wasmi_arena"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "104a7f73be44570cac297b3035d76b169d6599637631cf37a1703326a0727073"
+
+[[package]]
+name = "wasmi_collections"
+version = "0.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e80d6b275b1c922021939d561574bf376613493ae2b61c6963b15db0e8813562"
 
 [[package]]
 name = "wasmi_core"
@@ -7769,6 +7798,25 @@ dependencies = [
  "libm",
  "num-traits",
  "paste",
+]
+
+[[package]]
+name = "wasmi_core"
+version = "0.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a8c51482cc32d31c2c7ff211cd2bedd73c5bd057ba16a2ed0110e7a96097c33"
+dependencies = [
+ "downcast-rs",
+ "libm",
+]
+
+[[package]]
+name = "wasmi_ir"
+version = "0.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e431a14c186db59212a88516788bd68ed51f87aa1e08d1df742522867b5289a"
+dependencies = [
+ "wasmi_core 0.40.0",
 ]
 
 [[package]]
@@ -7790,6 +7838,15 @@ dependencies = [
  "bitflags 2.8.0",
  "indexmap 2.7.1",
  "semver",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.221.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d06bfa36ab3ac2be0dee563380147a5b81ba10dd8885d7fbbc9eb574be67d185"
+dependencies = [
+ "bitflags 2.8.0",
 ]
 
 [[package]]
