@@ -62,6 +62,11 @@ impl NodeRegistrationHelper for super::CoapClient {
                 agent_url: heapless::String::<256>::from_str(agent_url.as_str()).unwrap(),
                 invocation_url: heapless::String::<256>::from_str(invocation_url.as_str()).unwrap(),
                 resources: encoded_resources,
+                runtimes: capabilities
+                    .runtimes
+                    .iter()
+                    .map(|i| heapless::String::<32>::from_str(i.as_str()).unwrap())
+                    .collect(),
             };
 
             let res = self

@@ -37,13 +37,13 @@ impl CoapInvocationServer {
                             stream_id: invocation_event.stream_id,
                             data: match invocation_event.data {
                                 edgeless_api_core::invocation::EventData::Cast(val) => {
-                                    crate::invocation::EventData::Cast(String::from_utf8(val.to_vec()).unwrap())
+                                    crate::invocation::EventData::Cast(String::from_utf8(val.0.to_vec()).unwrap())
                                 }
                                 edgeless_api_core::invocation::EventData::Call(val) => {
-                                    crate::invocation::EventData::Call(String::from_utf8(val.to_vec()).unwrap())
+                                    crate::invocation::EventData::Call(String::from_utf8(val.0.to_vec()).unwrap())
                                 }
                                 edgeless_api_core::invocation::EventData::CallRet(val) => {
-                                    crate::invocation::EventData::CallRet(String::from_utf8(val.to_vec()).unwrap())
+                                    crate::invocation::EventData::CallRet(String::from_utf8(val.0.to_vec()).unwrap())
                                 }
                                 edgeless_api_core::invocation::EventData::CallNoRet => crate::invocation::EventData::CallNoRet,
                                 edgeless_api_core::invocation::EventData::Err => crate::invocation::EventData::Err,
@@ -87,15 +87,21 @@ impl CoapInvocationServer {
 #[async_trait::async_trait]
 impl crate::invocation::InvocationAPI for super::CoapClient {
     async fn handle(&mut self, event: crate::invocation::Event) -> anyhow::Result<crate::invocation::LinkProcessingResult> {
-        let encoded_event = edgeless_api_core::invocation::Event::<&[u8]> {
+        let encoded_event = edgeless_api_core::invocation::Event {
             target: event.target,
             source: event.source,
             target_port: edgeless_api_core::port::Port(heapless::String::from_str(&event.target_port.0).unwrap()),
             stream_id: event.stream_id,
             data: match &event.data {
-                crate::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(val.as_bytes()),
-                crate::invocation::EventData::Call(val) => edgeless_api_core::invocation::EventData::Call(val.as_bytes()),
-                crate::invocation::EventData::CallRet(val) => edgeless_api_core::invocation::EventData::CallRet(val.as_bytes()),
+                crate::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(edgeless_api_core::invocation::DataBuffer(
+                    heapless::Vec::from_slice(val.as_bytes()).unwrap(),
+                )),
+                crate::invocation::EventData::Call(val) => edgeless_api_core::invocation::EventData::Call(edgeless_api_core::invocation::DataBuffer(
+                    heapless::Vec::from_slice(val.as_bytes()).unwrap(),
+                )),
+                crate::invocation::EventData::CallRet(val) => edgeless_api_core::invocation::EventData::CallRet(
+                    edgeless_api_core::invocation::DataBuffer(heapless::Vec::from_slice(val.as_bytes()).unwrap()),
+                ),
                 crate::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                 crate::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
             },

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use std::str::FromStr;
+
 pub struct CoapOrchestrationServer {
     sock: tokio::net::UdpSocket,
     registration_api: Box<dyn crate::node_registration::NodeRegistrationAPI>,
@@ -52,6 +54,9 @@ impl CoapOrchestrationServer {
     ) {
         let key_entry = self.received_tokens.entry(sender.ip());
 
+        let mut capabilities = crate::node_registration::NodeCapabilities::empty();
+        capabilities.runtimes = registration.runtimes.iter().map(|i| String::from_str(i.as_str()).unwrap()).collect();
+
         let registration = crate::node_registration::UpdateNodeRequest::Registration(
             registration.node_id.0,
             String::from(registration.agent_url.as_str()),
@@ -65,7 +70,7 @@ impl CoapOrchestrationServer {
                     outputs: core_spec.outputs.iter().map(|core_output| String::from(*core_output)).collect(),
                 })
                 .collect(),
-            crate::node_registration::NodeCapabilities::empty(),
+            capabilities,
             Vec::new(),
         );
 

@@ -100,17 +100,17 @@ impl crate::resource::Resource for MockSensor {
         lck.instance_id == Some(*instance_id)
     }
 
-    async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
-        spawner.spawn(mock_sensor_task(self.inner, dataplane_handle)).unwrap();
+    async fn launch(&mut self, spawner: embassy_executor::Spawner, agent: crate::agent::EmbeddedAgent) {
+        spawner.spawn(mock_sensor_task(self.inner, agent)).unwrap();
     }
 }
 
 #[embassy_executor::task]
 pub async fn mock_sensor_task(
     state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
-    dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
+    agent: crate::agent::EmbeddedAgent,
 ) {
-    let mut dataplane_handle = dataplane_handle;
+    let mut agent = agent;
 
     loop {
         let (instance_id, data_out_id, delay) = {
@@ -120,17 +120,20 @@ pub async fn mock_sensor_task(
         };
         if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
             log::info!("Sensor send!");
+
+            let mut dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id.clone(), agent.clone(), heapless::Vec::new());
+
             match data_out_id {
                 edgeless_api_core::common::Output::Single(id) => {
                     dataplane_handle
-                        .send(instance_id, id.instance_id, id.port_id, "800.12345;50.12345;20.12345")
+                        .send(instance_id, id.instance_id, id.port_id, "800.12345;50.12345;20.12345".as_bytes())
                         .await;
                 }
                 edgeless_api_core::common::Output::Any(ids) => {
                     let id = ids.0.first();
                     if let Some(id) = id {
                         dataplane_handle
-                            .send(instance_id, id.instance_id, id.port_id.clone(), "800.12345;50.12345;20.12345")
+                            .send(instance_id, id.instance_id, id.port_id.clone(), "800.12345;50.12345;20.12345".as_bytes())
                             .await;
                     } else {
                         // return Err(GuestAPIError::UnknownAlias)
@@ -139,7 +142,7 @@ pub async fn mock_sensor_task(
                 edgeless_api_core::common::Output::All(ids) => {
                     for id in ids.0 {
                         dataplane_handle
-                            .send(instance_id, id.instance_id, id.port_id, "800.12345;50.12345;20.12345")
+                            .send(instance_id, id.instance_id, id.port_id, "800.12345;50.12345;20.12345".as_bytes())
                             .await;
                     }
                 }
@@ -150,10 +153,7 @@ pub async fn mock_sensor_task(
 }
 
 impl crate::invocation::InvocationAPI for MockSensor {
-    async fn handle(
-        &mut self,
-        _event: edgeless_api_core::invocation::Event<&[u8]>,
-    ) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
+    async fn handle(&mut self, _event: edgeless_api_core::invocation::Event) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
         log::warn!("Sensor received unexpected Event.");
         Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
     }
@@ -163,7 +163,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Mock Sensor Start");
         let instance_specification = Self::parse_configuration(instance_specification).await?;
         log::info!("Post Config Start");
@@ -185,7 +185,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         lck.data_out_id = instance_specification.data_out_id;
         lck.delay = instance_specification.delay_s;
         log::info!("End Start");
-        Ok(instance_id)
+        Ok(())
     }
 
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {

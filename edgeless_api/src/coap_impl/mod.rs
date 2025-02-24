@@ -6,6 +6,7 @@ use futures::FutureExt;
 
 pub mod agent;
 pub mod function_instance;
+pub mod helpers;
 pub mod invocation;
 pub mod link;
 pub mod node_management;

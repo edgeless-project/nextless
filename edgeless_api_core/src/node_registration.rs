@@ -12,7 +12,7 @@ pub struct EncodedNodeRegistration<'a> {
     pub agent_url: heapless::String<256>,
     pub invocation_url: heapless::String<256>,
     pub resources: heapless::Vec<ResourceProviderSpecification<'a>, 16>,
-    // 4: node capabilities
+    pub runtimes: heapless::Vec<heapless::String<32>, 4>, // 4: node capabilities
 }
 
 #[derive(Clone)]
@@ -57,6 +57,12 @@ impl<C> minicbor::Encode<C> for EncodedNodeRegistration<'_> {
                 e = e.encode(spec)?;
             }
         }
+        {
+            e = e.array(self.runtimes.len().try_into().unwrap())?;
+            for rt in &self.runtimes {
+                e = e.encode(rt.as_str())?;
+            }
+        }
 
         Ok(())
     }
@@ -76,26 +82,32 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
             }
         }
 
+        let mut runtimes = heapless::Vec::<heapless::String<32>, 4>::new();
+        for item in d.array_iter::<&'b str>().unwrap() {
+            if let Ok(item) = item {
+                runtimes.push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?);
+            }
+        }
+
         Ok(EncodedNodeRegistration {
             node_id: id,
             agent_url: heapless::String::from_str(agent_url).unwrap(),
             invocation_url: heapless::String::from_str(invocation_url).unwrap(),
             resources,
+            runtimes,
         })
     }
 }
 
 impl<C> minicbor::CborLen<C> for EncodedNodeRegistration<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let len = self.node_id.cbor_len(ctx) + self.agent_url.cbor_len(ctx) + self.invocation_url.cbor_len(ctx);
+        let mut len = self.node_id.cbor_len(ctx) + self.agent_url.cbor_len(ctx) + self.invocation_url.cbor_len(ctx);
 
-        let mut resources: heapless::Vec<ResourceProviderSpecification, 16> = heapless::Vec::new();
+        len = len + self.resources[..self.resources.len()].cbor_len(ctx);
 
-        for item in &self.resources {
-            resources.push(item.clone());
-        }
+        let rts: heapless::Vec<&str, 16> = self.runtimes.iter().map(|i| i.as_str()).collect();
 
-        len + resources[..resources.len()].cbor_len(ctx)
+        len + rts[..rts.len()].cbor_len(ctx)
     }
 }
 

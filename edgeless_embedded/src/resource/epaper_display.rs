@@ -72,7 +72,7 @@ impl crate::resource::Resource for EPaperDisplay {
         false
     }
 
-    async fn launch(&mut self, _spawner: embassy_executor::Spawner, _dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {}
+    async fn launch(&mut self, _spawner: embassy_executor::Spawner, agent: crate::agent::EmbeddedAgent) {}
 }
 
 #[embassy_executor::task]
@@ -101,12 +101,9 @@ impl EPaperDisplay {
 }
 
 impl crate::invocation::InvocationAPI for EPaperDisplay {
-    async fn handle(
-        &mut self,
-        event: edgeless_api_core::invocation::Event<&[u8]>,
-    ) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
+    async fn handle(&mut self, event: edgeless_api_core::invocation::Event) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
         if let edgeless_api_core::invocation::EventData::Cast(message) = event.data {
-            if let Ok(message) = core::str::from_utf8(message) {
+            if let Ok(message) = core::str::from_utf8(&message.0) {
                 self.msg_sender.send(heapless::String::<1500>::from_str(message).unwrap()).await;
             }
         }
@@ -135,7 +132,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Epaper Display Start");
 
         let instance_specification = Self::parse_configuration(instance_specification).await?;
@@ -161,7 +158,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
                 .await;
         }
 
-        Ok(self.instance_id.unwrap())
+        Ok(())
     }
 
     async fn patch(

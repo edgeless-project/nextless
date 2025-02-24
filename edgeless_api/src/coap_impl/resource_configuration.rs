@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use std::str::FromStr;
+use super::helpers;
 
 #[async_trait::async_trait]
 impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId> for super::CoapClient {
@@ -9,50 +9,8 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>> {
-        let mut outputs = heapless::Vec::<(&str, edgeless_api_core::common::Output), 16>::new();
+        let outputs = super::helpers::std_outputs_to_core_ouputs(&instance_specification.output_mapping)?;
         let mut configuration = heapless::Vec::<(&str, &str), 16>::new();
-        for (key, val) in &instance_specification.output_mapping {
-            outputs
-                .push((
-                    &key.0,
-                    match val {
-                        crate::common::Output::Single(instance_id, port_id) => {
-                            edgeless_api_core::common::Output::Single(edgeless_api_core::common::Target {
-                                instance_id: *instance_id,
-                                port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
-                            })
-                        }
-                        crate::common::Output::Any(ids) => {
-                            let mut id_vec = edgeless_api_core::common::TargetVec::<4>(heapless::Vec::new());
-                            for (instance_id, port_id) in ids {
-                                id_vec
-                                    .0
-                                    .push(edgeless_api_core::common::Target {
-                                        instance_id: *instance_id,
-                                        port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
-                                    })
-                                    .unwrap();
-                            }
-                            edgeless_api_core::common::Output::Any(id_vec)
-                        }
-                        crate::common::Output::All(ids) => {
-                            let mut id_vec = edgeless_api_core::common::TargetVec::<4>(heapless::Vec::new());
-                            for (instance_id, port_id) in ids {
-                                id_vec
-                                    .0
-                                    .push(edgeless_api_core::common::Target {
-                                        instance_id: *instance_id,
-                                        port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
-                                    })
-                                    .unwrap();
-                            }
-                            edgeless_api_core::common::Output::Any(id_vec)
-                        }
-                        crate::common::Output::Link(link_id) => todo!(),
-                    },
-                ))
-                .map_err(|_| anyhow::anyhow!("Too many outputs"))?;
-        }
 
         for (key, val) in &instance_specification.configuration {
             configuration
@@ -74,8 +32,8 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
             .await;
 
         match res {
-            Ok(data) => Ok(crate::common::StartComponentResponse::InstanceId(
-                edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(&data).unwrap(),
+            Ok(_) => Ok(crate::common::StartComponentResponse::InstanceId(
+                instance_specification.resource_id.clone(), // edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(&data).unwrap(),
             )),
             Err(data) => Ok(crate::common::StartComponentResponse::ResponseError(crate::common::ResponseError {
                 summary: minicbor::decode::<&str>(&data).unwrap().to_string(),
@@ -97,50 +55,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
     }
 
     async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
-        let mut outputs = heapless::Vec::<(&str, edgeless_api_core::common::Output), 16>::new();
-
-        for (key, val) in &update.output_mapping {
-            outputs.push((
-                &key.0,
-                match val {
-                    crate::common::Output::Single(instance_id, port_id) => {
-                        edgeless_api_core::common::Output::Single(edgeless_api_core::common::Target {
-                            instance_id: *instance_id,
-                            port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
-                        })
-                    }
-                    crate::common::Output::Any(ids) => {
-                        let mut id_vec = edgeless_api_core::common::TargetVec::<4>(heapless::Vec::new());
-                        for (instance_id, port_id) in ids {
-                            id_vec
-                                .0
-                                .push(edgeless_api_core::common::Target {
-                                    instance_id: *instance_id,
-                                    port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
-                                })
-                                .unwrap();
-                        }
-                        edgeless_api_core::common::Output::Any(id_vec)
-                    }
-                    crate::common::Output::All(ids) => {
-                        let mut id_vec = edgeless_api_core::common::TargetVec::<4>(heapless::Vec::new());
-                        for (instance_id, port_id) in ids {
-                            id_vec
-                                .0
-                                .push(edgeless_api_core::common::Target {
-                                    instance_id: *instance_id,
-                                    port_id: edgeless_api_core::port::Port::<32>(heapless::String::<32>::from_str(&port_id.0).unwrap()),
-                                })
-                                .unwrap();
-                        }
-                        edgeless_api_core::common::Output::Any(id_vec)
-                    }
-                    crate::common::Output::Link(link_id) => todo!(),
-                },
-            ));
-            //     outputs[outputs_i] = Some((key, val.clone()));
-            //     outputs_i = outputs_i + 1;
-        }
+        let outputs = helpers::std_outputs_to_core_ouputs(&update.output_mapping)?;
 
         let encoded_patch_req = edgeless_api_core::resource_configuration::EncodedPatchRequest {
             instance_id: update.function_id,
@@ -149,7 +64,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
 
         let res = self
             .call_with_reply(|token, addr, buffer| {
-                edgeless_api_core::coap_mapping::COAPEncoder::encode_patch_request(addr, encoded_patch_req.clone(), token, &mut buffer[..])
+                edgeless_api_core::coap_mapping::COAPEncoder::encode_resource_patch_request(addr, encoded_patch_req.clone(), token, &mut buffer[..])
             })
             .await;
         match res {

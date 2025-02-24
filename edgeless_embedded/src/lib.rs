@@ -14,6 +14,8 @@ const REGISTRATION_PEER: smoltcp::wire::IpEndpoint = smoltcp::wire::IpEndpoint {
 pub mod agent;
 pub mod coap;
 pub mod dataplane;
+pub mod function_instance;
 pub mod invocation;
 pub mod resource;
 pub mod resource_configuration;
+pub mod wasm_functions;

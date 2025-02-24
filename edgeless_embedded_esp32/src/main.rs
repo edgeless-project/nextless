@@ -260,7 +260,10 @@ async fn edgeless(
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [sensor_scd30_resource, display_resource]);
 
-    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources).await;
+    static WASM_RUNTIME_RAW: static_cell::StaticCell<edgeless_embedded::wasm_functions::WasmiRuntime> = static_cell::StaticCell::new();
+    let wasm_runtime = WASM_RUNTIME_RAW.init_with(|| edgeless_embedded::wasm_functions::WasmiRuntime::new());
+
+    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), wasm_runtime, resources).await;
 
     let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, clocks, wifi, agent.clone()).await;
     let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);

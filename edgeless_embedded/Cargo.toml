@@ -46,6 +46,8 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
     "async",
 ] }
 
+wasmi = {version = "0.40", default-features = false, features = []}
+
 # epd-waveshare = { path = "../vendor/epd-waveshare", features = ["graphics", "epd2in13_v3"], default-features = false}
 # embedded-graphics = { version = "0.8"}
 # sensor-scd30 = {path="../vendor/rust-sensor-scd30", default-features=false}

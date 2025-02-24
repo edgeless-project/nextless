@@ -70,15 +70,18 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [display, sensor_scd30]);
 
-    let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID, resources).await;
+    static WASM_RUNTIME_RAW: static_cell::StaticCell<edgeless_embedded::wasm_functions::WasmiRuntime> = static_cell::StaticCell::new();
+    let wasm_runtime = WASM_RUNTIME_RAW.init_with(|| edgeless_embedded::wasm_functions::WasmiRuntime::new());
+
+    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID, wasm_runtime, resources).await;
 
     spawner
         .spawn(edgeless_embedded::coap::coap_task(
             sock,
-            resource_registry.upstream_receiver().unwrap(),
-            resource_registry.clone(),
+            agent.upstream_receiver().unwrap(),
+            agent.clone(),
         ))
         .unwrap();
 
-    spawner.spawn(registration(resource_registry.clone()));
+    spawner.spawn(registration(agent.clone())).unwrap();
 }

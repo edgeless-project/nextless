@@ -17,6 +17,12 @@ pub enum Output {
 }
 
 #[derive(Debug, Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen, PartialEq, Eq)]
+pub enum Input {
+    #[n(0)]
+    Link(#[n(0)] [u8; 16]),
+}
+
+#[derive(Debug, Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen, PartialEq, Eq)]
 pub struct Target {
     #[n(0)]
     pub instance_id: crate::instance_id::InstanceId,

@@ -10,7 +10,7 @@ pub trait Resource: crate::invocation::InvocationAPI + crate::resource_configura
     fn resource_class(&self) -> &'static str;
     fn outputs(&self) -> &'static [&'static str];
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool;
-    async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle);
+    async fn launch(&mut self, spawner: embassy_executor::Spawner, agent: crate::agent::EmbeddedAgent);
 }
 
 // https://rust-lang.github.io/async-fundamentals-initiative/evaluation/case-studies/builder-provider-api.html#dynamic-dispatch-behind-the-api
@@ -27,7 +27,7 @@ pub trait ResourceDyn: crate::resource_configuration::ResourceConfigurationAPIDy
     fn launch(
         &mut self,
         spawner: embassy_executor::Spawner,
-        dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
+        agent: crate::agent::EmbeddedAgent,
     ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = ()> + '_>>;
 }
 
@@ -54,8 +54,8 @@ impl<T: Resource> ResourceDyn for T {
     fn launch(
         &mut self,
         spawner: embassy_executor::Spawner,
-        dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
+        agent: crate::agent::EmbeddedAgent,
     ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = ()> + '_>> {
-        alloc::boxed::Box::pin(<Self as Resource>::launch(self, spawner, dataplane_handle))
+        alloc::boxed::Box::pin(<Self as Resource>::launch(self, spawner, agent))
     }
 }

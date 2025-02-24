@@ -1,3 +1,5 @@
+use core::str::FromStr;
+
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 #[derive(Clone)]
@@ -5,14 +7,21 @@ pub struct EmbeddedAgent {
     own_node_id: edgeless_api_core::instance_id::NodeId,
     upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>,
     upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>>,
-    inner: &'static core::cell::RefCell<
-        embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, &'static mut [&'static mut dyn crate::resource::ResourceDyn]>,
-    >,
+    inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>>,
     registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
+    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 8>,
 }
 
+struct EmbeddedAgentInner {
+    resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
+    wasm_runtime: &'static mut crate::wasm_functions::WasmiRuntime,
+    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 8>,
+}
+
+type StoredMessage = edgeless_api_core::invocation::Event;
+
 pub enum AgentEvent {
-    Invocation(edgeless_api_core::invocation::Event<heapless::Vec<u8, 1500>>),
+    Invocation(StoredMessage),
     Registration(
         (
             edgeless_api_core::node_registration::EncodedNodeRegistration<'static>,
@@ -30,6 +39,7 @@ impl EmbeddedAgent {
     pub async fn new(
         spawner: embassy_executor::Spawner,
         node_id: edgeless_api_core::instance_id::NodeId,
+        runtime: &'static mut crate::wasm_functions::WasmiRuntime,
         resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
     ) -> &'static mut EmbeddedAgent {
         static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
@@ -39,15 +49,25 @@ impl EmbeddedAgent {
         let sender = channel.sender();
         let receiver = channel.receiver();
 
-        static SLF_INNER_RAW: static_cell::StaticCell<
-            core::cell::RefCell<
-                embassy_sync::mutex::Mutex<
-                    embassy_sync::blocking_mutex::raw::NoopRawMutex,
-                    &'static mut [&'static mut dyn crate::resource::ResourceDyn],
-                >,
-            >,
+        static BUFFER_CHANNEL_RAW: static_cell::StaticCell<
+            embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 8>,
         > = static_cell::StaticCell::new();
-        let slf_inner = SLF_INNER_RAW.init_with(|| core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(&mut resources[..])));
+        let buffer_channel =
+            BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 8>::new);
+
+        let buffer_sender = buffer_channel.sender();
+        let buffer_receiver = buffer_channel.receiver();
+
+        static SLF_INNER_RAW: static_cell::StaticCell<
+            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>>,
+        > = static_cell::StaticCell::new();
+        let slf_inner = SLF_INNER_RAW.init_with(|| {
+            core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(EmbeddedAgentInner {
+                resources: &mut resources[..],
+                wasm_runtime: runtime,
+                internal_buffer_receiver: buffer_receiver,
+            }))
+        });
 
         static REPLY_CHANNEL: static_cell::StaticCell<
             embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
@@ -61,22 +81,24 @@ impl EmbeddedAgent {
             inner: slf_inner,
             registration_signal: REPLY_CHANNEL
                 .init_with(embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new),
+            internal_buffer_sender: buffer_sender,
         });
 
         {
             let inner = slf.inner.borrow_mut();
             let mut lck = inner.lock().await;
-            for r in lck.iter_mut() {
-                r.launch(spawner, slf.dataplane_handle()).await;
+            for r in lck.resources.iter_mut() {
+                r.launch(spawner, slf.clone()).await;
             }
+            lck.wasm_runtime.launch(slf.clone()).await;
         }
 
         slf
     }
 
-    pub fn dataplane_handle(&mut self) -> crate::dataplane::EmbeddedDataplaneHandle {
-        crate::dataplane::EmbeddedDataplaneHandle { reg: self.clone() }
-    }
+    // pub fn dataplane_handle(&mut self) -> crate::dataplane::EmbeddedDataplaneHandle {
+    //     crate::dataplane::EmbeddedDataplaneHandle { agent: self.clone() }
+    // }
 
     pub fn upstream_receiver(
         &mut self,
@@ -92,7 +114,7 @@ impl EmbeddedAgent {
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
         let mut resources = heapless::Vec::new();
-        for i in &lck[..] {
+        for i in &lck.resources[..] {
             let mut outputs = heapless::Vec::new();
 
             for j in i.outputs() {
@@ -118,6 +140,7 @@ impl EmbeddedAgent {
             agent_url: url.clone(),
             invocation_url: url,
             resources,
+            runtimes: heapless::Vec::from_slice(&[heapless::String::from_str("RUST_WASM").unwrap()]).unwrap(),
         };
 
         loop {
@@ -133,45 +156,50 @@ impl EmbeddedAgent {
 }
 
 impl crate::invocation::InvocationAPI for EmbeddedAgent {
-    async fn handle(
-        &mut self,
-        event: edgeless_api_core::invocation::Event<&[u8]>,
-    ) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
+    async fn handle(&mut self, event: edgeless_api_core::invocation::Event) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
         if event.target.node_id != self.own_node_id && event.source.node_id == self.own_node_id {
-            let new_event: edgeless_api_core::invocation::Event<heapless::Vec<u8, 1500>> =
-                edgeless_api_core::invocation::Event::<heapless::Vec<u8, 1500>> {
-                    target: event.target,
-                    source: event.source,
-                    stream_id: event.stream_id,
-                    data: match event.data {
-                        edgeless_api_core::invocation::EventData::Cast(val) => {
-                            edgeless_api_core::invocation::EventData::Cast(heapless::Vec::<u8, 1500>::from_slice(val).unwrap())
-                        }
-                        edgeless_api_core::invocation::EventData::Call(val) => {
-                            edgeless_api_core::invocation::EventData::Call(heapless::Vec::<u8, 1500>::from_slice(val).unwrap())
-                        }
-                        edgeless_api_core::invocation::EventData::CallRet(val) => {
-                            edgeless_api_core::invocation::EventData::CallRet(heapless::Vec::<u8, 1500>::from_slice(val).unwrap())
-                        }
-                        edgeless_api_core::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
-                        edgeless_api_core::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
-                    },
-                    target_port: event.target_port,
-                    span_context: edgeless_api_core::invocation::SpanContext {
-                        trace_id: [0; 16],
-                        span_id: [0; 8],
-                        trace_flags: 0,
-                    },
-                };
-            self.upstream_sender.send(AgentEvent::Invocation(new_event)).await;
+            self.upstream_sender.send(AgentEvent::Invocation(event)).await;
             Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
         } else {
-            let inner = self.inner.borrow_mut();
-            let mut lck = inner.lock().await;
+            let inner = self.inner.try_borrow_mut();
 
-            for r in lck.iter_mut() {
-                if r.has_instance(&event.target).await {
-                    return r.handle(event).await;
+            if let Ok(inner) = inner {
+                let mut lck = inner.lock().await;
+
+                let mut handled = false;
+
+                for r in lck.resources.iter_mut() {
+                    if r.has_instance(&event.target).await {
+                        r.handle(event.clone()).await;
+                        handled = true;
+                    }
+                }
+
+                if !handled {
+                    if lck.wasm_runtime.has_instance(&event.target).await {
+                        lck.wasm_runtime.handle(event).await;
+                    }
+                }
+
+                loop {
+                    if let Ok(event) = lck.internal_buffer_receiver.try_receive() {
+                        for r in lck.resources.iter_mut() {
+                            if r.has_instance(&event.target).await {
+                                return r.handle(event).await;
+                            }
+                        }
+
+                        if lck.wasm_runtime.has_instance(&event.target).await {
+                            return lck.wasm_runtime.handle(event).await;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                if let Ok(_) = self.internal_buffer_sender.try_send(event) {
+                    return Ok(edgeless_api_core::invocation::LinkProcessingResult::PROCESSED);
+                } else {
                 }
             }
             Ok(edgeless_api_core::invocation::LinkProcessingResult::PASSED)
@@ -183,7 +211,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
-        for r in lck.iter_mut() {
+        for r in lck.resources.iter_mut() {
             if r.has_instance(&resource_id).await {
                 return r.stop(resource_id).await;
             }
@@ -197,10 +225,10 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
-        for r in lck.iter_mut() {
+        for r in lck.resources.iter_mut() {
             if r.resource_class() == instance_specification.class_type {
                 return r.start(instance_specification).await;
             }
@@ -223,7 +251,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
             node_id: self.own_node_id,
             function_id: my_patch.instance_id.function_id,
         };
-        for r in lck.iter_mut() {
+        for r in lck.resources.iter_mut() {
             if r.has_instance(&my_patch.instance_id).await {
                 return r.patch(my_patch).await;
             }
@@ -232,5 +260,39 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
             summary: "ResourceProvider Not Found",
             detail: None,
         })
+    }
+}
+
+impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
+    async fn start_function<'a>(
+        &mut self,
+        instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        let inner = self.inner.borrow_mut();
+        let mut lck = inner.lock().await;
+
+        log::info!("Function Start");
+
+        lck.wasm_runtime.start_function(instance_specification).await
+    }
+
+    async fn stop_function(
+        &mut self,
+        instance_id: edgeless_api_core::instance_id::InstanceId,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        let inner = self.inner.borrow_mut();
+        let mut lck = inner.lock().await;
+
+        lck.wasm_runtime.stop_function(instance_id).await
+    }
+
+    async fn patch_function<'a>(
+        &mut self,
+        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        let inner = self.inner.borrow_mut();
+        let mut lck = inner.lock().await;
+
+        lck.wasm_runtime.patch_function(patch_req).await
     }
 }
