@@ -1,6 +1,7 @@
 target/
 result/
 *.wasm
+*.tar.gz
 function_state/
 /balancer.toml
 /controller.toml

@@ -14,7 +14,10 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        toolchain = fenix.packages.${system}.stable.toolchain;
+        toolchain = with fenix.packages.${system}; combine [
+          stable.toolchain
+          targets.wasm32-unknown-unknown.stable.rust-std
+        ];
       in {
         packages = {
           nextless_cli = (pkgs.makeRustPlatform {
@@ -36,6 +39,18 @@
               pkg-config
               protobuf
             ];
+            buildInputs = with pkgs; [
+              toolchain
+              makeWrapper
+              gcc
+            ];
+            postInstall = ''
+              wrapProgram $out/bin/edgeless_cli \
+                --set PATH ${pkgs.lib.makeBinPath [
+                  toolchain
+                  pkgs.gcc
+                ]}
+            '';
           };
           nextless_node = (pkgs.makeRustPlatform {
             cargo = toolchain;
@@ -79,7 +94,16 @@
             buildInputs = with pkgs; [
               openssl #TODO Unify OpenSSL Usage
               toolchain
+              makeWrapper
+              gcc
             ];
+            postInstall = ''
+              wrapProgram $out/bin/edgeless_con_d \
+                --set PATH ${pkgs.lib.makeBinPath [
+                  toolchain
+                  pkgs.gcc
+                ]}
+            '';
           };
         };
 
