@@ -568,7 +568,12 @@ mod test {
         let mut handle_2 = provider.get_handle_for(fid_2).await;
 
         handle_1
-            .send(fid_2, edgeless_api::function_instance::PortId("test".to_string()), "Test".to_string())
+            .send(
+                fid_2,
+                edgeless_api::function_instance::PortId("test".to_string()),
+                "Test".to_string(),
+                opentelemetry::Context::new(),
+            )
             .await;
 
         let res = handle_2.receive_next().await;
@@ -591,7 +596,12 @@ mod test {
 
         let return_handle = tokio::spawn(async move {
             handle_1
-                .call(fid_2, edgeless_api::function_instance::PortId("test".to_string()), "Test".to_string())
+                .call(
+                    fid_2,
+                    edgeless_api::function_instance::PortId("test".to_string()),
+                    "Test".to_string(),
+                    opentelemetry::Context::new(),
+                )
                 .await
         });
 
@@ -649,7 +659,12 @@ mod test {
         let mut handle_2 = provider_2.get_handle_for(fid_2).await;
 
         handle_1
-            .send(fid_2, edgeless_api::function_instance::PortId("test".to_string()), "Test".to_string())
+            .send(
+                fid_2,
+                edgeless_api::function_instance::PortId("test".to_string()),
+                "Test".to_string(),
+                opentelemetry::Context::new(),
+            )
             .await;
         let cast_req = handle_2.receive_next().await;
         assert_eq!(
@@ -666,6 +681,7 @@ mod test {
                     cloned_id_1,
                     edgeless_api::function_instance::PortId("test".to_string()),
                     "Test".to_string(),
+                    opentelemetry::Context::new(),
                 )
                 .await
         });

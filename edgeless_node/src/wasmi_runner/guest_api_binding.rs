@@ -15,7 +15,7 @@ pub fn telemetry_log(
     target_len: i32,
     msg_ptr: i32,
     msg_len: i32,
-) -> Result<(), wasmi::core::Trap> {
+) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
     let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let msg = load_string_from_vm(&mut caller.as_context_mut(), &mem, msg_ptr, msg_len)?;
@@ -32,13 +32,13 @@ pub fn cast_raw(
     port_len: i32,
     payload_ptr: i32,
     payload_len: i32,
-) -> Result<(), wasmi::core::Trap> {
+) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
     let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16 as usize].to_vec();
     let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16 as usize].to_vec();
     let instance_id = edgeless_api::function_instance::InstanceId {
-        node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::core::Trap::new("uuid error"))?),
-        function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::core::Trap::new("uuid error"))?),
+        node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
+        function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
     };
 
     let port = load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
@@ -52,7 +52,7 @@ pub fn cast_raw(
                 .host
                 .cast_raw(instance_id, edgeless_api::function_instance::PortId(port), &payload),
         )
-        .map_err(|_| wasmi::core::Trap::new("string error"))?;
+        .map_err(|_| wasmi::Error::new("string error"))?;
     Ok(())
 }
 
@@ -66,14 +66,14 @@ pub fn call_raw(
     payload_len: i32,
     out_ptr_ptr: i32,
     out_len_ptr: i32,
-) -> Result<i32, wasmi::core::Trap> {
+) -> Result<i32, wasmi::Error> {
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
     let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16 as usize].to_vec();
     let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16 as usize].to_vec();
     let instance_id = edgeless_api::function_instance::InstanceId {
-        node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::core::Trap::new("uuid error"))?),
-        function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::core::Trap::new("uuid error"))?),
+        node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
+        function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
     };
 
     let port = load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
@@ -86,7 +86,7 @@ pub fn call_raw(
                 .host
                 .call_raw(instance_id, edgeless_api::function_instance::PortId(port), &payload),
         )
-        .map_err(|_| wasmi::core::Trap::new("call error"))?;
+        .map_err(|_| wasmi::Error::new("call error"))?;
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),
         edgeless_dataplane::core::CallRet::Reply(data) => {
@@ -108,7 +108,7 @@ pub fn cast(
     target_len: i32,
     payload_ptr: i32,
     payload_len: i32,
-) -> Result<(), wasmi::core::Trap> {
+) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
 
     let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
@@ -133,7 +133,7 @@ pub fn call(
     payload_len: i32,
     out_ptr_ptr: i32,
     out_len_ptr: i32,
-) -> Result<i32, wasmi::core::Trap> {
+) -> Result<i32, wasmi::Error> {
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
 
@@ -142,7 +142,7 @@ pub fn call(
 
     let call_ret = tokio::runtime::Handle::current()
         .block_on(caller.data_mut().host.call_alias(&target, &payload))
-        .map_err(|_| wasmi::core::Trap::new("call error"))?;
+        .map_err(|_| wasmi::Error::new("call error"))?;
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),
         edgeless_dataplane::core::CallRet::Reply(data) => {
@@ -165,28 +165,28 @@ pub fn delayed_cast(
     target_len: i32,
     payload_ptr: i32,
     payload_len: i32,
-) -> Result<(), wasmi::core::Trap> {
+) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
     let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     tokio::runtime::Handle::current()
         .block_on(caller.data_mut().host.delayed_cast(delay_ms as u64, &target, &payload))
-        .map_err(|_| wasmi::core::Trap::new("call error"))?;
+        .map_err(|_| wasmi::Error::new("call error"))?;
     Ok(())
 }
 
-pub fn sync(mut caller: wasmi::Caller<'_, GuestAPI>, state_ptr: i32, state_len: i32) -> Result<(), wasmi::core::Trap> {
+pub fn sync(mut caller: wasmi::Caller<'_, GuestAPI>, state_ptr: i32, state_len: i32) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
     let state = load_string_from_vm(&mut caller.as_context_mut(), &mem, state_ptr, state_len)?;
 
     tokio::runtime::Handle::current()
         .block_on(caller.data_mut().host.sync(&state))
-        .map_err(|_| wasmi::core::Trap::new("sync error"))?;
+        .map_err(|_| wasmi::Error::new("sync error"))?;
     Ok(())
 }
 
-pub fn slf(mut caller: wasmi::Caller<'_, GuestAPI>, out_node_id_ptr: i32, out_component_id_ptr: i32) -> Result<(), wasmi::core::Trap> {
+pub fn slf(mut caller: wasmi::Caller<'_, GuestAPI>, out_node_id_ptr: i32, out_component_id_ptr: i32) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
 
     let id = tokio::runtime::Handle::current().block_on(caller.data_mut().host.slf());
@@ -197,20 +197,20 @@ pub fn slf(mut caller: wasmi::Caller<'_, GuestAPI>, out_node_id_ptr: i32, out_co
     Ok(())
 }
 
-pub(crate) fn get_memory(caller: &mut wasmi::Caller<'_, super::guest_api_binding::GuestAPI>) -> Result<wasmi::Memory, wasmi::core::Trap> {
+pub(crate) fn get_memory(caller: &mut wasmi::Caller<'_, super::guest_api_binding::GuestAPI>) -> Result<wasmi::Memory, wasmi::Error> {
     caller
         .get_export("memory")
-        .ok_or(wasmi::core::Trap::new("memory error"))?
+        .ok_or(wasmi::Error::new("memory error"))?
         .into_memory()
-        .ok_or(wasmi::core::Trap::new("memory error"))
+        .ok_or(wasmi::Error::new("memory error"))
 }
 
-pub(crate) fn get_alloc(caller: &mut wasmi::Caller<'_, super::guest_api_binding::GuestAPI>) -> Result<wasmi::TypedFunc<i32, i32>, wasmi::core::Trap> {
+pub(crate) fn get_alloc(caller: &mut wasmi::Caller<'_, super::guest_api_binding::GuestAPI>) -> Result<wasmi::TypedFunc<i32, i32>, wasmi::Error> {
     caller
         .get_export("edgeless_mem_alloc")
-        .ok_or(wasmi::core::Trap::new("alloc error"))?
+        .ok_or(wasmi::Error::new("alloc error"))?
         .into_func()
-        .ok_or(wasmi::core::Trap::new("alloc error"))?
+        .ok_or(wasmi::Error::new("alloc error"))?
         .typed::<i32, i32>(&caller)
-        .map_err(|_| wasmi::core::Trap::new("alloc error"))
+        .map_err(|_| wasmi::Error::new("alloc error"))
 }

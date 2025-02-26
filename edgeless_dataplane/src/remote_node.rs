@@ -160,6 +160,7 @@ mod test {
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             target_port: edgeless_api::function_instance::PortId("test".to_string()),
+            context: opentelemetry::trace::SpanContext::empty_context(),
         })
         .await
         .unwrap();
@@ -172,7 +173,8 @@ mod test {
                 source: fid_source,
                 stream_id: 0,
                 data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
-                target_port: edgeless_api::function_instance::PortId("test".to_string())
+                target_port: edgeless_api::function_instance::PortId("test".to_string()),
+                context: opentelemetry::trace::SpanContext::empty_context(),
             })
             .await
             .is_err());
@@ -185,6 +187,7 @@ mod test {
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             target_port: edgeless_api::function_instance::PortId("test".to_string()),
+            context: opentelemetry::trace::SpanContext::empty_context(),
         })
         .await
         .unwrap();
@@ -243,6 +246,7 @@ mod test {
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                opentelemetry::trace::SpanContext::empty_context(),
             )
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
@@ -255,6 +259,7 @@ mod test {
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                opentelemetry::trace::SpanContext::empty_context(),
             )
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
@@ -267,6 +272,7 @@ mod test {
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                opentelemetry::trace::SpanContext::empty_context(),
             )
             .await;
         assert_eq!(res, LinkProcessingResult::PASSED);
@@ -279,6 +285,7 @@ mod test {
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                opentelemetry::trace::SpanContext::empty_context(),
             )
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);

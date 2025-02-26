@@ -30,7 +30,7 @@ mod tests {
 
         let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
-            orchestrators: vec![],
+            prometheus_url: None, // orchestrators: vec![],
         }));
         tokio::spawn(task);
         handles.push(handle);
@@ -164,7 +164,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 5)]
     #[serial_test::serial]
     async fn system_test_single_domain_single_node() -> anyhow::Result<()> {
         let _ = env_logger::try_init();
@@ -233,7 +233,7 @@ mod tests {
         terminate(handles)
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 5)]
     #[serial_test::serial]
     async fn system_test_single_domain_three_nodes() -> anyhow::Result<()> {
         let _ = env_logger::try_init();

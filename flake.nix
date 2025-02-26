@@ -121,6 +121,7 @@
             mold
             gcc
             binaryen
+            curl # libcurl used in the cli. Not sure why it is not needed in the CLI.
           ];
         };
       }

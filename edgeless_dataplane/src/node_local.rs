@@ -149,6 +149,7 @@ mod test {
                 &fid_1,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                opentelemetry::trace::SpanContext::empty_context(),
             )
             .as_mut()
             .await;
@@ -164,6 +165,7 @@ mod test {
                 &fid_1,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                opentelemetry::trace::SpanContext::empty_context(),
             )
             .as_mut()
             .await;
