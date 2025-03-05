@@ -4,8 +4,8 @@ use core::str::FromStr;
 pub struct EncodedFunctionInstanceSpecification<'a> {
     pub instance_id: crate::instance_id::InstanceId,
     pub class: EncodedFunctionClassSpecification,
-    pub input_mapping: heapless::Vec<(&'a str, crate::common::Input), 8>,
-    pub output_mapping: heapless::Vec<(&'a str, crate::common::Output), 16>,
+    pub input_mapping: heapless::Vec<(&'a str, crate::common::Input), 4>,
+    pub output_mapping: heapless::Vec<(&'a str, crate::common::Output), 4>,
 }
 
 #[derive(Clone)]
@@ -53,7 +53,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedFunctionInstanceSpecification<'b>
         let instance_id = d.decode::<crate::instance_id::InstanceId>()?;
         let class = d.decode::<EncodedFunctionClassSpecification>()?;
 
-        let mut input_mapping = heapless::Vec::<(&'b str, crate::common::Input), 8>::new();
+        let mut input_mapping = heapless::Vec::<(&'b str, crate::common::Input), 4>::new();
 
         for item in d.array_iter::<(&str, crate::common::Input)>().unwrap() {
             if let Ok(item) = item {
@@ -61,7 +61,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedFunctionInstanceSpecification<'b>
             }
         }
 
-        let mut output_mapping = heapless::Vec::<(&'b str, crate::common::Output), 16>::new();
+        let mut output_mapping = heapless::Vec::<(&'b str, crate::common::Output), 4>::new();
 
         for item in d.array_iter::<(&str, crate::common::Output)>().unwrap() {
             if let Ok(item) = item {

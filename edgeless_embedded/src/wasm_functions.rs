@@ -69,6 +69,7 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
         instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let code = core::include_bytes!("../../functions/esp_test_fun/esp_test_fun.wasm");
+        // let code = &[0];
 
         if self
             .functions

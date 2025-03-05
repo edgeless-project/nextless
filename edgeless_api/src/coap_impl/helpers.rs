@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 pub fn std_outputs_to_core_ouputs(
     output_mapping: &std::collections::HashMap<crate::function_instance::PortId, crate::common::Output>,
-) -> anyhow::Result<heapless::Vec<(&str, edgeless_api_core::common::Output), 16>> {
-    let mut outputs = heapless::Vec::<(&str, edgeless_api_core::common::Output), 16>::new();
+) -> anyhow::Result<heapless::Vec<(&str, edgeless_api_core::common::Output), 4>> {
+    let mut outputs = heapless::Vec::<(&str, edgeless_api_core::common::Output), 4>::new();
     for (key, val) in output_mapping {
         outputs
             .push((

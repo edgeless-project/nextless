@@ -9,13 +9,13 @@ pub struct EmbeddedAgent {
     upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>>,
     inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>>,
     registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
-    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 8>,
+    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
 }
 
 struct EmbeddedAgentInner {
     resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
-    wasm_runtime: &'static mut crate::wasm_functions::WasmiRuntime,
-    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 8>,
+    wasm_runtime: Option<&'static mut crate::wasm_functions::WasmiRuntime>,
+    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
 }
 
 type StoredMessage = edgeless_api_core::invocation::Event;
@@ -39,7 +39,7 @@ impl EmbeddedAgent {
     pub async fn new(
         spawner: embassy_executor::Spawner,
         node_id: edgeless_api_core::instance_id::NodeId,
-        runtime: &'static mut crate::wasm_functions::WasmiRuntime,
+        runtime: Option<&'static mut crate::wasm_functions::WasmiRuntime>,
         resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
     ) -> &'static mut EmbeddedAgent {
         static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
@@ -50,10 +50,10 @@ impl EmbeddedAgent {
         let receiver = channel.receiver();
 
         static BUFFER_CHANNEL_RAW: static_cell::StaticCell<
-            embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 8>,
+            embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
         > = static_cell::StaticCell::new();
         let buffer_channel =
-            BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 8>::new);
+            BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>::new);
 
         let buffer_sender = buffer_channel.sender();
         let buffer_receiver = buffer_channel.receiver();
@@ -90,15 +90,13 @@ impl EmbeddedAgent {
             for r in lck.resources.iter_mut() {
                 r.launch(spawner, slf.clone()).await;
             }
-            lck.wasm_runtime.launch(slf.clone()).await;
+            if let Some(runtime) = &mut lck.wasm_runtime {
+                runtime.launch(slf.clone()).await;
+            }
         }
 
         slf
     }
-
-    // pub fn dataplane_handle(&mut self) -> crate::dataplane::EmbeddedDataplaneHandle {
-    //     crate::dataplane::EmbeddedDataplaneHandle { agent: self.clone() }
-    // }
 
     pub fn upstream_receiver(
         &mut self,
@@ -106,9 +104,9 @@ impl EmbeddedAgent {
         self.upstream_receiver.take()
     }
 
-    pub async fn register(&mut self, addr: smoltcp::wire::Ipv4Address) {
+    pub async fn register(&mut self, addr: embassy_net::Ipv4Address) {
         let mut url = heapless::String::<256>::new();
-        let url_bytes = addr.as_bytes();
+        let url_bytes = addr.octets();
         ufmt::uwrite!(url, "coap://{}.{}.{}.{}:7050", url_bytes[0], url_bytes[1], url_bytes[2], url_bytes[3]).unwrap();
 
         let tmp = self.inner.borrow_mut();
@@ -176,8 +174,10 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
                 }
 
                 if !handled {
-                    if lck.wasm_runtime.has_instance(&event.target).await {
-                        lck.wasm_runtime.handle(event).await;
+                    if let Some(runtime) = &mut lck.wasm_runtime {
+                        if runtime.has_instance(&event.target).await {
+                            runtime.handle(event).await;
+                        }
                     }
                 }
 
@@ -189,8 +189,10 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
                             }
                         }
 
-                        if lck.wasm_runtime.has_instance(&event.target).await {
-                            return lck.wasm_runtime.handle(event).await;
+                        if let Some(runtime) = &mut lck.wasm_runtime {
+                            if runtime.has_instance(&event.target).await {
+                                runtime.handle(event).await;
+                            }
                         }
                     } else {
                         break;
@@ -271,9 +273,15 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
 
-        log::info!("Function Start");
-
-        lck.wasm_runtime.start_function(instance_specification).await
+        if let Some(runtime) = &mut lck.wasm_runtime {
+            log::info!("Agent Function Start");
+            runtime.start_function(instance_specification).await
+        } else {
+            Err(edgeless_api_core::common::ErrorResponse {
+                summary: "No Runtime",
+                detail: None,
+            })
+        }
     }
 
     async fn stop_function(
@@ -283,7 +291,14 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
 
-        lck.wasm_runtime.stop_function(instance_id).await
+        if let Some(runtime) = &mut lck.wasm_runtime {
+            runtime.stop_function(instance_id).await
+        } else {
+            Err(edgeless_api_core::common::ErrorResponse {
+                summary: "No Runtime",
+                detail: None,
+            })
+        }
     }
 
     async fn patch_function<'a>(
@@ -293,6 +308,13 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
 
-        lck.wasm_runtime.patch_function(patch_req).await
+        if let Some(runtime) = &mut lck.wasm_runtime {
+            runtime.patch_function(patch_req).await
+        } else {
+            Err(edgeless_api_core::common::ErrorResponse {
+                summary: "No Runtime",
+                detail: None,
+            })
+        }
     }
 }

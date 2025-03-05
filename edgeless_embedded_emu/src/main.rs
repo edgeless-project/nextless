@@ -21,8 +21,8 @@ fn main() -> ! {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static embassy_net::Stack<TunTapDevice>) -> ! {
-    stack.run().await
+async fn net_task(mut runner: embassy_net::Runner<'static, TunTapDevice>) -> ! {
+    runner.run().await
 }
 
 #[embassy_executor::task]
@@ -55,11 +55,10 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     });
 
     static STACK_RESOURCES_RAW: static_cell::StaticCell<embassy_net::StackResources<3>> = static_cell::StaticCell::new();
-    static STACK_RAW: static_cell::StaticCell<embassy_net::Stack<embassy_net_tuntap::TunTapDevice>> = static_cell::StaticCell::new();
-    let stack =
-        STACK_RAW.init_with(|| embassy_net::Stack::new(device, config, STACK_RESOURCES_RAW.init_with(embassy_net::StackResources::<3>::new), 1234));
+    // static STACK_RAW: static_cell::StaticCell<embassy_net::Stack<'static> = static_cell::StaticCell::new();
+    let (stack, runner) = embassy_net::new(device, config, STACK_RESOURCES_RAW.init_with(embassy_net::StackResources::<3>::new), 1234);
 
-    spawner.spawn(net_task(stack)).unwrap();
+    spawner.spawn(net_task(runner)).unwrap();
 
     let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
 
@@ -73,7 +72,7 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     static WASM_RUNTIME_RAW: static_cell::StaticCell<edgeless_embedded::wasm_functions::WasmiRuntime> = static_cell::StaticCell::new();
     let wasm_runtime = WASM_RUNTIME_RAW.init_with(|| edgeless_embedded::wasm_functions::WasmiRuntime::new());
 
-    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID, wasm_runtime, resources).await;
+    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID, Some(wasm_runtime), resources).await;
 
     spawner
         .spawn(edgeless_embedded::coap::coap_task(

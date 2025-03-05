@@ -9,8 +9,8 @@ struct CoapMultiplexer {
     out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 2>,
     agent: crate::agent::EmbeddedAgent,
     app_buf_tx: [u8; 5000],
-    last_tokens: heapless::LinearMap<smoltcp::wire::IpEndpoint, (u8, Option<Result<(), edgeless_api_core::common::ErrorResponse>>), 4>,
-    peers: heapless::LinearMap<edgeless_api_core::node_registration::NodeId, smoltcp::wire::IpEndpoint, 8>,
+    last_tokens: heapless::LinearMap<embassy_net::IpEndpoint, (u8, Option<Result<(), edgeless_api_core::common::ErrorResponse>>), 4>,
+    peers: heapless::LinearMap<edgeless_api_core::node_registration::NodeId, embassy_net::IpEndpoint, 8>,
     token: u8,
     waiting_for_reply: Option<(
         u8,
@@ -44,6 +44,7 @@ impl CoapMultiplexer {
     async fn task(&mut self) {
         let mut app_buf = [0_u8; 5000];
         loop {
+            log::debug!("Receive Loop");
             let res = embassy_futures::select::select(self.sock.recv_from(&mut app_buf), self.out_reader.receive()).await;
 
             match res {
@@ -63,6 +64,7 @@ impl CoapMultiplexer {
                             continue;
                         }
                     };
+                    let sender = sender.endpoint;
                     match message {
                         edgeless_api_core::coap_mapping::CoapMessage::Invocation(invocation) => {
                             self.incoming_invocation(sender, token, invocation).await;
@@ -94,6 +96,7 @@ impl CoapMultiplexer {
                             self.incoming_keepalive(sender, token).await;
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::FunctionStart(start_spec) => {
+                            log::info!("IsStart");
                             self.incoming_function_start(sender, token, start_spec).await;
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::FunctionStop(stop_instance_id) => {
@@ -120,7 +123,7 @@ impl CoapMultiplexer {
         }
     }
 
-    async fn incoming_invocation(&mut self, sender: smoltcp::wire::IpEndpoint, token: u8, invocation: edgeless_api_core::invocation::Event) {
+    async fn incoming_invocation(&mut self, sender: embassy_net::IpEndpoint, token: u8, invocation: edgeless_api_core::invocation::Event) {
         let key_entry = self.last_tokens.get_mut(&sender);
         match key_entry {
             None => {
@@ -141,7 +144,7 @@ impl CoapMultiplexer {
 
     async fn incoming_resource_start<'a>(
         &mut self,
-        sender: smoltcp::wire::IpEndpoint,
+        sender: embassy_net::IpEndpoint,
         token: u8,
         start_spec: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) {
@@ -152,7 +155,7 @@ impl CoapMultiplexer {
 
     async fn incoming_resource_stop(
         &mut self,
-        sender: smoltcp::wire::IpEndpoint,
+        sender: embassy_net::IpEndpoint,
         token: u8,
         stop_instance_id: edgeless_api_core::instance_id::InstanceId,
     ) {
@@ -163,7 +166,7 @@ impl CoapMultiplexer {
 
     async fn incoming_resource_patch<'a>(
         &mut self,
-        sender: smoltcp::wire::IpEndpoint,
+        sender: embassy_net::IpEndpoint,
         token: u8,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
     ) {
@@ -173,7 +176,7 @@ impl CoapMultiplexer {
 
     async fn incoming_function_start<'a>(
         &'a mut self,
-        sender: smoltcp::wire::IpEndpoint,
+        sender: embassy_net::IpEndpoint,
         token: u8,
         start_spec: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
     ) {
@@ -184,7 +187,7 @@ impl CoapMultiplexer {
 
     async fn incoming_function_stop(
         &mut self,
-        sender: smoltcp::wire::IpEndpoint,
+        sender: embassy_net::IpEndpoint,
         token: u8,
         stop_instance_id: edgeless_api_core::instance_id::InstanceId,
     ) {
@@ -195,7 +198,7 @@ impl CoapMultiplexer {
 
     async fn incoming_fucntion_patch<'a>(
         &mut self,
-        sender: smoltcp::wire::IpEndpoint,
+        sender: embassy_net::IpEndpoint,
         token: u8,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
     ) {
@@ -204,14 +207,14 @@ impl CoapMultiplexer {
             .await
     }
 
-    async fn incoming_peer_add(&mut self, sender: smoltcp::wire::IpEndpoint, token: u8, node_id: uuid::Uuid, addr: &[u8], port: u16) {
+    async fn incoming_peer_add(&mut self, sender: embassy_net::IpEndpoint, token: u8, node_id: uuid::Uuid, addr: &[u8], port: u16) {
         log::info!("Got Peer Add {:?}, {}", addr, port);
         if self
             .peers
             .insert(
                 edgeless_api_core::node_registration::NodeId(node_id),
-                smoltcp::wire::IpEndpoint {
-                    addr: smoltcp::wire::IpAddress::from(smoltcp::wire::Ipv4Address::from_bytes(addr)),
+                embassy_net::IpEndpoint {
+                    addr: embassy_net::IpAddress::from(embassy_net::Ipv4Address::new(addr[0], addr[1], addr[2], addr[4])),
                     port,
                 },
             )
@@ -226,7 +229,7 @@ impl CoapMultiplexer {
         }
     }
 
-    async fn incoming_peer_remove(&mut self, sender: smoltcp::wire::IpEndpoint, token: u8, node_id: uuid::Uuid) {
+    async fn incoming_peer_remove(&mut self, sender: embassy_net::IpEndpoint, token: u8, node_id: uuid::Uuid) {
         log::info!("Got Peer Remove");
         self.peers.remove(&edgeless_api_core::node_registration::NodeId(node_id));
         let ((data, sender), _tail) =
@@ -236,13 +239,15 @@ impl CoapMultiplexer {
         }
     }
 
-    async fn incoming_keepalive(&mut self, sender: smoltcp::wire::IpEndpoint, token: u8) {
+    async fn incoming_keepalive(&mut self, sender: embassy_net::IpEndpoint, token: u8) {
+        log::info!("KeepAlive: {}", sender);
         let ((data, sender), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, &mut self.app_buf_tx[..], true);
+        log::info!("KeepAlive 2");
         if let Err(err) = self.sock.send_to(data, sender).await {
             log::error!("keepalive UDP/COAP send error: {:?}", err);
         } else {
-            log::debug!("Sent Keepalive response");
+            log::info!("Sent Keepalive response");
         }
     }
 
@@ -283,9 +288,8 @@ impl CoapMultiplexer {
 
     async fn at_most_once<'a>(
         &'a mut self,
-        sender: smoltcp::wire::IpEndpoint,
+        sender: embassy_net::IpEndpoint,
         token: u8,
-        // start_spec: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
         operation: impl core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>>,
     ) {
         let key_entry = self.last_tokens.get_mut(&sender);

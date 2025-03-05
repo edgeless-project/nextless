@@ -16,18 +16,11 @@ embedded-hal = "1"
 
 log = { version = "0.4", default-features = false }
 
-
-embassy-executor = { version = "0.5.0", features = ["task-arena-size-32768"] }
-embassy-sync = { version = "0.5" }
-embassy-time = { version = "0.3" }
-embassy-net = { version = "0.4", features = [
-    "tcp",
-    "udp",
-    "dhcpv4",
-    "medium-ethernet",
-    "proto-ipv4",
-] }
-embassy-futures = { version = "0.1" }
+embassy-executor = { version = "0.7.0" }
+embassy-sync = { version = "0.6" }
+embassy-time = { version = "0.4"}
+embassy-net = { version = "0.6", features = ["tcp", "udp", "dhcpv4", "medium-ethernet", "proto-ipv4"] }
+embassy-futures = { version =  "0.1" }
 
 
 static_cell = { version = "1.2.0" }
@@ -41,13 +34,7 @@ edgeless_api_core = { path = "../edgeless_api_core" }
 coap-lite = { version = "0.11", default-features = false }
 minicbor = { version = "0.19", default-features = false, features = ["derive"] }
 
-smoltcp = { version = "0.11.0", default-features = false, features = [
-    "socket",
-    "async",
-] }
-
 wasmi = {version = "0.40", default-features = false, features = []}
 
-# epd-waveshare = { path = "../vendor/epd-waveshare", features = ["graphics", "epd2in13_v3"], default-features = false}
-# embedded-graphics = { version = "0.8"}
-# sensor-scd30 = {path="../vendor/rust-sensor-scd30", default-features=false}
+[features]
+nightly = ["embassy-executor/nightly"]

@@ -6,14 +6,14 @@
 pub struct EncodedResourceInstanceSpecification<'a> {
     pub instance_id: crate::instance_id::InstanceId,
     pub class_type: &'a str,
-    pub output_mapping: heapless::Vec<(&'a str, crate::common::Output), 16>,
+    pub output_mapping: heapless::Vec<(&'a str, crate::common::Output), 4>,
     pub configuration: heapless::Vec<(&'a str, &'a str), 16>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct EncodedPatchRequest<'a> {
     pub instance_id: crate::instance_id::InstanceId,
-    pub output_mapping: heapless::Vec<(&'a str, crate::common::Output), 16>,
+    pub output_mapping: heapless::Vec<(&'a str, crate::common::Output), 4>,
 }
 
 impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
@@ -42,7 +42,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
         let instance_id = d.decode::<crate::instance_id::InstanceId>()?;
 
         let class_type = d.str()?;
-        let mut outputs = heapless::Vec::<(&'b str, crate::common::Output), 16>::new();
+        let mut outputs = heapless::Vec::<(&'b str, crate::common::Output), 4>::new();
         let mut configuration = heapless::Vec::<(&'b str, &'b str), 16>::new();
 
         for item in d.array_iter::<(&str, crate::common::Output)>().unwrap() {
@@ -133,7 +133,7 @@ mod test {
     fn no_config() {
         let mut buffer = [0_u8; 1000];
 
-        let mut outputs = heapless::Vec::<(&str, crate::common::Output), 16>::new();
+        let mut outputs = heapless::Vec::<(&str, crate::common::Output), 4>::new();
         let configuration = heapless::Vec::<(&str, &str), 16>::new();
 
         outputs

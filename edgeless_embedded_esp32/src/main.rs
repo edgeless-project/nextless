@@ -4,6 +4,8 @@
 
 #![no_std]
 #![no_main]
+#![feature(stmt_expr_attributes)]
+#![feature(impl_trait_in_assoc_type)]
 
 extern crate alloc;
 
@@ -18,82 +20,97 @@ use edgeless_embedded::agent::EmbeddedAgent;
 use edgeless_embedded::resource::epaper_display::EPaper;
 use embedded_hal::delay::DelayNs;
 use epd_waveshare::prelude::*;
+use esp_alloc as _;
 use esp_backtrace as _;
-use hal::prelude::*;
 
-#[global_allocator]
-static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
-
-static RNG: once_cell::sync::OnceCell<hal::rng::Rng> = once_cell::sync::OnceCell::new();
-
-const ESP_GETRANDOM_ERROR: u32 = getrandom::Error::CUSTOM_START + 1;
+static RNG: once_cell::sync::OnceCell<esp_hal::rng::Rng> = once_cell::sync::OnceCell::new();
 
 const NODE_ID: uuid::Uuid = uuid::uuid!("0827240a-3050-4604-bf3e-564c41c77106");
 
-static mut APP_CORE_STACK: hal::cpu_control::Stack<8192> = hal::cpu_control::Stack::new();
+static mut APP_CORE_STACK: esp_hal::system::Stack<8192> = esp_hal::system::Stack::new();
 
-fn init_heap() {
-    const HEAP_SIZE: usize = 32 * 1024;
-    static mut HEAP: core::mem::MaybeUninit<[u8; HEAP_SIZE]> = core::mem::MaybeUninit::uninit();
+// Originally was planning to use a dedicated heap here, but this is currently not possible: https://github.com/esp-rs/esp-hal/issues/3187
+#[no_mangle]
+pub extern "C" fn esp_wifi_free_internal_heap() -> usize {
+    // return size of free allocatable RAM
+    esp_alloc::HEAP.free_caps(esp_alloc::MemoryCapability::Internal.into())
+}
 
+#[no_mangle]
+pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
+    // allocate memory of size `size` from internal memory
     unsafe {
-        ALLOCATOR.init(HEAP.as_mut_ptr() as *mut u8, HEAP_SIZE);
+        esp_alloc::HEAP.alloc_caps(
+            esp_alloc::MemoryCapability::Internal.into(),
+            core::alloc::Layout::from_size_align_unchecked(size, 4),
+        )
     }
 }
 
-fn esp_getrandom(dest: &mut [u8]) -> Result<(), getrandom::Error> {
+#[no_mangle]
+unsafe extern "Rust" fn __getrandom_v03_custom(dest: *mut u8, len: usize) -> Result<(), getrandom::Error> {
     match RNG.get() {
         Some(rng) => {
             let mut rng = rng.clone();
-            for dest_byte in dest {
-                *dest_byte = rng.random() as u8;
+            for i in 0..len {
+                *(dest.add(i)) = rng.random() as u8;
             }
             Ok(())
         }
-        None => Err(getrandom::Error::from(core::num::NonZeroU32::new(ESP_GETRANDOM_ERROR).unwrap())),
+        None => Err(getrandom::Error::UNSUPPORTED),
     }
 }
 
-#[allow(non_upper_case_globals)]
-getrandom::register_custom_getrandom!(esp_getrandom);
-
-#[entry]
+#[esp_hal::main]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
+    esp_println::logger::init_logger(log::LevelFilter::Debug);
     esp_println::println!("Start Edgeless Embedded.");
 
-    // https://github.com/esp-rs/esp-template/blob/main/src/main.rs
-    init_heap();
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()));
 
-    let peripherals = hal::peripherals::Peripherals::take();
-    #[allow(unused_variables)]
-    let io = hal::gpio::Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let system = hal::system::SystemControl::new(peripherals.SYSTEM);
+    #[cfg(not(feature = "esp32"))]
+    {
+        log::info!("Using PSRAM");
+        esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
+    }
 
-    let clocks = hal::clock::ClockControl::max(system.clock_control).freeze();
-    let timer_group0 = hal::timer::timg::TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    let timer_group1 = hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None);
+    esp_alloc::heap_allocator!(
+        #[link_section = ".dram2_uninit"]
+        size: 64 * 1024
+    );
+    esp_alloc::heap_allocator!(size: 32 * 1024);
 
-    let rng = hal::rng::Rng::new(peripherals.RNG);
+    let timer_group0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
+    // let timer_group1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
+
+    let rng = esp_hal::rng::Rng::new(peripherals.RNG);
     assert!(RNG.set(rng.clone()).is_ok());
 
-    esp_hal_embassy::init(&clocks, timer_group0);
+    #[cfg(not(feature = "esp32"))]
+    {
+        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
+        esp_hal_embassy::init(systimer.alarm0);
+    }
+    #[cfg(feature = "esp32")]
+    {
+        esp_hal_embassy::init(timer_group0.timer1);
+    }
 
-    let mut cpu_control = hal::cpu_control::CpuControl::new(peripherals.CPU_CTRL);
+    let mut cpu_control = esp_hal::system::CpuControl::new(peripherals.CPU_CTRL);
 
     #[cfg(feature = "epaper_2_13")]
     let display_wrapper = {
-        let spi = hal::spi::master::Spi::new(peripherals.SPI2, 100u32.kHz(), hal::spi::SpiMode::Mode0, &clocks)
+        let spi = esp_hal::spi::master::Spi::new(peripherals.SPI2, 100u32.kHz(), esp_hal::spi::SpiMode::Mode0, &clocks)
             .with_sck(io.pins.gpio18)
             .with_mosi(io.pins.gpio23);
 
-        let display_pin = hal::gpio::Output::new(io.pins.gpio5, hal::gpio::Level::Low);
+        let display_pin = esp_hal::gpio::Output::new(io.pins.gpio5, esp_hal::gpio::Level::Low);
 
         let mut spi_dev = embedded_hal_bus::spi::ExclusiveDevice::new_no_delay(spi, display_pin).unwrap();
-        let busy_pin = hal::gpio::Input::new(io.pins.gpio4, hal::gpio::Pull::None);
-        let dc_pin = hal::gpio::Output::new(io.pins.gpio17, hal::gpio::Level::High);
-        let rst_pin = hal::gpio::Output::new(io.pins.gpio16, hal::gpio::Level::High);
-        let mut epaper_delay = hal::delay::Delay::new(&clocks);
+        let busy_pin = esp_hal::gpio::Input::new(io.pins.gpio4, esp_hal::gpio::Pull::None);
+        let dc_pin = esp_hal::gpio::Output::new(io.pins.gpio17, esp_hal::gpio::Level::High);
+        let rst_pin = esp_hal::gpio::Output::new(io.pins.gpio16, esp_hal::gpio::Level::High);
+        let mut epaper_delay = esp_hal::delay::Delay::new(&clocks);
 
         let epd = epd_waveshare::epd2in13_lillygo::Epd2in13::new(&mut spi_dev, busy_pin, dc_pin, rst_pin, &mut epaper_delay, None).unwrap();
 
@@ -102,14 +119,14 @@ fn main() -> ! {
         static DISPLAY_WRAPPER_RAW: static_cell::StaticCell<
             epaper_display_impl::LillyGoEPaper<
                 embedded_hal_bus::spi::ExclusiveDevice<
-                    hal::spi::master::Spi<'_, hal::peripherals::SPI2, hal::spi::FullDuplexMode>,
-                    hal::gpio::Output<hal::gpio::Gpio5>,
+                    esp_hal::spi::master::Spi<'_, esp_hal::peripherals::SPI2, esp_hal::spi::FullDuplexMode>,
+                    esp_hal::gpio::Output<esp_hal::gpio::Gpio5>,
                     embedded_hal_bus::spi::NoDelay,
                 >,
-                hal::gpio::Input<hal::gpio::Gpio4>,
-                hal::gpio::Output<hal::gpio::Gpio17>,
-                hal::gpio::Output<hal::gpio::Gpio16>,
-                hal::delay::Delay,
+                esp_hal::gpio::Input<esp_hal::gpio::Gpio4>,
+                esp_hal::gpio::Output<esp_hal::gpio::Gpio17>,
+                esp_hal::gpio::Output<esp_hal::gpio::Gpio16>,
+                esp_hal::delay::Delay,
             >,
         > = static_cell::StaticCell::new();
         let display_wrapper = DISPLAY_WRAPPER_RAW.init_with(|| epaper_display_impl::LillyGoEPaper {
@@ -124,7 +141,7 @@ fn main() -> ! {
 
     #[cfg(feature = "scd30")]
     let sensor_wrapper = {
-        let i2c = hal::i2c::I2C::new_with_timeout(
+        let i2c = esp_hal::i2c::I2C::new_with_timeout(
             peripherals.I2C0,
             io.pins.gpio33,
             io.pins.gpio32,
@@ -134,13 +151,17 @@ fn main() -> ! {
             None,
         );
 
-        let mut i2c_delay = hal::delay::Delay::new(&clocks);
+        let mut i2c_delay = esp_hal::delay::Delay::new(&clocks);
         i2c_delay.delay_ms(5000u32);
 
         let scd = sensor_scd30::Scd30::new(i2c, i2c_delay).unwrap();
 
         static SENSOR_WRAPPER_RAW: static_cell::StaticCell<
-            scd30_sensor_impl::SCD30SensorWrapper<hal::i2c::I2C<'_, hal::peripherals::I2C0, hal::Blocking>, hal::delay::Delay, hal::i2c::Error>,
+            scd30_sensor_impl::SCD30SensorWrapper<
+                esp_hal::i2c::I2C<'_, esp_hal::peripherals::I2C0, esp_hal::Blocking>,
+                esp_hal::delay::Delay,
+                esp_hal::i2c::Error,
+            >,
         > = static_cell::StaticCell::new();
 
         let sensor_wrapper = SENSOR_WRAPPER_RAW.init_with(|| scd30_sensor_impl::SCD30SensorWrapper { sensor: scd });
@@ -175,7 +196,7 @@ fn main() -> ! {
     let display_receiver = display_channel.receiver();
 
     let _other_core = cpu_control
-        .start_app_core(unsafe { &mut *core::ptr::addr_of_mut!(APP_CORE_STACK) }, move || {
+        .start_app_core(unsafe { &mut APP_CORE_STACK }, move || {
             static IO_EXECUTOR_RAW: static_cell::StaticCell<esp_hal_embassy::Executor> = static_cell::StaticCell::new();
             let io_executor = IO_EXECUTOR_RAW.init_with(|| esp_hal_embassy::Executor::new());
 
@@ -199,10 +220,9 @@ fn main() -> ! {
     executor.run(|spawner| {
         spawner.spawn(edgeless(
             spawner,
-            timer_group1.timer0,
+            timer_group0.timer0,
             rng,
             peripherals.RADIO_CLK,
-            clocks,
             peripherals.WIFI,
             receiver,
             display_sender,
@@ -229,11 +249,10 @@ async fn io_task(
 #[embassy_executor::task]
 async fn edgeless(
     spawner: embassy_executor::Spawner,
-    timer: hal::timer::timg::Timer<hal::timer::timg::TimerX<hal::peripherals::TIMG1>, hal::Blocking>,
-    rng: hal::rng::Rng,
-    radio_clock_control: hal::peripherals::RADIO_CLK,
-    clocks: hal::clock::Clocks<'static>,
-    wifi: hal::peripherals::WIFI,
+    timer: esp_hal::timer::timg::Timer,
+    rng: esp_hal::rng::Rng,
+    radio_clock_control: esp_hal::peripherals::RADIO_CLK,
+    wifi: esp_hal::peripherals::WIFI,
     sensor_scd_receiver: embassy_sync::channel::Receiver<
         'static,
         embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
@@ -246,6 +265,7 @@ async fn edgeless(
 
     static RX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
     let rx_buf = RX_BUF_RAW.init_with(|| [0 as u8; 5000]);
+    // let rx_buf = esp_alloc::
     static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
     let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
     static TX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
@@ -259,18 +279,30 @@ async fn edgeless(
 
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [sensor_scd30_resource, display_resource]);
+    // let resources = RESOURCES_RAW.init_with(|| []);
 
-    static WASM_RUNTIME_RAW: static_cell::StaticCell<edgeless_embedded::wasm_functions::WasmiRuntime> = static_cell::StaticCell::new();
-    let wasm_runtime = WASM_RUNTIME_RAW.init_with(|| edgeless_embedded::wasm_functions::WasmiRuntime::new());
+    #[cfg(feature = "wasm")]
+    let agent = {
+        log::info!("Using a WASM Runtime");
+        static WASM_RUNTIME_RAW: static_cell::StaticCell<edgeless_embedded::wasm_functions::WasmiRuntime> = static_cell::StaticCell::new();
+        let wasm_runtime = WASM_RUNTIME_RAW.init_with(|| edgeless_embedded::wasm_functions::WasmiRuntime::new());
+        edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), Some(wasm_runtime), resources).await
+    };
+    #[cfg(not(feature = "wasm"))]
+    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), None, resources).await;
 
-    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), wasm_runtime, resources).await;
+    log::info!("Agent Created");
 
-    let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, clocks, wifi, agent.clone()).await;
+    let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, wifi, agent.clone()).await;
     let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
+
+    log::info!("WiFi Started");
 
     spawner.spawn(edgeless_embedded::coap::coap_task(
         sock,
         agent.upstream_receiver().unwrap(),
         agent.clone(),
     ));
+
+    log::info!("CoAP Started");
 }
