@@ -12,9 +12,9 @@ impl log::Log for Logger {
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
             match record.args().as_str() {
-                Some(data) => telemetry_log(rust_to_api(record.level()) as usize, record.target(), data),
+                Some(data) => super::telemetry_log(rust_to_api(record.level()) as usize, record.target(), data),
                 _ => {
-                    telemetry_log(rust_to_api(record.level()) as usize, record.target(), "Unsupported Message Arguments");
+                    super::telemetry_log(rust_to_api(record.level()) as usize, record.target(), "Unsupported Message Arguments");
                 }
             }
         }
