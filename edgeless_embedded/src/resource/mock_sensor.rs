@@ -14,7 +14,7 @@ pub struct MockSensorConfiguration {
 }
 
 pub struct MockSensor {
-    pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
+    pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>>,
 }
 
 impl MockSensor {
@@ -66,14 +66,16 @@ impl MockSensor {
 
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
-            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
+            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>>,
         > = static_cell::StaticCell::new();
         let mock_sensor_state = SENSOR_STATE_RAW.init_with(|| {
-            core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(MockSensorInner {
-                instance_id: None,
-                data_out_id: None,
-                delay: 30,
-            }))
+            core::cell::RefCell::new(
+                embassy_sync::mutex::Mutex::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, _>::new(MockSensorInner {
+                    instance_id: None,
+                    data_out_id: None,
+                    delay: 30,
+                }),
+            )
         });
         static SLF_RAW: static_cell::StaticCell<MockSensor> = static_cell::StaticCell::new();
         SLF_RAW.init_with(|| MockSensor { inner: mock_sensor_state })
@@ -107,7 +109,7 @@ impl crate::resource::Resource for MockSensor {
 
 #[embassy_executor::task]
 pub async fn mock_sensor_task(
-    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
+    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>>,
     agent: crate::agent::EmbeddedAgent,
 ) {
     let mut agent = agent;

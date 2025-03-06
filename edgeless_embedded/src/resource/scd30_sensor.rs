@@ -26,7 +26,7 @@ pub struct SCD30SensorConfiguration {
 }
 
 pub struct SCD30Sensor {
-    pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>>,
+    pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>>,
 }
 
 impl SCD30Sensor {
@@ -59,7 +59,7 @@ impl SCD30Sensor {
         data_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
-            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>>,
+            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>>,
         > = static_cell::StaticCell::new();
         let sensor_state = SENSOR_STATE_RAW.init_with(|| {
             core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(SCD30SensorInner {
@@ -128,7 +128,7 @@ impl crate::resource::Resource for SCD30Sensor {
 
 #[embassy_executor::task]
 pub async fn scd30_sensor_task(
-    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>>,
+    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>>,
     agent: crate::agent::EmbeddedAgent,
 ) {
     let receiver = {

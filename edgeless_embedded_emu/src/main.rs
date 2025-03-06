@@ -46,6 +46,10 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     let tx_buf = TX_BUF_RAW.init_with(|| [0_u8; 5000]);
     static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
     let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
+    static APP_TX_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
+    let app_tx = APP_TX_RAW.init_with(|| [0 as u8; 5000]);
+    static APP_RX_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
+    let app_rx = APP_RX_RAW.init_with(|| [0 as u8; 5000]);
 
     let device = embassy_net_tuntap::TunTapDevice::new("tap0").unwrap();
     let config = embassy_net::Config::ipv4_static(embassy_net::StaticConfigV4 {
@@ -55,7 +59,6 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     });
 
     static STACK_RESOURCES_RAW: static_cell::StaticCell<embassy_net::StackResources<3>> = static_cell::StaticCell::new();
-    // static STACK_RAW: static_cell::StaticCell<embassy_net::Stack<'static> = static_cell::StaticCell::new();
     let (stack, runner) = embassy_net::new(device, config, STACK_RESOURCES_RAW.init_with(embassy_net::StackResources::<3>::new), 1234);
 
     spawner.spawn(net_task(runner)).unwrap();
@@ -79,6 +82,8 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
             sock,
             agent.upstream_receiver().unwrap(),
             agent.clone(),
+            app_rx,
+            app_tx,
         ))
         .unwrap();
 

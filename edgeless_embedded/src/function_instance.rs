@@ -1,7 +1,7 @@
 pub trait FunctionInstanceAPI {
-    async fn start_function(
+    async fn start_function<'a>(
         &mut self,
-        instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification,
+        instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse>;
     async fn stop_function(
         &mut self,

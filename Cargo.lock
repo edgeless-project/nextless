@@ -1837,6 +1837,7 @@ dependencies = [
 name = "edgeless_embedded"
 version = "0.1.0"
 dependencies = [
+ "cfg-if",
  "coap-lite",
  "edgeless_api_core",
  "embassy-executor",

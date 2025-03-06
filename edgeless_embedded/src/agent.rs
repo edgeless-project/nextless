@@ -5,17 +5,17 @@ use core::str::FromStr;
 #[derive(Clone)]
 pub struct EmbeddedAgent {
     own_node_id: edgeless_api_core::instance_id::NodeId,
-    upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>,
-    upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>>,
-    inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>>,
-    registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
-    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
+    upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>,
+    upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>>,
+    inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>>,
+    registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
+    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
 }
 
 struct EmbeddedAgentInner {
     resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
     wasm_runtime: Option<&'static mut crate::wasm_functions::WasmiRuntime>,
-    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
+    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
 }
 
 type StoredMessage = edgeless_api_core::invocation::Event;
@@ -25,7 +25,7 @@ pub enum AgentEvent {
     Registration(
         (
             edgeless_api_core::node_registration::EncodedNodeRegistration<'static>,
-            &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
+            &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
         ),
     ),
 }
@@ -42,47 +42,87 @@ impl EmbeddedAgent {
         runtime: Option<&'static mut crate::wasm_functions::WasmiRuntime>,
         resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
     ) -> &'static mut EmbeddedAgent {
-        static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
-            static_cell::StaticCell::new();
-        let channel = CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>::new);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "alloc_static")] {
+                let channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::channel::Channel::<
+                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    AgentEvent,
+                    2,
+                >::new()));
+                let buffer_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::channel::Channel::<
+                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    StoredMessage,
+                    2,
+                >::new()));
+                let reply_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::signal::Signal::<
+                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    RegistrationReply,
+                >::new()));
+            } else {
+                static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>> =
+                    static_cell::StaticCell::new();
+                let channel = CHANNEL_RAW.init_with(|| embassy_sync::channel::Channel::<
+                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    AgentEvent,
+                    2,
+                    >::new()
+                );
+                static BUFFER_CHANNEL_RAW: static_cell::StaticCell<
+                    embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
+                > = static_cell::StaticCell::new();
+                let buffer_channel =
+                    BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>::new);
+                static REPLY_CHANNEL: static_cell::StaticCell<
+                    embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
+                > = static_cell::StaticCell::new();
+                let reply_channel = REPLY_CHANNEL.init_with(embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>::new);
+            }
+        }
 
         let sender = channel.sender();
         let receiver = channel.receiver();
-
-        static BUFFER_CHANNEL_RAW: static_cell::StaticCell<
-            embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
-        > = static_cell::StaticCell::new();
-        let buffer_channel =
-            BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>::new);
-
         let buffer_sender = buffer_channel.sender();
         let buffer_receiver = buffer_channel.receiver();
 
-        static SLF_INNER_RAW: static_cell::StaticCell<
-            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>>,
-        > = static_cell::StaticCell::new();
-        let slf_inner = SLF_INNER_RAW.init_with(|| {
-            core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(EmbeddedAgentInner {
-                resources: &mut resources[..],
-                wasm_runtime: runtime,
-                internal_buffer_receiver: buffer_receiver,
-            }))
-        });
-
-        static REPLY_CHANNEL: static_cell::StaticCell<
-            embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
-        > = static_cell::StaticCell::new();
-
-        static SLF_RAW: static_cell::StaticCell<EmbeddedAgent> = static_cell::StaticCell::new();
-        let slf = SLF_RAW.init_with(|| EmbeddedAgent {
-            own_node_id: node_id,
-            upstream_sender: sender,
-            upstream_receiver: Some(receiver),
-            inner: slf_inner,
-            registration_signal: REPLY_CHANNEL
-                .init_with(embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new),
-            internal_buffer_sender: buffer_sender,
-        });
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "alloc_static")] {
+                let slf_inner = alloc::boxed::Box::leak(alloc::boxed::Box::new(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(
+                    EmbeddedAgentInner {
+                        resources: &mut resources[..],
+                        wasm_runtime: runtime,
+                        internal_buffer_receiver: buffer_receiver,
+                    },
+                ))));
+                let slf = alloc::boxed::Box::leak(alloc::boxed::Box::new(EmbeddedAgent {
+                    own_node_id: node_id,
+                    upstream_sender: sender,
+                    upstream_receiver: Some(receiver),
+                    inner: slf_inner,
+                    registration_signal: reply_channel,
+                    internal_buffer_sender: buffer_sender,
+                }));
+            } else {
+                static SLF_INNER_RAW: static_cell::StaticCell<
+                    core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>>,
+                > = static_cell::StaticCell::new();
+                let slf_inner = SLF_INNER_RAW.init_with(|| {
+                    core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(EmbeddedAgentInner {
+                        resources: &mut resources[..],
+                        wasm_runtime: runtime,
+                        internal_buffer_receiver: buffer_receiver,
+                    }))
+                });
+                static SLF_RAW: static_cell::StaticCell<EmbeddedAgent> = static_cell::StaticCell::new();
+                let slf = SLF_RAW.init_with(||EmbeddedAgent {
+                    own_node_id: node_id,
+                    upstream_sender: sender,
+                    upstream_receiver: Some(receiver),
+                    inner: slf_inner,
+                    registration_signal: reply_channel,
+                    internal_buffer_sender: buffer_sender,
+                });
+            }
+        }
 
         {
             let inner = slf.inner.borrow_mut();
@@ -100,7 +140,7 @@ impl EmbeddedAgent {
 
     pub fn upstream_receiver(
         &mut self,
-    ) -> Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> {
+    ) -> Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>> {
         self.upstream_receiver.take()
     }
 

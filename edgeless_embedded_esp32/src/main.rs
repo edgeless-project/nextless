@@ -15,9 +15,9 @@ pub mod epaper_display_impl;
 pub mod scd30_sensor_impl;
 pub mod wifi;
 
-use edgeless_embedded::agent::EmbeddedAgent;
 #[cfg(feature = "epaper_2_13")]
 use edgeless_embedded::resource::epaper_display::EPaper;
+use edgeless_embedded::{agent::EmbeddedAgent, function_instance::FunctionInstanceAPI};
 use embedded_hal::delay::DelayNs;
 use epd_waveshare::prelude::*;
 use esp_alloc as _;
@@ -66,14 +66,20 @@ fn main() -> ! {
     esp_println::logger::init_logger(log::LevelFilter::Debug);
     esp_println::println!("Start Edgeless Embedded.");
 
-    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()));
+    let mut config = esp_hal::Config::default();
+    config = config.with_cpu_clock(esp_hal::clock::CpuClock::max());
+    #[cfg(feature = "psram")]
+    {
+        config = config.with_psram(esp_hal::psram::PsramConfig { ..Default::default() });
+    }
 
-    #[cfg(not(feature = "esp32"))]
+    let peripherals = esp_hal::init(config);
+
+    #[cfg(feature = "psram")]
     {
         log::info!("Using PSRAM");
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     }
-
     esp_alloc::heap_allocator!(
         #[link_section = ".dram2_uninit"]
         size: 64 * 1024
@@ -81,7 +87,6 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 32 * 1024);
 
     let timer_group0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
-    // let timer_group1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
 
     let rng = esp_hal::rng::Rng::new(peripherals.RNG);
     assert!(RNG.set(rng.clone()).is_ok());
@@ -168,29 +173,53 @@ fn main() -> ! {
         sensor_wrapper
     };
 
-    static CHANNEL_RAW: static_cell::StaticCell<
-        embassy_sync::channel::Channel<
-            embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
-            edgeless_embedded::resource::scd30_sensor::Measurement,
-            2,
-        >,
-    > = static_cell::StaticCell::new();
-    let channel = CHANNEL_RAW.init_with(|| {
-        embassy_sync::channel::Channel::<
-            embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
-            edgeless_embedded::resource::scd30_sensor::Measurement,
-            2,
-        >::new()
-    });
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "psram")] {
+            let sensor_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(
+                embassy_sync::channel::Channel::<
+                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    edgeless_embedded::resource::scd30_sensor::Measurement,
+                    2,
+                >::new(),
+            ));
+        } else {
+            static SENSOR_CHANNEL_RAW: static_cell::StaticCell<
+                embassy_sync::channel::Channel<
+                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    edgeless_embedded::resource::scd30_sensor::Measurement,
+                    2,
+                >,
+            > = static_cell::StaticCell::new();
 
-    let sender = channel.sender();
-    let receiver = channel.receiver();
 
-    static DISPLAY_CHANNEL_RAW: static_cell::StaticCell<
-        embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
-    > = static_cell::StaticCell::new();
-    let display_channel = DISPLAY_CHANNEL_RAW
-        .init_with(|| embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>::new());
+            let sensor_channel = SENSOR_CHANNEL_RAW.init_with(|| {
+                embassy_sync::channel::Channel::<
+                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    edgeless_embedded::resource::scd30_sensor::Measurement,
+                    2,
+                >::new()
+            });
+        }
+    }
+
+    let sender = sensor_channel.sender();
+    let receiver = sensor_channel.receiver();
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "psram")] {
+            static DISPLAY_CHANNEL_RAW: static_cell::StaticCell<
+                embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
+            > = static_cell::StaticCell::new();
+            let display_channel = DISPLAY_CHANNEL_RAW
+                .init_with(|| embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>::new());
+        } else {
+            let display_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::channel::Channel::<
+                embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                heapless::String<1500>,
+                2,
+            >::new()));
+        }
+    }
 
     let display_sender = display_channel.sender();
     let display_receiver = display_channel.receiver();
@@ -263,29 +292,61 @@ async fn edgeless(
 ) {
     log::info!("Edgeless Embedded Async Main");
 
-    static RX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
-    let rx_buf = RX_BUF_RAW.init_with(|| [0 as u8; 5000]);
-    // let rx_buf = esp_alloc::
-    static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
-    let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
-    static TX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
-    let tx_buf = TX_BUF_RAW.init_with(|| [0 as u8; 5000]);
-    static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
-    let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
+    cfg_if::cfg_if! {
+        if #[cfg(features = "psram")] {
+            let rx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 5000]));
+            let rx_meta = alloc::boxed::Box::leak(alloc::boxed::Box::new([embassy_net::udp::PacketMetadata::EMPTY; 10]));
+            let tx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 5000]));
+            let tx_meta = alloc::boxed::Box::leak(alloc::boxed::Box::new([embassy_net::udp::PacketMetadata::EMPTY; 10]));
+            let app_tx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 5000]));
+            let app_rx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 5000]));
+        } else {
+            static RX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
+            let rx_buf = RX_BUF_RAW.init_with(|| [0 as u8; 5000]);
+            static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
+            let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
+            static TX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
+            let tx_buf = TX_BUF_RAW.init_with(|| [0 as u8; 5000]);
+            static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
+            let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
+            static APP_TX_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
+            let app_tx = APP_TX_RAW.init_with(|| [0 as u8; 5000]);
+            static APP_RX_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
+            let app_rx = APP_RX_RAW.init_with(|| [0 as u8; 5000]);
+        }
+    }
 
-    let display_resource = edgeless_embedded::resource::epaper_display::EPaperDisplay::new(display_sender).await;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "scd30")] {
+            let sensor_scd30_resource = edgeless_embedded::resource::scd30_sensor::SCD30Sensor::new(sensor_scd_receiver).await;
+        } else {
+            let sensor_scd30_resource = edgeless_embedded::resource::mock_sensor::MockSensor::new().await;
+        }
+    }
 
-    let sensor_scd30_resource = edgeless_embedded::resource::scd30_sensor::SCD30Sensor::new(sensor_scd_receiver).await;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "epaper_2_13")] {
+            let display_resource = edgeless_embedded::resource::epaper_display::EPaperDisplay::new(display_sender).await;
+        } else {
+            let display_resource = edgeless_embedded::resource::mock_display::MockDisplay::new().await;
+        }
+    }
 
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [sensor_scd30_resource, display_resource]);
-    // let resources = RESOURCES_RAW.init_with(|| []);
 
     #[cfg(feature = "wasm")]
     let agent = {
         log::info!("Using a WASM Runtime");
-        static WASM_RUNTIME_RAW: static_cell::StaticCell<edgeless_embedded::wasm_functions::WasmiRuntime> = static_cell::StaticCell::new();
-        let wasm_runtime = WASM_RUNTIME_RAW.init_with(|| edgeless_embedded::wasm_functions::WasmiRuntime::new());
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "psram")] {
+                let wasm_runtime = alloc::boxed::Box::leak(alloc::boxed::Box::new(edgeless_embedded::wasm_functions::WasmiRuntime::new()));
+            } else {
+                static WASM_RUNTIME_RAW: static_cell::StaticCell<edgeless_embedded::wasm_functions::WasmiRuntime> = static_cell::StaticCell::new();
+                let wasm_runtime = WASM_RUNTIME_RAW.init_with(|| edgeless_embedded::wasm_functions::WasmiRuntime::new());
+            }
+        };
+
         edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), Some(wasm_runtime), resources).await
     };
     #[cfg(not(feature = "wasm"))]
@@ -302,6 +363,8 @@ async fn edgeless(
         sock,
         agent.upstream_receiver().unwrap(),
         agent.clone(),
+        app_rx,
+        app_tx,
     ));
 
     log::info!("CoAP Started");

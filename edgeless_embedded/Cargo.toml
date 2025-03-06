@@ -15,12 +15,19 @@ path = "src/lib.rs"
 embedded-hal = "1"
 
 log = { version = "0.4", default-features = false }
+cfg-if = "1.0"
 
 embassy-executor = { version = "0.7.0" }
 embassy-sync = { version = "0.6" }
-embassy-time = { version = "0.4"}
-embassy-net = { version = "0.6", features = ["tcp", "udp", "dhcpv4", "medium-ethernet", "proto-ipv4"] }
-embassy-futures = { version =  "0.1" }
+embassy-time = { version = "0.4" }
+embassy-net = { version = "0.6", features = [
+    "tcp",
+    "udp",
+    "dhcpv4",
+    "medium-ethernet",
+    "proto-ipv4",
+] }
+embassy-futures = { version = "0.1" }
 
 
 static_cell = { version = "1.2.0" }
@@ -34,7 +41,9 @@ edgeless_api_core = { path = "../edgeless_api_core" }
 coap-lite = { version = "0.11", default-features = false }
 minicbor = { version = "0.19", default-features = false, features = ["derive"] }
 
-wasmi = {version = "0.40", default-features = false, features = []}
+wasmi = { version = "0.40", default-features = false, features = [] }
+
 
 [features]
 nightly = ["embassy-executor/nightly"]
+alloc_static = []
