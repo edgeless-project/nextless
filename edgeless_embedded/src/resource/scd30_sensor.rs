@@ -26,7 +26,7 @@ pub struct SCD30SensorConfiguration {
 }
 
 pub struct SCD30Sensor {
-    pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>>,
+    pub inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>,
 }
 
 impl SCD30Sensor {
@@ -59,14 +59,14 @@ impl SCD30Sensor {
         data_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
-            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>>,
+            embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>,
         > = static_cell::StaticCell::new();
         let sensor_state = SENSOR_STATE_RAW.init_with(|| {
-            core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(SCD30SensorInner {
+            embassy_sync::mutex::Mutex::new(SCD30SensorInner {
                 instance_id: None,
                 data_out_id: None,
                 data_receiver: Some(data_receiver),
-            }))
+            })
         });
         static SLF_RAW: static_cell::StaticCell<SCD30Sensor> = static_cell::StaticCell::new();
         SLF_RAW.init_with(|| SCD30Sensor { inner: sensor_state })
@@ -115,8 +115,7 @@ impl crate::resource::Resource for SCD30Sensor {
     }
 
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
-        let tmp = self.inner.borrow_mut();
-        let lck = tmp.lock().await;
+        let lck = self.inner.lock().await;
 
         lck.instance_id == Some(*instance_id)
     }
@@ -128,20 +127,18 @@ impl crate::resource::Resource for SCD30Sensor {
 
 #[embassy_executor::task]
 pub async fn scd30_sensor_task(
-    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>>,
+    state: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>,
     agent: crate::agent::EmbeddedAgent,
 ) {
     let receiver = {
-        let tmp = state.borrow_mut();
-        let mut lck = tmp.lock().await;
+        let mut lck = state.lock().await;
         lck.data_receiver.take().unwrap()
     };
 
     loop {
         let measurement = receiver.receive().await;
 
-        let tmp = state.borrow_mut();
-        let lck = tmp.lock().await;
+        let lck = state.lock().await;
 
         if let (Some(instance_id), Some(data_out_id)) = (lck.instance_id, lck.data_out_id.clone()) {
             let mut dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id.clone(), agent.clone(), heapless::Vec::new());
@@ -191,9 +188,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let instance_specification = SCD30Sensor::parse_configuration(instance_specification).await?;
-
-        let tmp = self.inner.borrow_mut();
-        let mut lck = tmp.lock().await;
+        let mut lck = self.inner.lock().await;
 
         if lck.instance_id.is_some() {
             return Err(edgeless_api_core::common::ErrorResponse {
@@ -209,8 +204,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
     }
 
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let tmp = self.inner.borrow_mut();
-        let mut lck = tmp.lock().await;
+        let mut lck = self.inner.lock().await;
 
         if let Some(instance_id) = lck.instance_id {
             if instance_id == resource_id {
@@ -231,8 +225,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
         &mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let tmp = self.inner.borrow_mut();
-        let mut lck = tmp.lock().await;
+        let mut lck = self.inner.lock().await;
 
         for (output_key, output_val) in patch_req.output_mapping {
             if output_key == "data_out" {

@@ -27,7 +27,7 @@ static RNG: once_cell::sync::OnceCell<esp_hal::rng::Rng> = once_cell::sync::Once
 
 const NODE_ID: uuid::Uuid = uuid::uuid!("0827240a-3050-4604-bf3e-564c41c77106");
 
-static mut APP_CORE_STACK: esp_hal::system::Stack<8192> = esp_hal::system::Stack::new();
+static mut APP_CORE_STACK: esp_hal::system::Stack<16384> = esp_hal::system::Stack::new();
 
 // Originally was planning to use a dedicated heap here, but this is currently not possible: https://github.com/esp-rs/esp-hal/issues/3187
 #[no_mangle]
@@ -84,7 +84,7 @@ fn main() -> ! {
         #[link_section = ".dram2_uninit"]
         size: 64 * 1024
     );
-    esp_alloc::heap_allocator!(size: 32 * 1024);
+    esp_alloc::heap_allocator!(size: 24 * 1024);
 
     let timer_group0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
 
@@ -105,17 +105,26 @@ fn main() -> ! {
 
     #[cfg(feature = "epaper_2_13")]
     let display_wrapper = {
-        let spi = esp_hal::spi::master::Spi::new(peripherals.SPI2, 100u32.kHz(), esp_hal::spi::SpiMode::Mode0, &clocks)
-            .with_sck(io.pins.gpio18)
-            .with_mosi(io.pins.gpio23);
+        let spi = esp_hal::spi::master::Spi::new(
+            peripherals.SPI2,
+            esp_hal::spi::master::Config::default()
+                .with_frequency(esp_hal::time::Rate::from_khz(100))
+                .with_mode(esp_hal::spi::Mode::_0),
+        )
+        .unwrap()
+        .with_sck(peripherals.GPIO18)
+        .with_mosi(peripherals.GPIO23);
 
-        let display_pin = esp_hal::gpio::Output::new(io.pins.gpio5, esp_hal::gpio::Level::Low);
+        let display_pin = esp_hal::gpio::Output::new(peripherals.GPIO5, esp_hal::gpio::Level::Low, esp_hal::gpio::OutputConfig::default());
 
         let mut spi_dev = embedded_hal_bus::spi::ExclusiveDevice::new_no_delay(spi, display_pin).unwrap();
-        let busy_pin = esp_hal::gpio::Input::new(io.pins.gpio4, esp_hal::gpio::Pull::None);
-        let dc_pin = esp_hal::gpio::Output::new(io.pins.gpio17, esp_hal::gpio::Level::High);
-        let rst_pin = esp_hal::gpio::Output::new(io.pins.gpio16, esp_hal::gpio::Level::High);
-        let mut epaper_delay = esp_hal::delay::Delay::new(&clocks);
+        let busy_pin = esp_hal::gpio::Input::new(
+            peripherals.GPIO4,
+            esp_hal::gpio::InputConfig::default().with_pull(esp_hal::gpio::Pull::None),
+        );
+        let dc_pin = esp_hal::gpio::Output::new(peripherals.GPIO17, esp_hal::gpio::Level::High, esp_hal::gpio::OutputConfig::default());
+        let rst_pin = esp_hal::gpio::Output::new(peripherals.GPIO16, esp_hal::gpio::Level::High, esp_hal::gpio::OutputConfig::default());
+        let mut epaper_delay = esp_hal::delay::Delay::new();
 
         let epd = epd_waveshare::epd2in13_lillygo::Epd2in13::new(&mut spi_dev, busy_pin, dc_pin, rst_pin, &mut epaper_delay, None).unwrap();
 
@@ -124,13 +133,13 @@ fn main() -> ! {
         static DISPLAY_WRAPPER_RAW: static_cell::StaticCell<
             epaper_display_impl::LillyGoEPaper<
                 embedded_hal_bus::spi::ExclusiveDevice<
-                    esp_hal::spi::master::Spi<'_, esp_hal::peripherals::SPI2, esp_hal::spi::FullDuplexMode>,
-                    esp_hal::gpio::Output<esp_hal::gpio::Gpio5>,
+                    esp_hal::spi::master::Spi<'_, esp_hal::Blocking>,
+                    esp_hal::gpio::Output,
                     embedded_hal_bus::spi::NoDelay,
                 >,
-                esp_hal::gpio::Input<esp_hal::gpio::Gpio4>,
-                esp_hal::gpio::Output<esp_hal::gpio::Gpio17>,
-                esp_hal::gpio::Output<esp_hal::gpio::Gpio16>,
+                esp_hal::gpio::Input,
+                esp_hal::gpio::Output,
+                esp_hal::gpio::Output,
                 esp_hal::delay::Delay,
             >,
         > = static_cell::StaticCell::new();
@@ -146,26 +155,26 @@ fn main() -> ! {
 
     #[cfg(feature = "scd30")]
     let sensor_wrapper = {
-        let i2c = esp_hal::i2c::I2C::new_with_timeout(
+        let i2c = esp_hal::i2c::master::I2c::new(
             peripherals.I2C0,
-            io.pins.gpio33,
-            io.pins.gpio32,
-            50u32.kHz(),
-            &clocks,
-            Some(0xFFFFF),
-            None,
-        );
+            esp_hal::i2c::master::Config::default()
+                .with_frequency(esp_hal::time::Rate::from_khz(50))
+                .with_timeout(esp_hal::i2c::master::BusTimeout::Maximum),
+        )
+        .unwrap()
+        .with_sda(peripherals.GPIO33)
+        .with_scl(peripherals.GPIO32);
 
-        let mut i2c_delay = esp_hal::delay::Delay::new(&clocks);
+        let mut i2c_delay = esp_hal::delay::Delay::new();
         i2c_delay.delay_ms(5000u32);
 
         let scd = sensor_scd30::Scd30::new(i2c, i2c_delay).unwrap();
 
         static SENSOR_WRAPPER_RAW: static_cell::StaticCell<
             scd30_sensor_impl::SCD30SensorWrapper<
-                esp_hal::i2c::I2C<'_, esp_hal::peripherals::I2C0, esp_hal::Blocking>,
+                esp_hal::i2c::master::I2c<'_, esp_hal::Blocking>,
                 esp_hal::delay::Delay,
-                esp_hal::i2c::Error,
+                esp_hal::i2c::master::Error,
             >,
         > = static_cell::StaticCell::new();
 
@@ -293,26 +302,26 @@ async fn edgeless(
     log::info!("Edgeless Embedded Async Main");
 
     cfg_if::cfg_if! {
-        if #[cfg(features = "psram")] {
-            let rx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 5000]));
+        if #[cfg(feature = "psram")] {
+            let rx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
             let rx_meta = alloc::boxed::Box::leak(alloc::boxed::Box::new([embassy_net::udp::PacketMetadata::EMPTY; 10]));
-            let tx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 5000]));
+            let tx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
             let tx_meta = alloc::boxed::Box::leak(alloc::boxed::Box::new([embassy_net::udp::PacketMetadata::EMPTY; 10]));
-            let app_tx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 5000]));
-            let app_rx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 5000]));
+            let app_tx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
+            let app_rx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
         } else {
-            static RX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
-            let rx_buf = RX_BUF_RAW.init_with(|| [0 as u8; 5000]);
+            static RX_BUF_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
+            let rx_buf = RX_BUF_RAW.init_with(|| [0 as u8; 2500]);
             static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
             let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
-            static TX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
-            let tx_buf = TX_BUF_RAW.init_with(|| [0 as u8; 5000]);
+            static TX_BUF_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
+            let tx_buf = TX_BUF_RAW.init_with(|| [0 as u8; 2500]);
             static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
             let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
-            static APP_TX_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
-            let app_tx = APP_TX_RAW.init_with(|| [0 as u8; 5000]);
-            static APP_RX_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
-            let app_rx = APP_RX_RAW.init_with(|| [0 as u8; 5000]);
+            static APP_TX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
+            let app_tx = APP_TX_RAW.init_with(|| [0 as u8; 2500]);
+            static APP_RX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
+            let app_rx = APP_RX_RAW.init_with(|| [0 as u8; 2500]);
         }
     }
 

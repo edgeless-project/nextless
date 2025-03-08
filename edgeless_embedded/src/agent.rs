@@ -1,13 +1,14 @@
-use core::str::FromStr;
-
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
+use crate::invocation::InvocationAPI;
+use core::str::FromStr;
+
 #[derive(Clone)]
 pub struct EmbeddedAgent {
     own_node_id: edgeless_api_core::instance_id::NodeId,
     upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>,
     upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>>,
-    inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>>,
+    inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>,
     registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
     internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
 }
@@ -15,7 +16,30 @@ pub struct EmbeddedAgent {
 struct EmbeddedAgentInner {
     resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
     wasm_runtime: Option<&'static mut crate::wasm_functions::WasmiRuntime>,
+}
+
+struct AgentTask {
+    inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>,
     internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
+}
+
+#[embassy_executor::task]
+pub async fn run_agent(slf: AgentTask) {
+    loop {
+        let event = slf.internal_buffer_receiver.receive().await;
+        let mut lck = slf.inner.lock().await;
+        for r in lck.resources.iter_mut() {
+            if r.has_instance(&event.target).await {
+                r.handle(event.clone()).await.unwrap();
+                continue;
+            }
+        }
+        if let Some(runtime) = &mut lck.wasm_runtime {
+            if runtime.has_instance(&event.target).await {
+                runtime.handle(event).await.unwrap();
+            }
+        }
+    }
 }
 
 type StoredMessage = edgeless_api_core::invocation::Event;
@@ -103,14 +127,13 @@ impl EmbeddedAgent {
                 }));
             } else {
                 static SLF_INNER_RAW: static_cell::StaticCell<
-                    core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>>,
+                    embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>,
                 > = static_cell::StaticCell::new();
                 let slf_inner = SLF_INNER_RAW.init_with(|| {
-                    core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(EmbeddedAgentInner {
+                    embassy_sync::mutex::Mutex::new(EmbeddedAgentInner {
                         resources: &mut resources[..],
                         wasm_runtime: runtime,
-                        internal_buffer_receiver: buffer_receiver,
-                    }))
+                    })
                 });
                 static SLF_RAW: static_cell::StaticCell<EmbeddedAgent> = static_cell::StaticCell::new();
                 let slf = SLF_RAW.init_with(||EmbeddedAgent {
@@ -124,9 +147,14 @@ impl EmbeddedAgent {
             }
         }
 
+        let agent_task = AgentTask {
+            inner: slf_inner,
+            internal_buffer_receiver: buffer_receiver,
+        };
+        spawner.spawn(run_agent(agent_task)).unwrap();
+
         {
-            let inner = slf.inner.borrow_mut();
-            let mut lck = inner.lock().await;
+            let mut lck = slf.inner.lock().await;
             for r in lck.resources.iter_mut() {
                 r.launch(spawner, slf.clone()).await;
             }
@@ -149,8 +177,7 @@ impl EmbeddedAgent {
         let url_bytes = addr.octets();
         ufmt::uwrite!(url, "coap://{}.{}.{}.{}:7050", url_bytes[0], url_bytes[1], url_bytes[2], url_bytes[3]).unwrap();
 
-        let tmp = self.inner.borrow_mut();
-        let lck = tmp.lock().await;
+        let lck = self.inner.lock().await;
         let mut resources = heapless::Vec::new();
         for i in &lck.resources[..] {
             let mut outputs = heapless::Vec::new();
@@ -199,50 +226,8 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
             self.upstream_sender.send(AgentEvent::Invocation(event)).await;
             Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
         } else {
-            let inner = self.inner.try_borrow_mut();
-
-            if let Ok(inner) = inner {
-                let mut lck = inner.lock().await;
-
-                let mut handled = false;
-
-                for r in lck.resources.iter_mut() {
-                    if r.has_instance(&event.target).await {
-                        r.handle(event.clone()).await;
-                        handled = true;
-                    }
-                }
-
-                if !handled {
-                    if let Some(runtime) = &mut lck.wasm_runtime {
-                        if runtime.has_instance(&event.target).await {
-                            runtime.handle(event).await;
-                        }
-                    }
-                }
-
-                loop {
-                    if let Ok(event) = lck.internal_buffer_receiver.try_receive() {
-                        for r in lck.resources.iter_mut() {
-                            if r.has_instance(&event.target).await {
-                                return r.handle(event).await;
-                            }
-                        }
-
-                        if let Some(runtime) = &mut lck.wasm_runtime {
-                            if runtime.has_instance(&event.target).await {
-                                runtime.handle(event).await;
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            } else {
-                if let Ok(_) = self.internal_buffer_sender.try_send(event) {
-                    return Ok(edgeless_api_core::invocation::LinkProcessingResult::PROCESSED);
-                } else {
-                }
+            if let Ok(_) = self.internal_buffer_sender.try_send(event) {
+                return Ok(edgeless_api_core::invocation::LinkProcessingResult::PROCESSED);
             }
             Ok(edgeless_api_core::invocation::LinkProcessingResult::PASSED)
         }
@@ -251,8 +236,7 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
 
 impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let inner = self.inner.borrow_mut();
-        let mut lck = inner.lock().await;
+        let mut lck = self.inner.lock().await;
         for r in lck.resources.iter_mut() {
             if r.has_instance(&resource_id).await {
                 return r.stop(resource_id).await;
@@ -268,13 +252,17 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let inner = self.inner.borrow_mut();
-        let mut lck = inner.lock().await;
+        log::info!("R Start 1");
+        let mut lck = self.inner.lock().await;
+        log::info!("R Start 2");
         for r in lck.resources.iter_mut() {
+            log::info!("R Start {} {}", instance_specification.class_type.len(), r.resource_class());
             if r.resource_class() == instance_specification.class_type {
+                log::info!("Try Start");
                 return r.start(instance_specification).await;
             }
         }
+        log::info!("not found");
         Err(edgeless_api_core::common::ErrorResponse {
             summary: "ResourceProvider Not Found",
             detail: None,
@@ -285,8 +273,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         &mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let inner = self.inner.borrow_mut();
-        let mut lck = inner.lock().await;
+        let mut lck = self.inner.lock().await;
         let mut my_patch = patch_req;
 
         my_patch.instance_id = edgeless_api_core::instance_id::InstanceId {
@@ -310,8 +297,7 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
         &mut self,
         instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let inner = self.inner.borrow_mut();
-        let mut lck = inner.lock().await;
+        let mut lck = self.inner.lock().await;
 
         if let Some(runtime) = &mut lck.wasm_runtime {
             log::info!("Agent Function Start");
@@ -328,8 +314,7 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
         &mut self,
         instance_id: edgeless_api_core::instance_id::InstanceId,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let inner = self.inner.borrow_mut();
-        let mut lck = inner.lock().await;
+        let mut lck = self.inner.lock().await;
 
         if let Some(runtime) = &mut lck.wasm_runtime {
             runtime.stop_function(instance_id).await
@@ -345,8 +330,7 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
         &mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let inner = self.inner.borrow_mut();
-        let mut lck = inner.lock().await;
+        let mut lck = self.inner.lock().await;
 
         if let Some(runtime) = &mut lck.wasm_runtime {
             runtime.patch_function(patch_req).await

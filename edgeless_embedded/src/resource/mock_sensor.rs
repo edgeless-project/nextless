@@ -14,7 +14,7 @@ pub struct MockSensorConfiguration {
 }
 
 pub struct MockSensor {
-    pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>>,
+    pub inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>,
 }
 
 impl MockSensor {
@@ -66,16 +66,14 @@ impl MockSensor {
 
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
-            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>>,
+            embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>,
         > = static_cell::StaticCell::new();
         let mock_sensor_state = SENSOR_STATE_RAW.init_with(|| {
-            core::cell::RefCell::new(
-                embassy_sync::mutex::Mutex::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, _>::new(MockSensorInner {
-                    instance_id: None,
-                    data_out_id: None,
-                    delay: 30,
-                }),
-            )
+            embassy_sync::mutex::Mutex::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, _>::new(MockSensorInner {
+                instance_id: None,
+                data_out_id: None,
+                delay: 30,
+            })
         });
         static SLF_RAW: static_cell::StaticCell<MockSensor> = static_cell::StaticCell::new();
         SLF_RAW.init_with(|| MockSensor { inner: mock_sensor_state })
@@ -96,8 +94,7 @@ impl crate::resource::Resource for MockSensor {
     }
 
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
-        let tmp = self.inner.borrow_mut();
-        let lck = tmp.lock().await;
+        let lck = self.inner.lock().await;
 
         lck.instance_id == Some(*instance_id)
     }
@@ -109,15 +106,14 @@ impl crate::resource::Resource for MockSensor {
 
 #[embassy_executor::task]
 pub async fn mock_sensor_task(
-    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>>,
+    state: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>,
     agent: crate::agent::EmbeddedAgent,
 ) {
-    let mut agent = agent;
+    let agent = agent;
 
     loop {
         let (instance_id, data_out_id, delay) = {
-            let tmp = state.borrow_mut();
-            let lck = tmp.lock().await;
+            let lck = state.lock().await;
             (lck.instance_id, lck.data_out_id.clone(), lck.delay)
         };
         if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
@@ -170,8 +166,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         let instance_specification = Self::parse_configuration(instance_specification).await?;
         log::info!("Post Config Start");
 
-        let tmp = self.inner.borrow_mut();
-        let mut lck = tmp.lock().await;
+        let mut lck = self.inner.lock().await;
         log::info!("got Lock Start");
 
         if lck.instance_id.is_some() {
@@ -192,8 +187,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
 
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Mock Sensor Stop");
-        let tmp = self.inner.borrow_mut();
-        let mut lck = tmp.lock().await;
+        let mut lck = self.inner.lock().await;
 
         if let Some(instance_id) = lck.instance_id {
             if instance_id == resource_id {
@@ -214,8 +208,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         &mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let tmp = self.inner.borrow_mut();
-        let mut lck = tmp.lock().await;
+        let mut lck = self.inner.lock().await;
 
         for (output_key, output_val) in patch_req.output_mapping {
             if output_key == "data_out" {

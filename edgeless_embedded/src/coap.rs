@@ -8,7 +8,7 @@ struct CoapMultiplexer {
     sock: embassy_net::udp::UdpSocket<'static>,
     out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, crate::agent::AgentEvent, 2>,
     agent: crate::agent::EmbeddedAgent,
-    app_buf_tx: &'static mut [u8; 5000],
+    app_buf_tx: &'static mut [u8; 2500],
     last_tokens: heapless::LinearMap<embassy_net::IpEndpoint, (u8, Option<Result<(), edgeless_api_core::common::ErrorResponse>>), 4>,
     peers: heapless::LinearMap<edgeless_api_core::node_registration::NodeId, embassy_net::IpEndpoint, 8>,
     token: u8,
@@ -23,8 +23,8 @@ pub async fn coap_task(
     mut sock: embassy_net::udp::UdpSocket<'static>,
     out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, crate::agent::AgentEvent, 2>,
     agent: crate::agent::EmbeddedAgent,
-    rx_buffer: &'static mut [u8; 5000],
-    tx_buffer: &'static mut [u8; 5000],
+    rx_buffer: &'static mut [u8; 2500],
+    tx_buffer: &'static mut [u8; 2500],
 ) {
     sock.bind(7050).unwrap();
 
@@ -43,7 +43,7 @@ pub async fn coap_task(
 }
 
 impl CoapMultiplexer {
-    async fn task(&mut self, rx_buffer: &'static mut [u8; 5000]) {
+    async fn task(&mut self, rx_buffer: &'static mut [u8; 2500]) {
         loop {
             log::debug!("Receive Loop");
             let res = embassy_futures::select::select(self.sock.recv_from(rx_buffer), self.out_reader.receive()).await;
@@ -96,8 +96,9 @@ impl CoapMultiplexer {
                         edgeless_api_core::coap_mapping::CoapMessage::KeepAlive => {
                             self.incoming_keepalive(sender, token).await;
                         }
+                        #[cfg(feature = "wasm")]
                         edgeless_api_core::coap_mapping::CoapMessage::FunctionStart(start_spec) => {
-                            log::info!("IsStart");
+                            log::info!("Is Start");
                             self.incoming_function_start(sender, token, start_spec).await;
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::FunctionStop(stop_instance_id) => {
@@ -215,7 +216,7 @@ impl CoapMultiplexer {
             .insert(
                 edgeless_api_core::node_registration::NodeId(node_id),
                 embassy_net::IpEndpoint {
-                    addr: embassy_net::IpAddress::from(embassy_net::Ipv4Address::new(addr[0], addr[1], addr[2], addr[4])),
+                    addr: embassy_net::IpAddress::from(embassy_net::Ipv4Address::new(addr[0], addr[1], addr[2], addr[3])),
                     port,
                 },
             )
