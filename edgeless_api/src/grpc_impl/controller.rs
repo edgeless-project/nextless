@@ -27,6 +27,10 @@ impl crate::controller::ControllerAPI for ControllerAPIClient {
     fn node_registration_api(&mut self) -> Box<dyn crate::node_registration::NodeRegistrationAPI> {
         self.node_registration_client.clone()
     }
+
+    fn image_repository(&mut self) -> Box<dyn crate::image_repository::ImageRepositoryAPI> {
+        todo!()
+    }
 }
 
 pub struct WorkflowInstanceAPIServer {}

@@ -6,7 +6,7 @@
 // This contains code originally developed in edgeless_orc (also in some of the related files).
 // Refer to the orchestrator's history for the history/authorship of those snippets.
 
-use edgeless_api::common::ResponseError;
+use edgeless_api::{common::ResponseError, image_repository::FunctionImageHash};
 use futures::StreamExt;
 
 use crate::ir::RequiredChange;
@@ -21,6 +21,7 @@ pub struct ControllerTask {
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::super::ir::managed_worflow::ManagedWorkflow>,
     orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
     telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
+    image_repository: super::image_repository::ImageRepository,
 }
 pub struct WorkerNode {
     pub agent_url: String,
@@ -52,6 +53,7 @@ impl ControllerTask {
         cluster_id: edgeless_api::function_instance::NodeId,
         request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
         telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
+        image_repository: super::image_repository::ImageRepository,
     ) -> Self {
         Self {
             request_receiver,
@@ -67,6 +69,7 @@ impl ControllerTask {
                 crate::orchestration_utils::OrchestrationStrategy::Random,
             ))),
             telemetry_provider,
+            image_repository,
         }
     }
 
@@ -484,6 +487,9 @@ impl ControllerTask {
         // read from the function annotations.
         log::debug!("state specifications currently forced to NodeLocal");
         log::info!("{:?}", output_mapping);
+
+        self.image_repository.update(image.code.image_hash(), image.code.clone()).await;
+
         let response = self
             .fn_client(&function_id.node_id)
             .await

@@ -3,6 +3,8 @@
 
 use std::str::FromStr;
 
+use crate::image_repository::FunctionImageHash;
+
 #[async_trait::async_trait]
 impl crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_id::InstanceId> for super::CoapClient {
     async fn start(
@@ -16,8 +18,8 @@ impl crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_i
                 .map_err(|_| anyhow::anyhow!("String to long!"))?,
             version: heapless::String::<8>::from_str(spawn_request.code.function_class_version.as_str())
                 .map_err(|_| anyhow::anyhow!("String to long!"))?,
-            // code: heapless::Vec::<u8, 1000>::from_slice(&spawn_request.code.function_class_code[..]).map_err(|_| anyhow::anyhow!("Code to long!"))?
-            code: heapless::Vec::<u8, 1000>::new(),
+            image_size: spawn_request.code.function_class_code.len() as u64,
+            image_hash: spawn_request.code.function_class_code.image_hash(),
         };
         let cbor_req = edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification {
             instance_id: spawn_request.instance_id,

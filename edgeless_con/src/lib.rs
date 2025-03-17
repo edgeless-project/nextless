@@ -41,6 +41,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
             log::info!("Start Controller COAP: {}:{}", address, port);
             edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
                 controller.get_api_client().node_registration_api(),
+                controller.get_api_client().image_repository(),
                 std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
             )
         } else {

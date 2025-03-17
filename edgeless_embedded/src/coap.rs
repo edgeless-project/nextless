@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
+use crate::code_store::ImageEntry;
 use crate::function_instance::FunctionInstanceAPI;
 use crate::invocation::InvocationAPI;
 use crate::resource_configuration::ResourceConfigurationAPI;
@@ -16,6 +17,13 @@ struct CoapMultiplexer {
         u8,
         &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, crate::agent::RegistrationReply>,
     )>,
+    active_fetch: Option<ImageFetchJob>,
+}
+
+struct ImageFetchJob {
+    spec: edgeless_api_core::function_instance::EncodedFunctionClassSpecification,
+    requesting_function: edgeless_api_core::instance_id::InstanceId,
+    current_offset: u64,
 }
 
 #[embassy_executor::task]
@@ -37,6 +45,7 @@ pub async fn coap_task(
         peers: heapless::LinearMap::new(),
         token: 0,
         waiting_for_reply: None,
+        active_fetch: None,
     };
 
     slf.task(rx_buffer).await;
@@ -46,11 +55,16 @@ impl CoapMultiplexer {
     async fn task(&mut self, rx_buffer: &'static mut [u8; 2500]) {
         loop {
             log::debug!("Receive Loop");
-            let res = embassy_futures::select::select(self.sock.recv_from(rx_buffer), self.out_reader.receive()).await;
+            let res = embassy_futures::select::select3(
+                self.sock.recv_from(rx_buffer),
+                self.out_reader.receive(),
+                embassy_time::Timer::after_secs(1),
+            )
+            .await;
 
             match res {
                 // External Message Received
-                embassy_futures::select::Either::First(res) => {
+                embassy_futures::select::Either3::First(res) => {
                     let (data_len, sender) = match res {
                         Ok(ret) => ret,
                         Err(err) => {
@@ -96,7 +110,7 @@ impl CoapMultiplexer {
                         edgeless_api_core::coap_mapping::CoapMessage::KeepAlive => {
                             self.incoming_keepalive(sender, token).await;
                         }
-                        #[cfg(feature = "wasm")]
+                        // #[cfg(feature = "wasm")]
                         edgeless_api_core::coap_mapping::CoapMessage::FunctionStart(start_spec) => {
                             log::info!("Is Start");
                             self.incoming_function_start(sender, token, start_spec).await;
@@ -107,20 +121,59 @@ impl CoapMultiplexer {
                         edgeless_api_core::coap_mapping::CoapMessage::FunctionPatch(patch_req) => {
                             self.incoming_fucntion_patch(sender, token, patch_req).await;
                         }
+                        edgeless_api_core::coap_mapping::CoapMessage::ResponseChunk { offset, size, buf } => {
+                            let complete = if let Some(active_fetch) = &mut self.active_fetch {
+                                let complete = offset + size >= active_fetch.spec.image_size;
+                                log::trace!("Fetch Response: {} {} {} {}", offset, size, active_fetch.spec.image_size, complete);
+
+                                let image = self.agent.code_store().get_image(&active_fetch.spec).await.unwrap();
+                                image.update(offset as usize, buf, complete).unwrap();
+                                if !complete {
+                                    active_fetch.current_offset += size;
+                                    self.fetch_next_chunk().await;
+                                } else {
+                                    self.agent.fetch_complete(active_fetch.requesting_function).await;
+                                }
+                                complete
+                            } else {
+                                false
+                            };
+                            if complete {
+                                self.active_fetch = None;
+                            }
+                        }
                         _ => {
                             log::info!("Unhandled Message");
                         }
                     }
                 }
                 // Internal Message that needs to be sent out.
-                embassy_futures::select::Either::Second(event) => match event {
+                embassy_futures::select::Either3::Second(event) => match event {
                     crate::agent::AgentEvent::Invocation(event) => {
                         self.outgoing_invocation(event).await;
                     }
                     crate::agent::AgentEvent::Registration((registration, reply_signal)) => {
                         self.outgoing_registration(&registration, reply_signal).await;
                     }
+                    crate::agent::AgentEvent::FetchImage { function_id, image_spec } => {
+                        if self.active_fetch.is_none() {
+                            self.active_fetch = Some(ImageFetchJob {
+                                spec: image_spec,
+                                current_offset: 0,
+                                requesting_function: function_id,
+                            });
+                            self.fetch_next_chunk().await;
+                        } else {
+                            log::error!("Parallel Fetch not Implemented");
+                        }
+                    }
                 },
+                // Periodic Retry
+                embassy_futures::select::Either3::Third(_) => {
+                    if self.active_fetch.is_some() {
+                        self.fetch_next_chunk().await;
+                    }
+                }
             }
         }
     }
@@ -292,6 +345,28 @@ impl CoapMultiplexer {
             log::error!("UDP/COAP Send Error: {:?}", err);
         } else {
             self.waiting_for_reply = Some((used_token, reply_channel))
+        }
+    }
+
+    async fn fetch_next_chunk(&mut self) {
+        let endpoint = crate::REGISTRATION_PEER;
+        if let Some(active_fetch) = &mut self.active_fetch {
+            log::trace!("Fetch Next Chunk: {}", active_fetch.current_offset);
+            let ((data, endpoint), _tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_fetch_image_chunk(
+                endpoint,
+                active_fetch.spec.image_hash,
+                active_fetch.current_offset as usize,
+                self.token,
+                self.app_buf_tx.as_mut_slice(),
+            );
+
+            self.token = match self.token {
+                u8::MAX => 0,
+                _ => self.token + 1,
+            };
+            if let Err(err) = self.sock.send_to(data, endpoint).await {
+                log::error!("UDP/COAP Send Error: {:?}", err);
+            }
         }
     }
 

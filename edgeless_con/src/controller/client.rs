@@ -8,13 +8,18 @@ use futures::SinkExt;
 pub struct ControllerClient {
     workflow_instance_client: Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
     node_registration_client: Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
+    image_repository: Box<crate::controller::image_repository::ImageRepository>,
 }
 
 impl ControllerClient {
-    pub fn new(sender: futures::channel::mpsc::UnboundedSender<super::ControllerRequest>) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
+    pub fn new(
+        sender: futures::channel::mpsc::UnboundedSender<super::ControllerRequest>,
+        repo: super::image_repository::ImageRepository,
+    ) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
         Box::new(ControllerClient {
             workflow_instance_client: Box::new(ControllerWorkflowInstanceClient { sender: sender.clone() }),
             node_registration_client: Box::new(ControllerNodeRegistrationClient { sender: sender.clone() }),
+            image_repository: Box::new(repo),
         })
     }
 }
@@ -26,6 +31,10 @@ impl edgeless_api::controller::ControllerAPI for ControllerClient {
 
     fn node_registration_api(&mut self) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
         self.node_registration_client.clone()
+    }
+
+    fn image_repository(&mut self) -> Box<dyn edgeless_api::image_repository::ImageRepositoryAPI> {
+        self.image_repository.clone()
     }
 }
 

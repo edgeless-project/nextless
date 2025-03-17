@@ -1,5 +1,8 @@
-use core::str::FromStr;
+// SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 
+use crate::code_store::ImageEntry;
+use core::str::FromStr;
 use wasmi::AsContextMut;
 
 pub mod guest_api;
@@ -68,8 +71,15 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
         &mut self,
         instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        let code = core::include_bytes!("../../functions/esp_test_fun/esp_test_fun.wasm");
-        // let code = &[0];
+        let image = self
+            .agent
+            .as_mut()
+            .unwrap()
+            .code_store()
+            .get_image(&instance_specification.class)
+            .await
+            .expect("Bad Image");
+        let image2 = image.image().unwrap();
 
         if self
             .functions
@@ -98,7 +108,7 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
                     output_mapping,
                 ),
             },
-            code,
+            image2.read(),
         )
         .await
         .unwrap();

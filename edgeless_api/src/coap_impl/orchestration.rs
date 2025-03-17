@@ -6,6 +6,7 @@ use std::str::FromStr;
 pub struct CoapOrchestrationServer {
     sock: tokio::net::UdpSocket,
     registration_api: Box<dyn crate::node_registration::NodeRegistrationAPI>,
+    image_repository: Box<dyn crate::image_repository::ImageRepositoryAPI>,
     received_tokens: std::collections::HashMap<std::net::IpAddr, u8>,
     tx_buffer: Vec<u8>,
 }
@@ -13,6 +14,7 @@ pub struct CoapOrchestrationServer {
 impl CoapOrchestrationServer {
     pub fn run(
         registration_api: Box<dyn crate::node_registration::NodeRegistrationAPI>,
+        image_repository: Box<dyn crate::image_repository::ImageRepositoryAPI>,
         listen_addr: std::net::SocketAddrV4,
     ) -> futures::future::BoxFuture<'static, ()> {
         Box::pin(async move {
@@ -23,6 +25,7 @@ impl CoapOrchestrationServer {
                 registration_api,
                 tx_buffer: vec![0_u8; 5000],
                 received_tokens: std::collections::HashMap::new(),
+                image_repository,
             };
 
             let mut buffer = vec![0_u8; 5000];
@@ -37,6 +40,9 @@ impl CoapOrchestrationServer {
                     }
                     edgeless_api_core::coap_mapping::CoapMessage::NodeDeregistration(node_id) => {
                         slf.process_node_deregistration(&node_id, token, sender).await;
+                    }
+                    edgeless_api_core::coap_mapping::CoapMessage::FetchImage { hash, offset, size } => {
+                        slf.process_fetch_image_part(sender, token, hash, offset as usize, size as usize).await;
                     }
                     _ => {
                         log::info!("Unhandled Message");
@@ -164,6 +170,25 @@ impl CoapOrchestrationServer {
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {
+                log::error!("UDP/COAP Send Error: {:?}", err);
+            }
+        }
+    }
+
+    async fn process_fetch_image_part(&mut self, sender: core::net::SocketAddr, token: u8, hash: [u8; 32], offset: usize, size: usize) {
+        let part = self.image_repository.get_part(hash, offset, size).await;
+
+        if let Some((data, last_chunk)) = part {
+            let ((data, target), _tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_chunked_response(
+                sender,
+                data.as_slice(),
+                offset,
+                last_chunk,
+                token,
+                &mut self.tx_buffer[..],
+                true,
+            );
+            if let Err(err) = self.sock.send_to(data, target).await {
                 log::error!("UDP/COAP Send Error: {:?}", err);
             }
         }

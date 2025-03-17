@@ -117,12 +117,22 @@
             openssl.dev
             pkg-config
             protobuf
-            toolchain
             mold
             gcc
-            binaryen
+            binaryen #wasm-opt
             curl # libcurl used in the cli. Not sure why it is not needed in the CLI.
+            # While i would prefer to use fenix here, we depend on the ESP toolchain and rust-toolchain.toml
+            # which are specific to rustup / espup.
+            # toolchain
+            rustup
+            espup
+            espflash
           ];
+          shellHook = ''
+            rustup install stable
+            espup install
+            source ~/export-esp.sh
+          '';
         };
       }
     );

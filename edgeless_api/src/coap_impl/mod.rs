@@ -122,18 +122,21 @@ impl CoapClient {
             let mut buffer = vec![0_u8; 5000];
             let ((packet, _addr), _tail) = encode_request(token, endpoint, &mut buffer);
             if self.outgoing_sender.send(Vec::from(packet)).is_err() {
-                log::warn!("Sender could not send on iteration {}", i);
+                log::info!("Sender could not send on iteration {}", i);
             }
 
-            let res = tokio::time::timeout(core::time::Duration::from_millis(500), &mut receiver).await;
+            let res = tokio::time::timeout(core::time::Duration::from_millis(1000), &mut receiver).await;
             match res {
-                Ok(reply) => {
-                    if let Ok(val) = reply {
+                Ok(reply) => match reply {
+                    Ok(val) => {
                         return val;
                     }
-                }
+                    Err(e) => {
+                        log::info!("Error in Response: {}", e);
+                    }
+                },
                 Err(_timeout) => {
-                    log::debug!("reached receive timeout");
+                    log::debug!("Reached receive timeout");
                     continue;
                 }
             }

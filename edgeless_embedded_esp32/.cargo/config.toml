@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-License-Identifier: MIT
 [target.xtensa-esp32-none-elf]
-runner = "espflash flash --monitor"
+runner = "espflash flash --monitor --partition-table part_table.txt -B 921600"
 
 [target.xtensa-esp32s3-none-elf]
-runner = "espflash flash --monitor"
+runner = "espflash flash --monitor --partition-table part_table.txt -B 921600"
 
 
 [env]
@@ -29,7 +29,7 @@ rustflags = [
     # "-C", "link-arg=-Trom_functions.x",
 ]
 
-target = "xtensa-esp32-none-elf"
+target = "xtensa-esp32s3-none-elf"
 
 [unstable]
 build-std = ["alloc", "core"]

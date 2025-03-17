@@ -8,9 +8,12 @@ pub mod server;
 // TODO Split and fix
 // #[cfg(test)]
 // pub mod test;
+//
+pub mod image_repository;
 
 pub struct Controller {
     sender: futures::channel::mpsc::UnboundedSender<ControllerRequest>,
+    image_repository: image_repository::ImageRepository,
 }
 
 pub(crate) enum ControllerRequest {
@@ -56,16 +59,18 @@ impl Controller {
 
     fn new(telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let image_repository = image_repository::ImageRepository::new();
 
+        let image_repository_clone = image_repository.clone();
         let main_task = Box::pin(async move {
-            let mut controller_task = server::ControllerTask::new(uuid::Uuid::new_v4(), receiver, telemetry_provider);
+            let mut controller_task = server::ControllerTask::new(uuid::Uuid::new_v4(), receiver, telemetry_provider, image_repository_clone);
             controller_task.run().await;
         });
 
-        (Controller { sender }, main_task)
+        (Controller { sender, image_repository }, main_task)
     }
 
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
-        client::ControllerClient::new(self.sender.clone())
+        client::ControllerClient::new(self.sender.clone(), self.image_repository.clone())
     }
 }

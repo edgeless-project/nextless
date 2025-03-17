@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
-use crate::invocation::InvocationAPI;
+use crate::{function_instance::FunctionInstanceAPI, invocation::InvocationAPI};
 use core::str::FromStr;
 
 #[derive(Clone)]
@@ -11,11 +11,13 @@ pub struct EmbeddedAgent {
     inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>,
     registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
     internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
+    code_store: crate::code_store::CodeStore,
 }
 
 struct EmbeddedAgentInner {
     resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
     wasm_runtime: Option<&'static mut crate::wasm_functions::WasmiRuntime>,
+    delayed_start: Option<edgeless_api_core::function_instance::OwnedFunctionInstanceSpecification>,
 }
 
 struct AgentTask {
@@ -52,6 +54,10 @@ pub enum AgentEvent {
             &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
         ),
     ),
+    FetchImage {
+        function_id: edgeless_api_core::instance_id::InstanceId,
+        image_spec: edgeless_api_core::function_instance::EncodedFunctionClassSpecification,
+    },
 }
 
 pub enum RegistrationReply {
@@ -110,13 +116,14 @@ impl EmbeddedAgent {
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "alloc_static")] {
-                let slf_inner = alloc::boxed::Box::leak(alloc::boxed::Box::new(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(
+                let slf_inner = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::mutex::Mutex::new(
                     EmbeddedAgentInner {
                         resources: &mut resources[..],
                         wasm_runtime: runtime,
-                        internal_buffer_receiver: buffer_receiver,
+                        delayed_start: None,
                     },
-                ))));
+                )));
+
                 let slf = alloc::boxed::Box::leak(alloc::boxed::Box::new(EmbeddedAgent {
                     own_node_id: node_id,
                     upstream_sender: sender,
@@ -124,6 +131,7 @@ impl EmbeddedAgent {
                     inner: slf_inner,
                     registration_signal: reply_channel,
                     internal_buffer_sender: buffer_sender,
+                    code_store: crate::code_store::CodeStore::new(),
                 }));
             } else {
                 static SLF_INNER_RAW: static_cell::StaticCell<
@@ -133,6 +141,7 @@ impl EmbeddedAgent {
                     embassy_sync::mutex::Mutex::new(EmbeddedAgentInner {
                         resources: &mut resources[..],
                         wasm_runtime: runtime,
+                        delayed_start: None,
                     })
                 });
                 static SLF_RAW: static_cell::StaticCell<EmbeddedAgent> = static_cell::StaticCell::new();
@@ -143,6 +152,7 @@ impl EmbeddedAgent {
                     inner: slf_inner,
                     registration_signal: reply_channel,
                     internal_buffer_sender: buffer_sender,
+                    code_store: crate::code_store::CodeStore::new(),
                 });
             }
         }
@@ -216,6 +226,23 @@ impl EmbeddedAgent {
             if let RegistrationReply::Sucess = self.registration_signal.wait().await {
                 return;
             }
+        }
+    }
+
+    pub fn code_store(&self) -> crate::code_store::CodeStore {
+        self.code_store.clone()
+    }
+
+    pub async fn fetch_complete(&mut self, _instance_id: edgeless_api_core::instance_id::InstanceId) {
+        let delayed_start = {
+            let mut lck = self.inner.lock().await;
+            lck.delayed_start.take()
+        };
+
+        if let Some(delayed_start) = delayed_start {
+            log::info!("Fetch Complete, Starting Function Now");
+            let instace_spec = edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification::from_owned_spec(&delayed_start);
+            self.start_function(instace_spec).await.unwrap();
         }
     }
 }
@@ -297,6 +324,19 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
         &mut self,
         instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        if !self.code_store().has_image(&instance_specification.class).await {
+            log::info!("Code Fetch Required");
+            self.code_store.create_image(&instance_specification.class).await.unwrap();
+            self.inner.lock().await.delayed_start = Some(instance_specification.to_owned_spec());
+            self.upstream_sender
+                .send(AgentEvent::FetchImage {
+                    function_id: instance_specification.instance_id.clone(),
+                    image_spec: instance_specification.class.clone(),
+                })
+                .await;
+            return Ok(());
+        }
+
         let mut lck = self.inner.lock().await;
 
         if let Some(runtime) = &mut lck.wasm_runtime {

@@ -1,5 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
+
+mod block_value;
+
 use alloc::vec;
 use coap_lite::{MessageClass, MessageType, ResponseType};
 
@@ -198,6 +201,59 @@ impl COAPEncoder {
         ((data, endpoint), tail)
     }
 
+    pub fn encode_fetch_image_chunk<'a, Endpoint>(
+        endpoint: Endpoint,
+        image_hash: [u8; 32],
+        offset: usize,
+        token: u8,
+        out_buf: &'a mut [u8],
+    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
+        req.set_method(coap_lite::RequestType::Post);
+        req.set_path("image");
+        req.message.set_token(vec![token]);
+        req.message.header.set_type(MessageType::Confirmable);
+        req.message.payload = alloc::vec::Vec::<u8>::from(image_hash);
+        req.message.add_option(
+            coap_lite::CoapOption::Block1,
+            block_value::BlockValue::new(offset / 1024, true, 1024).unwrap().into(),
+        );
+
+        let out = req.message.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
+    pub fn encode_chunked_response<'a, Endpoint>(
+        endpoint: Endpoint,
+        data: &[u8],
+        offset: usize,
+        last_chunk: bool,
+        token: u8,
+        out_buf: &'a mut [u8],
+        ok: bool,
+    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut packet = coap_lite::Packet::new();
+        packet.header.set_version(1);
+        packet.header.set_type(MessageType::Acknowledgement);
+        packet.header.code = match ok {
+            true => MessageClass::Response(coap_lite::ResponseType::Content),
+            false => MessageClass::Response(coap_lite::ResponseType::BadRequest),
+        };
+        packet.set_token(vec![token]);
+        packet.add_option(
+            coap_lite::CoapOption::Block2,
+            block_value::BlockValue::new(offset / 1024, !last_chunk, 1024).unwrap().into(),
+        );
+
+        packet.payload = alloc::vec::Vec::from(data);
+        let out = packet.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
     pub fn encode<'a, 'b, Endpoint>(
         endpoint: Endpoint,
         token: u8,
@@ -254,6 +310,8 @@ pub enum CoapMessage<'a> {
     NodeRegistration(crate::node_registration::EncodedNodeRegistration<'a>),
     NodeDeregistration(crate::node_registration::NodeId),
     Response(&'a [u8], bool),
+    FetchImage { hash: [u8; 32], offset: u64, size: u64 },
+    ResponseChunk { offset: u64, size: u64, buf: &'a [u8] },
 }
 
 pub struct CoapDecoder {}
@@ -347,6 +405,19 @@ impl CoapDecoder {
                 let resource_id: crate::node_registration::NodeId = minicbor::decode(body_ref).unwrap();
                 Ok((CoapMessage::NodeDeregistration(resource_id), packet.get_token()[0]))
             }
+            "image" => {
+                let b1 =
+                    block_value::BlockValue::try_from(packet.get_option(coap_lite::CoapOption::Block1).unwrap().front().unwrap().clone()).unwrap();
+
+                Ok((
+                    CoapMessage::FetchImage {
+                        hash: body_ref.try_into().unwrap(),
+                        offset: b1.num as u64 * 1024_u64,
+                        size: b1.size() as u64,
+                    },
+                    packet.get_token()[0],
+                ))
+            }
             _ => Err(()),
         }
     }
@@ -364,6 +435,19 @@ impl CoapDecoder {
             },
             _ => true,
         };
+
+        if let Some(block_2) = response.message.get_option(coap_lite::CoapOption::Block2) {
+            let block_2 = block_value::BlockValue::try_from(block_2.front().unwrap().clone()).unwrap();
+
+            return Ok((
+                CoapMessage::ResponseChunk {
+                    offset: block_2.num as u64 * 1024,
+                    size: block_2.size() as u64,
+                    buf: body_ref,
+                },
+                response.message.get_token()[0],
+            ));
+        }
 
         Ok((CoapMessage::Response(body_ref, return_status_ok), response.message.get_token()[0]))
     }

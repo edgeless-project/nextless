@@ -13,6 +13,7 @@ const REGISTRATION_PEER: embassy_net::IpEndpoint = embassy_net::IpEndpoint {
 
 pub mod agent;
 pub mod coap;
+pub mod code_store;
 pub mod dataplane;
 pub mod function_instance;
 pub mod invocation;

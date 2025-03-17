@@ -905,6 +905,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "coap-lite"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c03a13714f9ac01bf29ca4c969bdd1ef007174dfd06f703531add1cce2e8368c"
+dependencies = [
+ "coap-message 0.2.3",
+ "coap-message 0.3.6",
+]
+
+[[package]]
 name = "coap-message"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1695,6 +1705,7 @@ dependencies = [
  "opentelemetry_sdk",
  "prost 0.11.9",
  "regex",
+ "ring",
  "serde",
  "tokio",
  "tonic 0.9.2",
@@ -1706,7 +1717,7 @@ dependencies = [
 name = "edgeless_api_core"
 version = "0.1.0"
 dependencies = [
- "coap-lite",
+ "coap-lite 0.13.1",
  "heapless",
  "log",
  "minicbor",
@@ -1838,7 +1849,7 @@ name = "edgeless_embedded"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
- "coap-lite",
+ "coap-lite 0.11.5",
  "edgeless_api_core",
  "embassy-executor",
  "embassy-futures",
@@ -5875,6 +5886,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ring"
+version = "0.17.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "getrandom 0.2.15",
+ "libc",
+ "untrusted",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7396,6 +7421,12 @@ name = "unicode-xid"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
+
+[[package]]
+name = "untrusted"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "url"

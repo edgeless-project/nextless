@@ -126,6 +126,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "coap-lite"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c03a13714f9ac01bf29ca4c969bdd1ef007174dfd06f703531add1cce2e8368c"
+dependencies = [
+ "coap-message 0.2.3",
+ "coap-message 0.3.6",
+]
+
+[[package]]
 name = "coap-message"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -246,7 +256,7 @@ dependencies = [
 name = "edgeless_api_core"
 version = "0.1.0"
 dependencies = [
- "coap-lite",
+ "coap-lite 0.13.1",
  "heapless 0.8.0",
  "log",
  "minicbor",
@@ -259,7 +269,7 @@ name = "edgeless_embedded"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
- "coap-lite",
+ "coap-lite 0.11.5",
  "edgeless_api_core",
  "embassy-executor",
  "embassy-futures",
