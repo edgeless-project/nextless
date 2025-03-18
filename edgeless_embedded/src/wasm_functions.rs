@@ -99,19 +99,21 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
             .map(|(k, v)| (edgeless_api_core::port::Port(heapless::String::<32>::from_str(k).unwrap()), v))
             .collect();
 
-        let inner_fun = WasmiFunctionInstance::instantiate(
+        let mut inner_fun = WasmiFunctionInstance::instantiate(
             guest_api::GuestAPIHost {
                 instance_id: instance_specification.instance_id.clone(),
-                data_plane: crate::dataplane::EmbeddedDataplaneHandle::new(
+                data_plane: core::cell::RefCell::new(crate::dataplane::EmbeddedDataplaneHandle::new(
                     instance_specification.instance_id.clone(),
                     self.agent.clone().unwrap(),
                     output_mapping,
-                ),
+                )),
             },
             image2.read(),
         )
         .await
         .unwrap();
+
+        inner_fun.init(None, None).await.unwrap();
 
         let fun = WasmiFunctionInstanceWrapper {
             inner: inner_fun,
@@ -127,6 +129,9 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
         &mut self,
         function_id: edgeless_api_core::instance_id::InstanceId,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        if let Some(f) = self.functions.iter_mut().find(|f| f.instance_id == function_id) {
+            f.inner.stop().await.unwrap();
+        }
         self.functions.retain(|f| f.instance_id != function_id);
         Ok(())
     }
@@ -135,8 +140,15 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
         &mut self,
         patch_reg: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        if let Some(fun) = self.functions.iter().find(|fun| fun.instance_id == patch_reg.instance_id) {
-            // TODO Patch
+        if let Some(fun) = self.functions.iter_mut().find(|fun| fun.instance_id == patch_reg.instance_id) {
+            // TODO(raphaelhetzel) This should probably be changed to Port<32> in the request type.
+            let output_mapping = patch_reg
+                .output_mapping
+                .into_iter()
+                .map(|(k, v)| (edgeless_api_core::port::Port(heapless::String::<32>::from_str(k).unwrap()), v))
+                .collect();
+
+            fun.inner.store.data_mut().host.data_plane.borrow_mut().patch(output_mapping);
         }
         Ok(())
     }
@@ -145,9 +157,18 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
 impl crate::invocation::InvocationAPI for WasmiFunctionInstanceWrapper {
     async fn handle(&mut self, event: edgeless_api_core::invocation::Event) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
         match event.data {
-            edgeless_api_core::invocation::EventData::Call(_) => todo!(),
+            edgeless_api_core::invocation::EventData::Call(data) => {
+                let ret = self.inner.call(&event.source, event.target_port.0.as_str(), &data.0).await.unwrap();
+                let own_host = &mut self.inner.store.data_mut().host;
+                own_host
+                    .data_plane
+                    .borrow_mut()
+                    .reply(own_host.instance_id, event.source, event.stream_id, ret)
+                    .await
+                    .map_err(|_| ())?;
+            }
             edgeless_api_core::invocation::EventData::Cast(data) => {
-                self.inner.cast(&event.source, event.target_port.0.as_str(), &data.0).await;
+                self.inner.cast(&event.source, event.target_port.0.as_str(), &data.0).await.unwrap();
             }
             edgeless_api_core::invocation::EventData::CallRet(_) => todo!(),
             edgeless_api_core::invocation::EventData::CallNoRet => todo!(),
@@ -274,7 +295,7 @@ impl WasmiFunctionInstance {
             memory: instance
                 .get_memory(&mut store, "memory")
                 .ok_or_else(|| (FunctionInstanceError::BadCode))?,
-            store: store,
+            store,
         })
     }
 
@@ -304,7 +325,6 @@ impl WasmiFunctionInstance {
             None => (0i32, 0i32),
         };
 
-        // let ret = tokio::task::block_in_place(|| {
         let ret = Ok(self
             .edgefunctione_handle_init
             .call(
@@ -312,8 +332,6 @@ impl WasmiFunctionInstance {
                 (init_payload_ptr, init_payload_len, serialized_state_ptr, serialized_state_len),
             )
             .map_err(|_| FunctionInstanceError::InternalError)?);
-        // Ok(())
-        // });
 
         if init_payload_len > 0 {
             self.edgeless_mem_free
@@ -386,7 +404,7 @@ impl WasmiFunctionInstance {
         &mut self,
         src: &edgeless_api_core::instance_id::InstanceId,
         port: &str,
-        msg: &str,
+        msg: &[u8],
     ) -> Result<crate::dataplane::CallRet, FunctionInstanceError> {
         self.edgeless_mem_clear
             .call(&mut self.store, ())
@@ -412,8 +430,8 @@ impl WasmiFunctionInstance {
         let port_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
             .map_err(|_| FunctionInstanceError::BadCode)?;
 
-        let payload_len = msg.as_bytes().len();
-        let payload_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
+        let payload_len = msg.len();
+        let payload_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg)
             .map_err(|_| FunctionInstanceError::BadCode)?;
 
         let out_ptr_ptr = self
@@ -426,7 +444,6 @@ impl WasmiFunctionInstance {
             .call(&mut self.store, 4)
             .map_err(|_| FunctionInstanceError::BadCode)?;
 
-        // let callret_type = tokio::task::block_in_place(|| {
         let callret_type = self
             .edgefunctione_handle_call
             .call(
@@ -443,7 +460,6 @@ impl WasmiFunctionInstance {
                 ),
             )
             .map_err(|_| FunctionInstanceError::BadCode)?;
-        // })?;
 
         let ret = match callret_type {
             0 => Ok(crate::dataplane::CallRet::NoReply),
@@ -461,9 +477,10 @@ impl WasmiFunctionInstance {
                 let out_len = i32::from_le_bytes(out_len);
 
                 // load the atual output param
-                let out_raw = self.memory.data_mut(&mut self.store)[out_ptr as usize..(out_ptr as usize) + out_len as usize].to_vec();
-                // TODO(raphaelhetzel) This unwrap can be removed after we migrate the dataplane to use string slices.
-                // let out = std::string::String::from_utf8(out_raw).unwrap();
+                let out_raw = heapless::Vec::<u8, 1500>::from_slice(
+                    &self.memory.data_mut(&mut self.store)[out_ptr as usize..(out_ptr as usize) + out_len as usize],
+                )
+                .unwrap();
                 Ok(crate::dataplane::CallRet::Reply(out_raw))
             }
             _ => Ok(crate::dataplane::CallRet::Err),
@@ -497,10 +514,8 @@ impl WasmiFunctionInstance {
         self.edgeless_mem_clear
             .call(&mut self.store, ())
             .map_err(|_| FunctionInstanceError::BadCode)?;
-        // tokio::task::block_in_place(|| {
         self.edgefunctione_handle_stop
             .call(&mut self.store, ())
             .map_err(|_| FunctionInstanceError::BadCode)
-        // })
     }
 }

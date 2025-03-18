@@ -1,11 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-// use wasmi::AsContextMut;
+use wasmi::{AsContext, AsContextMut};
 
-use wasmi::AsContextMut;
-
-// use super::helpers::*;
 pub struct GuestAPI {
     pub host: super::guest_api::GuestAPIHost,
 }
@@ -18,14 +15,14 @@ pub fn telemetry_log(
     msg_ptr: i32,
     msg_len: i32,
 ) -> Result<(), wasmi::Error> {
-    // let mem = get_memory(&mut caller)?;
-    // let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    // let msg = load_string_from_vm(&mut caller.as_context_mut(), &mem, msg_ptr, msg_len)?;
+    let mem = get_memory(&mut caller)?;
+    let ctx = caller.as_context();
+    let target = super::helpers::load_str_from_vm(&ctx, &mem, target_ptr, target_len)?;
+    let msg = super::helpers::load_str_from_vm(&ctx, &mem, msg_ptr, msg_len)?;
+    let lvl = super::helpers::level_from_i32(level);
 
-    // tokio::runtime::Handle::current().block_on(caller.data_mut().host.telemetry_log(level_from_i32(level), &target, &msg));
-    log::info!("TL Called");
+    embassy_futures::block_on(caller.data().host.telemetry_log(lvl, target, msg));
     Ok(())
-    // Err(wasmi::Error::new("Not Implemented"))
 }
 
 pub fn cast_raw(
@@ -37,29 +34,18 @@ pub fn cast_raw(
     payload_ptr: i32,
     payload_len: i32,
 ) -> Result<(), wasmi::Error> {
-    // let mem = get_memory(&mut caller)?;
-    // let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16 as usize].to_vec();
-    // let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16 as usize].to_vec();
-    // let instance_id = edgeless_api::function_instance::InstanceId {
-    //     node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
-    //     function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
-    // };
+    let mem = get_memory(&mut caller)?;
+    let ctx = caller.as_context();
 
-    // let port = load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
+    let target_port = edgeless_api_core::port::Port(
+        heapless::String::from_utf8(heapless::Vec::<u8, 32>::from_slice(super::helpers::load_from_vm(&ctx, &mem, port_ptr, port_len)?).unwrap())
+            .unwrap(),
+    );
+    let payload = super::helpers::load_from_vm(&ctx, &mem, payload_ptr, payload_len).unwrap();
 
-    // let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let target_instance_id = super::helpers::load_instance_id_from_vm(&ctx, &mem, instance_node_id_ptr, instance_component_id_ptr)?;
 
-    // tokio::runtime::Handle::current()
-    //     .block_on(
-    //         caller
-    //             .data_mut()
-    //             .host
-    //             .cast_raw(instance_id, edgeless_api::function_instance::PortId(port), &payload),
-    //     )
-    //     .map_err(|_| wasmi::Error::new("string error"))?;
-    // Err(wasmi::Error::new("Not Implemented"))
-    log::info!("Cast Called");
-    Ok(())
+    embassy_futures::block_on(caller.data().host.cast_raw(target_instance_id, target_port, payload)).map_err(|_| wasmi::Error::new("Cast Error"))
 }
 
 pub fn call_raw(
@@ -73,40 +59,36 @@ pub fn call_raw(
     out_ptr_ptr: i32,
     out_len_ptr: i32,
 ) -> Result<i32, wasmi::Error> {
-    // let mem = get_memory(&mut caller)?;
-    // let alloc = get_alloc(&mut caller)?;
-    // let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16 as usize].to_vec();
-    // let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16 as usize].to_vec();
-    // let instance_id = edgeless_api::function_instance::InstanceId {
-    //     node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
-    //     function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
-    // };
+    let mem = get_memory(&mut caller)?;
+    let alloc = get_alloc(&mut caller)?;
+    let ctx = caller.as_context();
 
-    // let port = load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
-    // let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let target_instance_id = super::helpers::load_instance_id_from_vm(&ctx, &mem, instance_node_id_ptr, instance_component_id_ptr)?;
 
-    // let call_ret = tokio::runtime::Handle::current()
-    //     .block_on(
-    //         caller
-    //             .data_mut()
-    //             .host
-    //             .call_raw(instance_id, edgeless_api::function_instance::PortId(port), &payload),
-    //     )
-    //     .map_err(|_| wasmi::Error::new("call error"))?;
-    // match call_ret {
-    //     edgeless_dataplane::core::CallRet::NoReply => Ok(0),
-    //     edgeless_dataplane::core::CallRet::Reply(data) => {
-    //         let len = data.as_bytes().len();
+    let target_port = edgeless_api_core::port::Port(
+        heapless::String::from_utf8(
+            heapless::Vec::<u8, 32>::from_slice(super::helpers::load_from_vm(&ctx, &mem, port_ptr, port_len).unwrap()).unwrap(),
+        )
+        .unwrap(),
+    );
+    let payload = super::helpers::load_from_vm(&ctx, &mem, payload_ptr, payload_len).unwrap();
 
-    //         let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes())?;
-    //         copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
-    //         copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
+    let call_ret = embassy_futures::block_on(caller.data().host.call_raw(target_instance_id, target_port, payload))
+        .map_err(|_| wasmi::Error::new("Call Error"))?;
 
-    //         Ok(1)
-    //     }
-    //     edgeless_dataplane::core::CallRet::Err => Ok(2),
-    // }
-    Err(wasmi::Error::new("Not Implemented"))
+    match call_ret {
+        crate::dataplane::CallRet::NoReply => Ok(0),
+        crate::dataplane::CallRet::Reply(data) => {
+            let len = data.len();
+
+            let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, &data)?;
+            super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
+            super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
+
+            Ok(1)
+        }
+        crate::dataplane::CallRet::Err => Ok(2),
+    }
 }
 
 pub fn cast(
@@ -117,26 +99,12 @@ pub fn cast(
     payload_len: i32,
 ) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
+    let ctx = caller.as_context();
 
-    let target = super::helpers::load_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len).unwrap();
-    let payload = super::helpers::load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len).unwrap();
+    let target = super::helpers::load_str_from_vm(&ctx, &mem, target_ptr, target_len)?;
+    let payload = super::helpers::load_from_vm(&ctx, &mem, payload_ptr, payload_len)?;
 
-    embassy_futures::block_on(caller.data_mut().host.cast_alias(core::str::from_utf8(&target).unwrap(), &payload)).unwrap();
-
-    // match tokio::runtime::Handle::current().block_on(
-    // match caller.
-    // }
-    //     Ok(_) => {}
-    //     Err(_) => {
-    //         // We ignore casts to unknown targets.
-    //         log::warn!("Cast to unknown target");
-    //     }
-    // };
-
-    // Err(wasmi::Error::new("Not Implemented"))
-    log::info!("Cast Alias Called");
-    Ok(())
-    // Ok(())
+    embassy_futures::block_on(caller.data().host.cast_alias(target, &payload)).map_err(|_| wasmi::Error::new("Cast Error"))
 }
 
 pub fn call(
@@ -148,29 +116,28 @@ pub fn call(
     out_ptr_ptr: i32,
     out_len_ptr: i32,
 ) -> Result<i32, wasmi::Error> {
-    // let mem = get_memory(&mut caller)?;
-    // let alloc = get_alloc(&mut caller)?;
+    let mem = get_memory(&mut caller)?;
+    let alloc = get_alloc(&mut caller)?;
+    let ctx = caller.as_context();
 
-    // let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    // let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let target = super::helpers::load_str_from_vm(&ctx, &mem, target_ptr, target_len)?;
+    let payload = super::helpers::load_from_vm(&ctx, &mem, payload_ptr, payload_len)?;
 
-    // let call_ret = tokio::runtime::Handle::current()
-    //     .block_on(caller.data_mut().host.call_alias(&target, &payload))
-    //     .map_err(|_| wasmi::Error::new("call error"))?;
-    // match call_ret {
-    //     edgeless_dataplane::core::CallRet::NoReply => Ok(0),
-    //     edgeless_dataplane::core::CallRet::Reply(data) => {
-    //         let len = data.as_bytes().len();
+    let call_ret = embassy_futures::block_on(caller.data().host.call_alias(target, payload)).map_err(|_| wasmi::Error::new("Call Error"))?;
 
-    //         let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes())?;
-    //         copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
-    //         copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
+    match call_ret {
+        crate::dataplane::CallRet::NoReply => Ok(0),
+        crate::dataplane::CallRet::Reply(data) => {
+            let len = data.len();
 
-    //         Ok(1)
-    //     }
-    //     edgeless_dataplane::core::CallRet::Err => Ok(2),
-    // }
-    Err(wasmi::Error::new("Not Implemented"))
+            let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, &data)?;
+            super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
+            super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
+
+            Ok(1)
+        }
+        crate::dataplane::CallRet::Err => Ok(2),
+    }
 }
 
 pub fn delayed_cast(
@@ -181,38 +148,33 @@ pub fn delayed_cast(
     payload_ptr: i32,
     payload_len: i32,
 ) -> Result<(), wasmi::Error> {
-    // let mem = get_memory(&mut caller)?;
-    // let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    // let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let mem = get_memory(&mut caller)?;
+    let ctx = caller.as_context();
 
-    // tokio::runtime::Handle::current()
-    //     .block_on(caller.data_mut().host.delayed_cast(delay_ms as u64, &target, &payload))
-    //     .map_err(|_| wasmi::Error::new("call error"))?;
-    // Ok(())
-    Err(wasmi::Error::new("Not Implemented"))
+    let target = super::helpers::load_str_from_vm(&ctx, &mem, target_ptr, target_len)?;
+    let payload = super::helpers::load_from_vm(&ctx, &mem, payload_ptr, payload_len)?;
+
+    embassy_futures::block_on(caller.data().host.delayed_cast(delay_ms as u64, target, payload)).map_err(|_| wasmi::Error::new("Delayed Cast Error"))
 }
 
 pub fn sync(mut caller: wasmi::Caller<'_, GuestAPI>, state_ptr: i32, state_len: i32) -> Result<(), wasmi::Error> {
-    // let mem = get_memory(&mut caller)?;
-    // let state = load_string_from_vm(&mut caller.as_context_mut(), &mem, state_ptr, state_len)?;
+    let mem = get_memory(&mut caller)?;
+    let ctx = caller.as_context();
 
-    // tokio::runtime::Handle::current()
-    //     .block_on(caller.data_mut().host.sync(&state))
-    //     .map_err(|_| wasmi::Error::new("sync error"))?;
-    // Ok(())
-    Err(wasmi::Error::new("Not Implemented"))
+    let state = super::helpers::load_from_vm(&ctx, &mem, state_ptr, state_len).unwrap();
+
+    embassy_futures::block_on(caller.data().host.sync(state)).map_err(|_| wasmi::Error::new("Sync Error"))
 }
 
 pub fn slf(mut caller: wasmi::Caller<'_, GuestAPI>, out_node_id_ptr: i32, out_component_id_ptr: i32) -> Result<(), wasmi::Error> {
-    // let mem = get_memory(&mut caller)?;
+    let mem = get_memory(&mut caller)?;
 
-    // let id = tokio::runtime::Handle::current().block_on(caller.data_mut().host.slf());
+    let id = embassy_futures::block_on(caller.data().host.slf());
 
-    // copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_node_id_ptr, id.node_id.as_bytes())?;
-    // copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_component_id_ptr, id.function_id.as_bytes())?;
+    super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_node_id_ptr, id.node_id.as_bytes())?;
+    super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_component_id_ptr, id.function_id.as_bytes())?;
 
-    // Ok(())
-    Err(wasmi::Error::new("Not Implemented"))
+    Ok(())
 }
 
 pub(crate) fn get_memory(caller: &mut wasmi::Caller<'_, super::guest_api_binding::GuestAPI>) -> Result<wasmi::Memory, wasmi::Error> {

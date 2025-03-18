@@ -1,16 +1,14 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+// TODO(raphaelhetzel) Move this to a generic module once we have more than one embedded runtime
+
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
 /// Those need to be made available to the guest using a virtualization-specific interface/binding.
 pub struct GuestAPIHost {
     pub instance_id: edgeless_api_core::instance_id::InstanceId,
-    pub data_plane: crate::dataplane::EmbeddedDataplaneHandle,
-    // pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
-    // pub telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    // pub poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
-    // pub tracing_context: std::sync::Arc<tokio::sync::Mutex<super::function_instance_runner::TracingContext>>,
+    pub data_plane: core::cell::RefCell<crate::dataplane::EmbeddedDataplaneHandle>,
 }
 
 /// Errors to be reported by the host side of the guest binding.
@@ -19,105 +17,77 @@ pub struct GuestAPIHost {
 pub enum GuestAPIError {
     UnknownAlias,
     Unimplemented,
+    Internal,
+    BadParameter,
+}
+
+impl From<crate::dataplane::DataplaneError> for GuestAPIError {
+    fn from(dataplane_error: crate::dataplane::DataplaneError) -> Self {
+        match dataplane_error {
+            crate::dataplane::DataplaneError::BadParameter => Self::BadParameter,
+            crate::dataplane::DataplaneError::Internal => Self::Internal,
+            crate::dataplane::DataplaneError::UnknownAlias => Self::UnknownAlias,
+        }
+    }
 }
 
 impl GuestAPIHost {
-    pub async fn cast_alias(&mut self, alias: &str, msg: &[u8]) -> Result<(), GuestAPIError> {
+    pub async fn cast_alias(&self, alias: &str, msg: &[u8]) -> Result<(), GuestAPIError> {
         self.data_plane
-            .send_alias(
-                alias,
-                msg,
-                // alias.to_string(),
-                // msg.to_string(),
-                // self.tracing_context.lock().await.parent_context.clone(),
-            )
-            .await;
-        // .map_err(|_e| GuestAPIError::UnknownAlias)
+            .borrow_mut()
+            .send_alias(alias, msg)
+            .await
+            .map_err(|e| GuestAPIError::from(e))?;
         Ok(())
     }
 
     pub async fn cast_raw(
-        &mut self,
+        &self,
         target: edgeless_api_core::instance_id::InstanceId,
         target_port: edgeless_api_core::port::Port<32>,
-        msg: &str,
+        msg: &[u8],
     ) -> Result<(), GuestAPIError> {
         self.data_plane
-            .send(
-                self.instance_id.clone(),
-                target,
-                target_port,
-                msg.as_bytes(),
-                // self.tracing_context.lock().await.parent_context.clone(),
-            )
-            .await;
+            .borrow_mut()
+            .send(self.instance_id.clone(), target, target_port, msg)
+            .await
+            .map_err(|e| GuestAPIError::from(e))?;
         Ok(())
     }
 
-    pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<crate::dataplane::CallRet, GuestAPIError> {
-        // futures::select! {
-        //     _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
-        //         Ok(edgeless_dataplane::core::CallRet::Err)
-        //     },
-        //     call_res = Box::pin(self.data_plane.call_alias(alias.to_string(), msg.to_string(), self.tracing_context.lock().await.parent_context.clone()).fuse()) => {
-        //         Ok(call_res)
-        //     }
-        // }
+    pub async fn call_alias(&self, _alias: &str, _msg: &[u8]) -> Result<crate::dataplane::CallRet, GuestAPIError> {
         Err(GuestAPIError::Unimplemented)
     }
 
     pub async fn call_raw(
-        &mut self,
-        target: edgeless_api_core::instance_id::InstanceId,
-        target_port: edgeless_api_core::port::Port<32>,
-        msg: &str,
+        &self,
+        _target: edgeless_api_core::instance_id::InstanceId,
+        _target_port: edgeless_api_core::port::Port<32>,
+        _msg: &[u8],
     ) -> Result<crate::dataplane::CallRet, GuestAPIError> {
-        // futures::select! {
-        //     _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
-        //         Ok(edgeless_dataplane::core::CallRet::Err)
-        //     },
-        //     call_res = Box::pin(self.data_plane.call(target, target_port, msg.to_string(), self.tracing_context.lock().await.parent_context.clone())).fuse() => {
-        //         Ok(call_res)
-        //     }
-        // }
         Err(GuestAPIError::Unimplemented)
     }
 
-    pub async fn telemetry_log(&mut self, lvl: super::TelemetryLogLevel, target: &str, msg: &str) {
-        // self.telemetry_handle.observe(
-        //     edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionLogEntry(lvl, target.to_string(), msg.to_string()),
-        //     std::collections::BTreeMap::new(),
-        // );
-        log::info!("Function Log: {}", msg);
+    pub async fn telemetry_log(&self, lvl: super::TelemetryLogLevel, target: &str, msg: &str) {
+        let lvl = match lvl {
+            crate::wasm_functions::TelemetryLogLevel::Error => log::Level::Error,
+            crate::wasm_functions::TelemetryLogLevel::Warn => log::Level::Warn,
+            crate::wasm_functions::TelemetryLogLevel::Info => log::Level::Info,
+            crate::wasm_functions::TelemetryLogLevel::Debug => log::Level::Debug,
+            crate::wasm_functions::TelemetryLogLevel::Trace => log::Level::Trace,
+        };
+        log::log!(lvl, "Function Log {}-{}: {}", self.instance_id, target, msg);
     }
 
-    pub async fn slf(&mut self) -> edgeless_api_core::instance_id::InstanceId {
+    pub async fn slf(&self) -> edgeless_api_core::instance_id::InstanceId {
         self.instance_id
     }
 
-    pub async fn delayed_cast(&mut self, delay: u64, target_alias: &str, payload: &str) -> Result<(), GuestAPIError> {
-        // let mut cloned_plane = self.data_plane.clone();
-        // let cloned_msg = payload.to_string();
-        // let cloned_alias = target_alias.to_string();
-
-        // // let cloned_context = self.tracing_context.lock().await.parent_context.clone();
-        // let cloned_tracer = self.tracing_context.lock().await.tracer.clone();
-
-        // tokio::spawn(async move {
-        //     let span = cloned_tracer.start("wait");
-        //     tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-        //     cloned_plane
-        //         .send_alias(cloned_alias, cloned_msg, opentelemetry::Context::new())
-        //         .await
-        //         .unwrap();
-        // });
-
+    pub async fn delayed_cast(&self, _delay: u64, _target_alias: &str, _payload: &[u8]) -> Result<(), GuestAPIError> {
         Err(GuestAPIError::Unimplemented)
     }
 
-    pub async fn sync(&mut self, serialized_state: &str) -> Result<(), GuestAPIError> {
-        // self.state_handle.set(serialized_state.to_string()).await;
-        // log::info!("Function State Sync: {}", serialized_state);
+    pub async fn sync(&self, _serialized_state: &[u8]) -> Result<(), GuestAPIError> {
         Err(GuestAPIError::Unimplemented)
     }
 }
