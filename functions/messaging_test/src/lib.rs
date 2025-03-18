@@ -8,9 +8,9 @@ struct MessagingTest;
 
 edgeless_function::generate!(MessagingTest);
 
-impl MessagingTestAPI for MessagingTest {
+impl MessagingTestAPI<'_> for MessagingTest {
     type STRING = String;
-    
+
     fn handle_cast_test_cast_input(src: InstanceId, message: String) {
         match message.as_str() {
             "test_cast_raw_output" => {
@@ -38,8 +38,7 @@ impl MessagingTestAPI for MessagingTest {
         "test_reply".to_string()
     }
 
-    fn handle_call_test_input_noreply(_src: InstanceId, _message: String){
-    }
+    fn handle_call_test_input_noreply(_src: InstanceId, _message: String) {}
 
     fn handle_internal(_message: &[u8]) {}
 

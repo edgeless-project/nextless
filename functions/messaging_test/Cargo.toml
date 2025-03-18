@@ -24,8 +24,8 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-edgeless_function = { path = "../../edgeless_function" }
-edgeless_function_core ={ path = "../../edgeless_function_core"}
+edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
+edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
 log = "0.4"
 
 [features]
@@ -34,7 +34,7 @@ default = [
     "input_test_input_reply",
     "input_test_input_noreply",
     "output_test_cast",
-    "output_test_call"
+    "output_test_call",
 ]
 input_test_cast_input = []
 input_test_input_reply = []

@@ -24,11 +24,12 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
+edgeless_function = { path = "../../edgeless_function", default-features = false }
+# edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 log = "0.4"
-minicbor = { version = "0.19", default-features = false, features = ["derive"] }
-edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
+edgeless_function_core = { path = "../../edgeless_function_core" }
 
+# minicbor = { version = "0.19", default-features = false, features = ["derive"] }
 [features]
 default = ["output_message", "input_measurement"]
 output_message = []

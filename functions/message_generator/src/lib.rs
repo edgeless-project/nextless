@@ -15,11 +15,9 @@ struct State {
 static INIT_STATE: std::sync::OnceLock<InitState> = std::sync::OnceLock::new();
 static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock::new();
 
-impl MessageGeneratorAPI for MessageGenerator {
-    
+impl MessageGeneratorAPI<'_> for MessageGenerator {
     type STRING = String;
 
-    
     fn handle_internal(message: &[u8]) {
         let init_state = INIT_STATE.get().unwrap();
         let mut state = STATE.get().unwrap().lock().unwrap();

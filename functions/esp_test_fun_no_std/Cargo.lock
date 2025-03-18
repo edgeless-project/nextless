@@ -3,26 +3,8 @@
 version = 4
 
 [[package]]
-name = "anyhow"
-version = "1.0.97"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
-
-[[package]]
-name = "async-trait"
-version = "0.1.88"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e539d3fca749fcee5236ab05e93a52867dd549cc157c8cb7f99595f3cedffdb5"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "edgeless_function"
 version = "0.1.0"
-source = "git+https://github.com/edgeless-project/nextless.git?branch=development#2e560fcec3eb69d45368719d37e7ad9893321603"
 dependencies = [
  "edgeless_function_macro",
  "log",
@@ -31,7 +13,6 @@ dependencies = [
 [[package]]
 name = "edgeless_function_core"
 version = "0.1.0"
-source = "git+https://github.com/edgeless-project/nextless.git?branch=development#2e560fcec3eb69d45368719d37e7ad9893321603"
 dependencies = [
  "log",
  "serde",
@@ -41,7 +22,6 @@ dependencies = [
 [[package]]
 name = "edgeless_function_macro"
 version = "0.1.0"
-source = "git+https://github.com/edgeless-project/nextless.git?branch=development#2e560fcec3eb69d45368719d37e7ad9893321603"
 dependencies = [
  "edgeless_function_core",
  "proc-macro2",
@@ -51,24 +31,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "edgeless_http"
-version = "0.1.0"
-source = "git+https://github.com/edgeless-project/nextless.git?branch=development#2e560fcec3eb69d45368719d37e7ad9893321603"
-dependencies = [
- "anyhow",
- "async-trait",
- "edgeless_function_core",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "http_processor"
+name = "esp_test_fun"
 version = "0.1.0"
 dependencies = [
  "edgeless_function",
  "edgeless_function_core",
- "edgeless_http",
  "log",
 ]
 

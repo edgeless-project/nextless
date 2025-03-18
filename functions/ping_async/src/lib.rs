@@ -29,7 +29,7 @@ impl edgeless_function_core::Serialize for PingType {
     }
 }
 
-impl PingAsyncAPI for PingerFun {
+impl PingAsyncAPI<'_> for PingerFun {
     type EDGELESS_EXAMPLE_PONG = PongType;
     type EDGELESS_EXAMPLE_PING = PingType;
 

@@ -29,7 +29,7 @@ impl edgeless_function_core::Serialize for PongType {
 
 edgeless_function::generate!(PongerFun);
 
-impl PongAsyncAPI for PongerFun {
+impl PongAsyncAPI<'_> for PongerFun {
     type EDGELESS_EXAMPLE_PING = PingType;
     type EDGELESS_EXAMPLE_PONG = PongType;
 

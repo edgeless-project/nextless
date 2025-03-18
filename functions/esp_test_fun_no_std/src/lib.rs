@@ -1,34 +1,25 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+#![no_std]
+
 use edgeless_function::*;
 
 struct TestFun;
 
 edgeless_function::generate!(TestFun);
 
-#[derive(minicbor::Decode, minicbor::CborLen)]
-struct SCD30Measurement {
-    #[n(0)]
-    co2: f32,
-    #[n(1)]
-    rh: f32,
-    #[n(2)]
-    temp: f32,
-}
+impl<'c> EspTestFunAPI<'c> for TestFun {
+    type STRING = &'c str;
 
-impl EspTestFunAPI<'_> for TestFun {
-    type STRING = String;
-
-    fn handle_cast_measurement(_src: InstanceId, str_message: String) {
+    fn handle_cast_measurement(_src: InstanceId, str_message: &'c str) {
+        // let str_message = core::str::from_utf8(encoded_message).unwrap();
         log::info!("Resource Processor: 'Cast' called, MSG: {}", str_message);
-        let values: Vec<_> = str_message.split(";").collect();
-        if values.len() == 3 {
-            let co2: f32 = values[0].parse().unwrap();
-            let item = format!("CO2:\n{:.0}", co2);
-            cast_message(&item);
-        } else {
-            cast_message(&"No Data".to_string());
+        let mut values = str_message.split(";");
+        if let Some(co2) = values.next() {
+            let co2: f32 = co2.parse().unwrap();
+            let msg = if co2 > 800.0 { "high" } else { "low" };
+            cast_message(&msg);
         }
     }
 

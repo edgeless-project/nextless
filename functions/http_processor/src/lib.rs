@@ -8,8 +8,7 @@ struct ProcessorFun;
 
 edgeless_function::generate!(ProcessorFun);
 
-impl HttpProcessorAPI for ProcessorFun {
-
+impl HttpProcessorAPI<'_> for ProcessorFun {
     type EDGELESS_HTTP_REQUEST = edgeless_http::EdgelessHTTPRequest;
     type EDGELESS_HTTP_RESPONSE = edgeless_http::EdgelessHTTPResponse;
 
