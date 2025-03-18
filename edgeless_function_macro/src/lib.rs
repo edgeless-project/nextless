@@ -72,7 +72,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                     let return_statement = quote! {
                         let serialized = <<#parsed_ident as #trait_name>::#return_type_ident as edgeless_function_core::Serialize>::serialize(&res);
-                        return edgeless_function::CallRet::Reply(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(&serialized));
+                        return edgeless_function::CallRet::Reply(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(serialized.as_ref()));
                     };
 
                     (Some(return_type_ident), return_statement)
@@ -133,7 +133,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                             #[cfg(feature = #feature)]
                             {
                                 let serialized = <<#parsed_ident as #trait_name>::#type_ident as edgeless_function_core::Serialize>::serialize(payload);
-                                cast(#output_id, &serialized);
+                                cast(#output_id, serialized.as_ref());
                             }
                         }
                     }
@@ -198,20 +198,20 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let mut traits = Vec::new();
 
         if *input {
-            traits.push(quote!(edgeless_function_core::Deserialize));
+            traits.push(quote!(edgeless_function_core::Deserialize<'a>));
         }
 
         if *output {
-            traits.push(quote!(edgeless_function_core::Serialize));
+            traits.push(quote!(edgeless_function_core::Serialize<'a>));
         }
 
         quote! {
-            type #t : #(#traits)+*;
+            type #t : #(#traits)+* + 'a;
         }
     });
 
     quote! {
-        trait #trait_name {
+        trait #trait_name<'a> {
             #(#quoted_types)*
             #(#handlers)*
             fn handle_internal(encoded_message: &[u8]);

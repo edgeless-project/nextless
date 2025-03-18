@@ -47,12 +47,12 @@ pub enum MappingNode {
     Port(String),
 }
 
-pub trait Deserialize {
-    fn deserialize(raw: &[u8]) -> Self;
+pub trait Deserialize<'a> {
+    fn deserialize(raw: &'a [u8]) -> Self;
 }
 
-pub trait Serialize {
-    fn serialize(&self) -> Vec<u8>;
+pub trait Serialize<'a> {
+    fn serialize(&'a self) -> impl core::convert::AsRef<[u8]>;
 }
 
 // pub enum EdgelessKVValue {
@@ -69,26 +69,38 @@ pub trait Serialize {
 //     fn set(key: &str, val: EdgelessKVValue);
 // }
 
-impl Deserialize for std::string::String {
+impl Deserialize<'_> for std::string::String {
     fn deserialize(raw: &[u8]) -> Self {
         String::from_utf8(raw.to_vec()).unwrap()
     }
 }
 
-impl Serialize for std::string::String {
-    fn serialize(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
+impl<'a> Serialize<'a> for std::string::String {
+    fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
+        self.as_bytes()
     }
 }
 
-impl Serialize for () {
-    fn serialize(&self) -> Vec<u8> {
-        Vec::new()
+impl<'a> Serialize<'a> for () {
+    fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
+        &[]
     }
 }
 
-impl Deserialize for () {
+impl Deserialize<'_> for () {
     fn deserialize(raw: &[u8]) -> Self {
         ()
+    }
+}
+
+impl<'a> Serialize<'a> for &'a str {
+    fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
+        self.as_bytes()
+    }
+}
+
+impl<'a> Deserialize<'a> for &'a str {
+    fn deserialize(raw: &'a [u8]) -> Self {
+        core::str::from_utf8(raw).unwrap()
     }
 }

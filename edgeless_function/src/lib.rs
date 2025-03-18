@@ -7,6 +7,7 @@
 pub mod lcg;
 
 /// Guest Codegen based on function.json
+// #[cfg(feature = "std")]
 pub use edgeless_function_macro::generate;
 
 /// These functions are imported by the WASM module.
