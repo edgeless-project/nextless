@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: MIT
 use edgeless_api::function_instance::InstanceId;
 use http_body_util::BodyExt;
-use opentelemetry::trace::TracerProvider;
 use opentelemetry::trace::{TraceContextExt, Tracer};
-use opentelemetry_otlp::WithExportConfig;
 use std::str::FromStr;
 
 struct ResourceDesc {
@@ -17,8 +15,6 @@ struct IngressState {
     interests: Vec<HTTPIngressInterest>,
     active_resources: std::collections::HashMap<InstanceId, ResourceDesc>,
     dataplane: edgeless_dataplane::handle::DataplaneHandle,
-    tracer_provider: opentelemetry_sdk::trace::TracerProvider,
-    tracer: opentelemetry_sdk::trace::Tracer,
 }
 
 #[derive(Clone)]
@@ -49,7 +45,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
             let method = edgeless_http::hyper_method_to_edgeless(&parts.method)?;
             let data = body.collect().await?.to_bytes();
 
-            let span = lck.tracer.start("ingress_event");
+            let span = opentelemetry::global::tracer("ingress_resource").start("ingress_event");
             let request_context = opentelemetry::Context::current_with_span(span);
 
             if let Some((host, target, target_port)) = lck.interests.iter().find_map(|intr| {
@@ -118,34 +114,10 @@ pub async fn ingress_task(
 
     let mut dataplane = provider.get_handle_for(ingress_id).await;
 
-    let exporter = opentelemetry_otlp::SpanExporter::builder()
-        .with_tonic()
-        .with_endpoint("http://otelco:4317")
-        .with_timeout(std::time::Duration::from_secs(3))
-        .build()
-        .unwrap();
-
-    let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
-        .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
-        .with_config(
-            opentelemetry_sdk::trace::Config::default().with_resource(opentelemetry_sdk::Resource::new(vec![
-                opentelemetry::KeyValue::new("service.name", "http_ingress"),
-                opentelemetry::KeyValue::new("component.instance_id", ingress_id.function_id.to_string()),
-                opentelemetry::KeyValue::new("component.node_id", ingress_id.node_id.to_string()),
-            ])),
-        )
-        .build();
-
-    let tracer = tracer_provider.tracer("ingress_resource");
-
-    dataplane.set_tracer(tracer.clone());
-
     let ingress_state = std::sync::Arc::new(tokio::sync::Mutex::new(IngressState {
         interests: Vec::<HTTPIngressInterest>::new(),
         active_resources: std::collections::HashMap::new(),
         dataplane,
-        tracer_provider,
-        tracer,
     }));
 
     let cloned_interests = ingress_state.clone();

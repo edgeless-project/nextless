@@ -50,7 +50,6 @@ pub struct DataplaneHandle {
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
-    tracer: Option<opentelemetry_sdk::trace::Tracer>,
 }
 
 impl DataplaneHandle {
@@ -121,7 +120,6 @@ impl DataplaneHandle {
             links: std::collections::HashMap::new(),
             receiver_overwrites,
             next_id: 1,
-            tracer: None,
         }
     }
 
@@ -194,18 +192,9 @@ impl DataplaneHandle {
         }
     }
 
-    pub fn set_tracer(&mut self, tracer: opentelemetry_sdk::trace::Tracer) {
-        self.tracer = Some(tracer);
-    }
-
     pub async fn send_alias(&mut self, target: String, msg: String, context: opentelemetry::Context) -> anyhow::Result<()> {
-        let context = if let Some(tracer) = &self.tracer {
-            let call_handler_span = tracer.start_with_context(format!("send_{}", target), &context);
-            opentelemetry::Context::current_with_span(call_handler_span)
-        } else {
-            log::info!("Missing Tracer");
-            context
-        };
+        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("send_{}", target), &context);
+        let context = opentelemetry::Context::current_with_span(call_handler_span);
         if target == "self" {
             self.send_inner(
                 self.slf,
@@ -248,12 +237,8 @@ impl DataplaneHandle {
     }
 
     pub async fn call_alias(&mut self, alias: String, msg: String, context: opentelemetry::Context) -> CallRet {
-        let context = if let Some(tracer) = &self.tracer {
-            let call_handler_span = tracer.start_with_context(format!("call_{}", alias), &context);
-            opentelemetry::Context::current_with_span(call_handler_span)
-        } else {
-            context
-        };
+        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("call_{}", alias), &context);
+        let context = opentelemetry::Context::current_with_span(call_handler_span);
         if alias == "self" {
             self.call_raw(self.slf, edgeless_api::function_instance::PortId("INTERNAL".to_string()), msg, context)
                 .await
@@ -307,12 +292,8 @@ impl DataplaneHandle {
         msg: String,
         context: opentelemetry::Context,
     ) {
-        let context = if let Some(tracer) = &self.tracer {
-            let call_handler_span = tracer.start_with_context("send", &context);
-            opentelemetry::Context::current_with_span(call_handler_span)
-        } else {
-            context
-        };
+        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context("send", &context);
+        let context = opentelemetry::Context::current_with_span(call_handler_span);
         self.send_inner(target, Message::Cast(msg), target_port, 0, context).await;
     }
 
@@ -325,13 +306,8 @@ impl DataplaneHandle {
         msg: String,
         context: opentelemetry::Context,
     ) -> CallRet {
-        let context = if let Some(tracer) = &self.tracer {
-            let call_handler_span = tracer.start_with_context("call", &context);
-            opentelemetry::Context::current_with_span(call_handler_span)
-        } else {
-            log::info!("No Tracer");
-            context
-        };
+        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context("call", &context);
+        let context = opentelemetry::Context::current_with_span(call_handler_span);
         self.call_raw(target, target_port, msg, context).await
     }
 

@@ -96,10 +96,9 @@ impl GuestAPIHost {
         let cloned_alias = target_alias.to_string();
 
         // let cloned_context = self.tracing_context.lock().await.parent_context.clone();
-        let cloned_tracer = self.tracing_context.lock().await.tracer.clone();
 
         tokio::spawn(async move {
-            let span = cloned_tracer.start("wait");
+            let span = opentelemetry::global::tracer("actor_runtime_guest").start("wait");
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
             cloned_plane
                 .send_alias(cloned_alias, cloned_msg, opentelemetry::Context::new())

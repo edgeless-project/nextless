@@ -1,11 +1,8 @@
-use chrono::Duration;
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 use futures::{FutureExt, SinkExt};
 use opentelemetry::trace::Span;
-use opentelemetry::trace::TracerProvider;
 use opentelemetry::trace::{TraceContextExt, Tracer};
-use opentelemetry_otlp::WithExportConfig;
 use std::marker::PhantomData;
 
 use super::{FunctionInstance, FunctionInstanceError};
@@ -35,12 +32,10 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     init_payload: Option<String>,
     runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
     instance_id: edgeless_api::function_instance::InstanceId,
-    tracer_provider: opentelemetry_sdk::trace::TracerProvider,
     tracing_context: std::sync::Arc<tokio::sync::Mutex<TracingContext>>,
     duration_soft_limit: std::time::Duration,
 }
 pub struct TracingContext {
-    pub tracer: opentelemetry_sdk::trace::Tracer,
     pub parent_context: opentelemetry::Context,
 }
 
@@ -60,35 +55,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         let (poison_pill_sender, poison_pill_receiver) = tokio::sync::broadcast::channel::<()>(1);
         let serialized_state = state_handle.get().await;
 
-        let exporter = opentelemetry_otlp::SpanExporter::builder()
-            .with_tonic()
-            .with_endpoint("http://otelco:4317")
-            .with_timeout(std::time::Duration::from_secs(3))
-            .build()
-            .unwrap();
-
-        let tracer_provider = opentelemetry_sdk::trace::TracerProvider::builder()
-            .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
-            .with_config(
-                opentelemetry_sdk::trace::Config::default().with_resource(opentelemetry_sdk::Resource::new(vec![
-                    opentelemetry::KeyValue::new("service.name", spawn_req.code.function_class_id),
-                    opentelemetry::KeyValue::new("component.instance_id", spawn_req.instance_id.function_id.to_string()),
-                    opentelemetry::KeyValue::new("component.node_id", spawn_req.instance_id.node_id.to_string()),
-                    opentelemetry::KeyValue::new("component.type", "actor"),
-                    opentelemetry::KeyValue::new("actor.version", spawn_req.code.function_class_version.to_string()),
-                    opentelemetry::KeyValue::new("actor.runtime", spawn_req.code.function_class_type.to_string()),
-                ])),
-            )
-            .build();
-
-        let tracer = tracer_provider.tracer("actor_runtime");
-
         let tracing_context = std::sync::Arc::new(tokio::sync::Mutex::new(TracingContext {
-            tracer: tracer.clone(),
             parent_context: opentelemetry::Context::new(),
         }));
-
-        data_plane.set_tracer(tracer);
 
         let guest_api_host = crate::base_runtime::guest_api::GuestAPIHost {
             instance_id,
@@ -112,7 +81,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 spawn_req.annotations.get("init-payload").cloned(),
                 runtime_api,
                 instance_id,
-                tracer_provider,
                 tracing_context,
                 duration_soft_limit,
             )
@@ -158,7 +126,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         init_param: Option<String>,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         instance_id: edgeless_api::function_instance::InstanceId,
-        tracer_provider: opentelemetry_sdk::trace::TracerProvider,
         tracing_context: std::sync::Arc<tokio::sync::Mutex<TracingContext>>,
         duration_soft_limit: std::time::Duration,
     ) -> Self {
@@ -173,7 +140,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             init_payload: init_param,
             runtime_api,
             instance_id,
-            tracer_provider,
             tracing_context,
             duration_soft_limit,
         }
@@ -196,7 +162,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         // self.data_plane.set_tracer(self.tracing_context.lock().await.tracer.clone());
 
         let start = tokio::time::Instant::now();
-        let mut span = self.tracing_context.lock().await.tracer.start("instantiate");
+        let mut span = opentelemetry::global::tracer("actor_runtime").start("instantiate");
 
         let runtime_configuration = std::collections::HashMap::new();
         self.function_instance =
@@ -214,7 +180,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn init(&mut self) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
-        let mut span = self.tracing_context.lock().await.tracer.start("init");
+        let mut span = opentelemetry::global::tracer("actor_runtime").start("init");
 
         self.function_instance
             .as_mut()
@@ -420,20 +386,18 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         span_id: String,
         parent: opentelemetry::trace::SpanContext,
         input_port: Option<edgeless_api::function_instance::PortId>,
-    ) -> opentelemetry_sdk::trace::Span {
-        let tracer = self.tracing_context.lock().await.tracer.clone();
+    ) -> opentelemetry::global::BoxedSpan {
         let context = opentelemetry::Context::current();
         let mut span = if parent.is_valid() {
             assert!(parent.is_sampled());
             let context = context.with_remote_span_context(parent);
             context.span().add_event("msg_received", Vec::new());
             context.span().end();
-            tracer.start_with_context(span_id, &context)
+            opentelemetry::global::tracer("actor_runtime").start_with_context(span_id, &context)
         } else {
             // assert!(false);
-            tracer.start(span_id)
+            opentelemetry::global::tracer("actor_runtime").start(span_id)
         };
-        span.add_event("test", vec![]);
         if let Some(input_port) = &input_port {
             span.set_attribute(opentelemetry::KeyValue::new("component.input_port", input_port.0.clone()));
         }
