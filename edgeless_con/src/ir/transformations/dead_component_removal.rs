@@ -8,7 +8,7 @@ pub use super::super::*;
 pub struct DeadComponentRemoval {}
 
 impl super::Transformation for DeadComponentRemoval {
-    fn apply(&mut self, workflow: &mut workflow::ActiveWorkflow) {
+    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mut changed = true;
         while changed {
             changed = false;

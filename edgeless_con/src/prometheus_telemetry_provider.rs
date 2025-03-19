@@ -41,6 +41,10 @@ impl crate::ir::TelemetryProvider for PrometheusTelemetryProvider {
             &self.url,
         ))
     }
+
+    fn wasm_runtime_statistics_for(&self, node_id: &edgeless_api::function_instance::NodeId) -> Box<dyn crate::ir::WasmRuntimeInfo> {
+        Box::new(PrometheusWasmRuntimeInfo::new(node_id, &self.url))
+    }
 }
 
 struct PrometheusComponentRuntimeStatistics {
@@ -53,6 +57,11 @@ struct PrometheusPortStatistics {
     port_id: edgeless_api::function_instance::PortId,
     client: prometheus_http_query::Client,
     direction: PortDirection,
+}
+
+struct PrometheusWasmRuntimeInfo {
+    node_id: edgeless_api::function_instance::NodeId,
+    client: prometheus_http_query::Client,
 }
 
 enum PortDirection {
@@ -264,6 +273,29 @@ impl crate::ir::PortStatistics for PrometheusPortStatistics {
             }
         }
         vec![]
+    }
+}
+
+impl PrometheusWasmRuntimeInfo {
+    fn new(node_id: &edgeless_api::function_instance::NodeId, url: &str) -> Self {
+        Self {
+            node_id: node_id.clone(),
+            client: prometheus_http_query::Client::from_str(url).expect("Critical Prometheus Configuration Error"),
+        }
+    }
+}
+
+impl crate::ir::WasmRuntimeInfo for PrometheusWasmRuntimeInfo {
+    fn cpu_load(&self) -> f32 {
+        0.0
+    }
+
+    fn mem_used(&self) -> f32 {
+        0.0
+    }
+
+    fn running_instances(&self) -> u32 {
+        0
     }
 }
 

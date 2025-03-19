@@ -34,6 +34,8 @@ pub struct WorkerNode {
     pub supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
     // This should probably be based on link types and is a placeholder
     pub is_proxy: bool,
+    telemetry_provider: Box<dyn crate::ir::TelemetryProvider>,
+    id: edgeless_api::function_instance::NodeId,
 }
 
 pub struct PeerCluster {
@@ -46,6 +48,66 @@ pub struct PeerCluster {
 pub struct ResourceProvider {
     pub class_type: String,
     pub outputs: Vec<String>,
+}
+
+impl crate::ir::ResourceProvider for ResourceProvider {
+    fn class_type(&self) -> String {
+        self.class_type.clone()
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        self.outputs.clone()
+    }
+}
+
+impl crate::ir::Node for WorkerNode {
+    fn available_runtimes(&self) -> std::collections::HashMap<String, crate::ir::Runtime> {
+        self.capabilities
+            .runtimes
+            .iter()
+            .filter_map(|id| match id.as_str() {
+                "RUST_WASM" => Some(("RUST_WASM".to_string(), crate::ir::Runtime::WasmBase(self))),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn available_resource_providers(&self) -> crate::ir::ResourceProviders {
+        self.resource_providers
+            .iter()
+            .map(|(k, v)| (k.clone(), v as &dyn crate::ir::ResourceProvider))
+            .collect()
+    }
+
+    fn available_link_types(&self) -> crate::ir::LinkProviders {
+        self.supported_link_types.clone()
+    }
+
+    fn labels(&self) -> Vec<String> {
+        self.capabilities.labels.clone()
+    }
+
+    fn is_proxy(&self) -> bool {
+        self.is_proxy
+    }
+}
+
+impl crate::ir::WasmRuntime for WorkerNode {
+    fn num_cores(&self) -> u32 {
+        self.capabilities.num_cores
+    }
+
+    fn cpu_freq_hz(&self) -> f32 {
+        self.capabilities.clock_freq_cpu
+    }
+
+    fn mem_size_bytes(&self) -> u32 {
+        self.capabilities.mem_size
+    }
+
+    fn runtime_info(&self) -> Box<dyn crate::ir::WasmRuntimeInfo> {
+        self.telemetry_provider.wasm_runtime_statistics_for(&self.id)
+    }
 }
 
 impl ControllerTask {
@@ -145,12 +207,16 @@ impl ControllerTask {
             spawn_workflow_request.clone(),
             wf_id.clone(),
             self.orchestration_logic.clone(),
-            self.nodes.clone(),
-            self.peer_clusters.clone(),
             self.link_controllers.clone(),
             self.telemetry_provider.clone(),
         );
-        let required_changes = tokio::task::block_in_place(|| wf.initial_spawn());
+
+        let required_changes = {
+            let nodes = self.nodes.lock().await;
+            let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
+                nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
+            tokio::task::block_in_place(|| wf.initial_spawn(&ir_nodes, &std::collections::HashMap::new()))
+        };
 
         let desc = edgeless_api::workflow_instance::WorkflowInstance {
             workflow_id: wf_id.clone(),
@@ -250,7 +316,12 @@ impl ControllerTask {
             workflow_id: req.function_id.function_id,
         };
         if let Some(wf) = self.active_workflows.get_mut(&id) {
-            let required_changes = tokio::task::block_in_place(|| wf.patch_external_links(req.clone()));
+            let required_changes = {
+                let nodes = self.nodes.lock().await;
+                let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
+                    nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
+                tokio::task::block_in_place(|| wf.patch_external_links(req.clone(), &ir_nodes, &std::collections::HashMap::new()))
+            };
             if let Err(errs) = self.materialize(id.clone(), required_changes).await {
                 log::info!("Failures while stopping workflow: {}", errs.join(";"));
             };
@@ -287,7 +358,7 @@ impl ControllerTask {
         };
 
         self.nodes.lock().await.insert(
-            node_id,
+            node_id.clone(),
             WorkerNode {
                 agent_url,
                 invocation_url: invocation_url.clone(),
@@ -309,6 +380,8 @@ impl ControllerTask {
                 weight: node_weight,
                 supported_link_types: link_providers.into_iter().map(|p| (p.class, p.provider_id)).collect(),
                 is_proxy: true,
+                id: node_id,
+                telemetry_provider: self.telemetry_provider.as_ref().unwrap().clone(),
             },
         );
 
@@ -678,7 +751,12 @@ impl ControllerTask {
         wf_id: edgeless_api::workflow_instance::WorkflowId,
     ) {
         if let Some(wf) = self.active_workflows.get_mut(&wf_id) {
-            let required_changes = tokio::task::block_in_place(|| wf.node_removal(removed_nodes));
+            let required_changes = {
+                let nodes = self.nodes.lock().await;
+                let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
+                    nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
+                tokio::task::block_in_place(|| wf.node_removal(removed_nodes, &ir_nodes, &std::collections::HashMap::new()))
+            };
             if let Err(errs) = self.materialize(wf_id, required_changes).await {
                 log::error!("Failures Handling Node Removal: {}", errs.join(";"));
             }
@@ -698,7 +776,12 @@ impl ControllerTask {
 
     async fn optimize_workflow(&mut self, wf_id: edgeless_api::workflow_instance::WorkflowId) {
         if let Some(wf) = self.active_workflows.get_mut(&wf_id) {
-            let required_changes = tokio::task::block_in_place(|| wf.periodic_optimize());
+            let required_changes = {
+                let nodes = self.nodes.lock().await;
+                let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
+                    nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
+                tokio::task::block_in_place(|| wf.periodic_optimize(&ir_nodes, &std::collections::HashMap::new()))
+            };
             if let Err(errs) = self.materialize(wf_id, required_changes).await {
                 log::error!("Failures Handling Periodic Optimization: {}", errs.join(";"));
             }

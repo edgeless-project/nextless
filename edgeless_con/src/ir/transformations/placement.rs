@@ -7,40 +7,23 @@ use super::super::*;
 
 pub struct DefaultPlacement {
     orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
-    nodes:
-        std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>>>,
-    peer_clusters: std::sync::Arc<
-        tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>>,
-    >,
 }
 
 impl DefaultPlacement {
-    pub fn new(
-        orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
-        nodes: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>>,
-        >,
-        peer_clusters: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>>,
-        >,
-    ) -> Self {
-        Self {
-            orchestration_logic,
-            nodes,
-            peer_clusters,
-        }
+    pub fn new(orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>) -> Self {
+        Self { orchestration_logic }
     }
 }
 
 impl super::Transformation for DefaultPlacement {
-    fn apply(&mut self, slf: &mut workflow::ActiveWorkflow) {
-        for (f_id, function) in &mut slf.functions {
+    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) {
+        for (f_id, function) in &mut workflow.functions {
             let mut function = function.borrow_mut();
             if function.instances.is_empty() {
                 let dst = self
                     .orchestration_logic
                     .blocking_lock()
-                    .next(&self.nodes.blocking_lock(), &function.image.format, &function.annotations);
+                    .next(nodes, &function.image.format, &function.annotations);
 
                 if let Some(dst) = dst {
                     function.instances.push(std::cell::RefCell::new(actor::PhysicalActor {
@@ -50,7 +33,7 @@ impl super::Transformation for DefaultPlacement {
                         materialized: None,
                     }))
                 } else {
-                    log::info!("Found no viable node for {} in {}", &f_id, slf.id.workflow_id);
+                    log::info!("Found no viable node for {} in {}", &f_id, workflow.id.workflow_id);
                 }
             } else {
                 // This is a test that shows the use of the Materialized Representation
@@ -122,10 +105,10 @@ impl super::Transformation for DefaultPlacement {
             }
         }
 
-        for (_, resource) in &mut slf.resources {
+        for (_, resource) in &mut workflow.resources {
             let mut resource = resource.borrow_mut();
             if resource.instances.is_empty() {
-                let dst = select_node_for_resource(&resource, &self.nodes.blocking_lock());
+                let dst = select_node_for_resource(&resource, nodes);
                 if let Some(dst) = dst {
                     resource.instances.push(std::cell::RefCell::new(resource::PhysicalResource {
                         id: edgeless_api::function_instance::InstanceId::new(dst),
@@ -136,10 +119,10 @@ impl super::Transformation for DefaultPlacement {
             }
         }
 
-        for (_, subflow) in &mut slf.subflows {
+        for (_, subflow) in &mut workflow.subflows {
             let mut subflow = subflow.borrow_mut();
             if subflow.instances.is_empty() && subflow.instances.is_empty() {
-                let dst = select_cluster_for_subflow(&subflow, &self.peer_clusters.blocking_lock());
+                let dst = select_cluster_for_subflow(&subflow, peer_clusters);
                 if let Some(dst) = dst {
                     subflow.instances.push(std::cell::RefCell::new(subflow::PhysicalSubFlow {
                         id: edgeless_api::function_instance::InstanceId::new(dst),
@@ -151,11 +134,11 @@ impl super::Transformation for DefaultPlacement {
         }
 
         {
-            let mut proxy = slf.proxy.borrow_mut();
+            let mut proxy = workflow.proxy.borrow_mut();
             if (!proxy.logical_ports.logical_input_mapping.is_empty() || !proxy.logical_ports.logical_output_mapping.is_empty())
                 && proxy.instances.is_empty()
             {
-                let dst = select_node_for_proxy(&proxy, &self.nodes.blocking_lock());
+                let dst = select_node_for_proxy(&proxy, nodes);
                 if let Some(dst) = dst {
                     proxy.instances.push(std::cell::RefCell::new(proxy::PhyiscalProxy {
                         id: edgeless_api::function_instance::InstanceId::new(dst),
@@ -168,13 +151,10 @@ impl super::Transformation for DefaultPlacement {
     }
 }
 
-fn select_node_for_resource(
-    resource: &resource::LogicalResource,
-    nodes: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>,
-) -> Option<edgeless_api::function_instance::NodeId> {
+fn select_node_for_resource(resource: &resource::LogicalResource, nodes: &crate::ir::Nodes) -> Option<edgeless_api::function_instance::NodeId> {
     if let Some((id, _)) = nodes
         .iter()
-        .find(|(_, n)| n.resource_providers.iter().any(|(_, r)| r.class_type == resource.class))
+        .find(|(_, n)| n.available_resource_providers().iter().any(|(_, r)| r.class_type() == resource.class))
     {
         Some(*id)
     } else {
@@ -182,12 +162,9 @@ fn select_node_for_resource(
     }
 }
 
-fn select_node_for_proxy(
-    _proxy: &proxy::LogicalProxy,
-    nodes: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>,
-) -> Option<edgeless_api::function_instance::NodeId> {
+fn select_node_for_proxy(_proxy: &proxy::LogicalProxy, nodes: &crate::ir::Nodes) -> Option<edgeless_api::function_instance::NodeId> {
     for (node_id, node) in nodes {
-        if node.is_proxy {
+        if node.is_proxy() {
             return Some(*node_id);
         }
     }
@@ -195,8 +172,8 @@ fn select_node_for_proxy(
 }
 
 fn select_cluster_for_subflow(
-    subflow: &subflow::LogicalSubFlow,
-    clusters: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>,
+    _subflow: &subflow::LogicalSubFlow,
+    _clusters: &crate::ir::Clusters,
 ) -> Option<edgeless_api::function_instance::NodeId> {
     // for (cluster_id, cluster) in clusters {
     //     // TODO Proper Selection

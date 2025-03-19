@@ -14,13 +14,13 @@ impl InputLinker {
 }
 
 impl super::Transformation for InputLinker {
-    fn apply(&mut self, slf: &mut workflow::ActiveWorkflow) {
+    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mut inputs = std::collections::HashMap::<
             String,
             std::collections::HashMap<edgeless_api::function_instance::PortId, Vec<(String, edgeless_api::function_instance::PortId)>>,
         >::new();
 
-        for (out_cid, fdesc) in slf.components() {
+        for (out_cid, fdesc) in workflow.components() {
             for (out_port, mapping) in &fdesc.borrow_mut().logical_ports().logical_output_mapping {
                 match mapping {
                     LogicalOutput::DirectTarget(target_fid, target_port) => inputs
@@ -55,7 +55,7 @@ impl super::Transformation for InputLinker {
         }
 
         for (targed_fid, links) in &inputs {
-            if let Some(target) = slf.functions.get_mut(targed_fid) {
+            if let Some(target) = workflow.functions.get_mut(targed_fid) {
                 for (target_port, sources) in links {
                     target
                         .borrow_mut()
@@ -63,7 +63,7 @@ impl super::Transformation for InputLinker {
                         .logical_input_mapping
                         .insert(target_port.clone(), LogicalInput::Direct(sources.clone()));
                 }
-            } else if let Some(target) = slf.resources.get_mut(targed_fid) {
+            } else if let Some(target) = workflow.resources.get_mut(targed_fid) {
                 // Some(&mut target.borrow_mut().ports)
                 for (target_port, sources) in links {
                     target

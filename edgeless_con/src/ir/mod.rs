@@ -52,17 +52,63 @@ pub trait PortStatistics: Sync + Send {
     // fn latency_by_peer_mean_secs(&self, period: Option<std::time::Duration>) -> Vec<(edgeless_api::function_instance::InstanceId, f64)>;
 }
 
-// Read-only view of a node's state
 pub trait Node {
-    // fn capabilities(&self) -> &edgeless_api::node_registration::NodeCapabilities;
-    // Available Hardware Resources
-    // Available Software (Runtimes, Resources)
-    // Available Links
-    // Usage
+    fn available_runtimes(&self) -> Runtimes;
+    fn available_resource_providers(&self) -> ResourceProviders;
+    fn available_link_types(&self) -> LinkProviders;
+    fn labels(&self) -> Vec<String>;
+    fn is_proxy(&self) -> bool;
 }
+
+pub type Nodes<'a> = std::collections::HashMap<edgeless_api::function_instance::NodeId, &'a dyn Node>;
+
+pub enum Runtime<'a> {
+    WasmBase(&'a dyn WasmRuntime),
+    Native(Box<dyn NativeRuntime>),
+}
+
+pub type Runtimes<'a> = std::collections::HashMap<String, Runtime<'a>>;
+
+pub trait WasmRuntime {
+    fn num_cores(&self) -> u32;
+    fn cpu_freq_hz(&self) -> f32;
+    fn mem_size_bytes(&self) -> u32;
+    fn runtime_info(&self) -> Box<dyn WasmRuntimeInfo>;
+}
+
+pub trait NativeRuntime {
+    fn num_cores(&self) -> u32;
+    fn cpu_freq_hz(&self) -> f32;
+    fn mem_size_bytes(&self) -> f32;
+    fn architecture(&self) -> NodeArchitecture;
+}
+
+pub enum NodeArchitecture {
+    X86,
+    Arm64,
+    Xtensa,
+}
+
+pub trait WasmRuntimeInfo {
+    fn cpu_load(&self) -> f32;
+    fn mem_used(&self) -> f32;
+    fn running_instances(&self) -> u32;
+}
+
+pub trait ResourceProvider {
+    fn class_type(&self) -> String;
+    // TODO(raphael) Update to use Ports.
+    fn outputs(&self) -> Vec<String>;
+}
+
+pub type ResourceProviders<'a> = std::collections::HashMap<String, &'a dyn ResourceProvider>;
 
 // Read-only view of a peer-cluster's state
 pub trait Cluster {}
+
+pub type Clusters<'a> = std::collections::HashMap<edgeless_api::function_instance::NodeId, &'a dyn Cluster>;
+
+pub type LinkProviders = std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>;
 
 pub trait TelemetryProvider: TelemetryProviderClone + Sync + Send {
     fn component_statistics_for(&self, component_id: &edgeless_api::function_instance::InstanceId) -> Box<dyn ComponentRuntimeStatistics>;
@@ -76,6 +122,7 @@ pub trait TelemetryProvider: TelemetryProviderClone + Sync + Send {
         component_id: &edgeless_api::function_instance::InstanceId,
         port_id: &edgeless_api::function_instance::PortId,
     ) -> Box<dyn PortStatistics>;
+    fn wasm_runtime_statistics_for(&self, node_id: &edgeless_api::function_instance::NodeId) -> Box<dyn WasmRuntimeInfo>;
 }
 
 // https://stackoverflow.com/a/30353928

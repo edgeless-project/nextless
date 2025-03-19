@@ -14,12 +14,6 @@ impl ManagedWorkflow {
         request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
         id: edgeless_api::workflow_instance::WorkflowId,
         orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
-        nodes: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>>,
-        >,
-        peer_clusters: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>>,
-        >,
         link_controllers: std::sync::Arc<
             tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
         >,
@@ -27,44 +21,51 @@ impl ManagedWorkflow {
     ) -> Self {
         Self {
             wf: super::workflow::ActiveWorkflow::new(request, id),
-            pipeline: super::transformations::TransformationPipeline::new_default(orchestration_logic, nodes, peer_clusters, link_controllers),
+            pipeline: super::transformations::TransformationPipeline::new_default(orchestration_logic, link_controllers),
             telemetry_provider: telementry_provider,
         }
     }
 
-    pub fn initial_spawn(&mut self) -> Vec<super::RequiredChange> {
-        self.pipeline.apply_all(&mut self.wf);
+    pub fn initial_spawn(&mut self, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) -> Vec<super::RequiredChange> {
+        self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters);
         self.materialize()
     }
 
-    pub fn periodic_optimize(&mut self) -> Vec<super::RequiredChange> {
-        self.pipeline.apply_placement(&mut self.wf);
+    pub fn periodic_optimize(&mut self, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) -> Vec<super::RequiredChange> {
+        self.pipeline.apply_placement(&mut self.wf, nodes, peer_clusters);
         self.materialize()
     }
 
     pub fn node_removal(
         &mut self,
         removed_node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
     ) -> Vec<super::RequiredChange> {
         if self.remove_nodes(removed_node_ids) {
-            self.pipeline.apply_all(&mut self.wf);
+            self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters);
             self.materialize()
         } else {
             Vec::new()
         }
     }
 
-    pub fn patch_external_links(&mut self, update: edgeless_api::common::PatchRequest) -> Vec<super::RequiredChange> {
+    pub fn patch_external_links(
+        &mut self,
+        update: edgeless_api::common::PatchRequest,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+    ) -> Vec<super::RequiredChange> {
         {
             let mut prx = self.wf.proxy.borrow_mut();
             prx.external_ports.external_input_mapping = update.input_mapping;
             prx.external_ports.external_output_mapping = update.output_mapping;
         }
-        self.pipeline.apply_all(&mut self.wf);
+        self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters);
         self.materialize()
     }
 
-    pub fn peer_cluster_removal(&self, removed_cluster_ids: edgeless_api::function_instance::NodeId) -> Vec<super::RequiredChange> {
+    pub fn peer_cluster_removal(&self, _removed_cluster_ids: edgeless_api::function_instance::NodeId) -> Vec<super::RequiredChange> {
         Vec::new()
     }
 

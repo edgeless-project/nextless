@@ -13,7 +13,7 @@ pub mod topic_converter;
 pub mod workflow_spitter;
 
 trait Transformation: Send + Sync {
-    fn apply(&mut self, workflow: &mut super::workflow::ActiveWorkflow);
+    fn apply(&mut self, workflow: &mut super::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters);
 }
 
 pub struct TransformationPipeline {
@@ -25,12 +25,6 @@ pub struct TransformationPipeline {
 impl TransformationPipeline {
     pub fn new_default(
         orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
-        nodes: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>>,
-        >,
-        peer_clusters: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>>,
-        >,
         link_controllers: std::sync::Arc<
             tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
         >,
@@ -42,37 +36,33 @@ impl TransformationPipeline {
                 Box::new(workflow_spitter::WorkflowSplitter::new()),
                 Box::new(dead_component_removal::DeadComponentRemoval::new()),
             ],
-            placement: vec![Box::new(placement::DefaultPlacement::new(
-                orchestration_logic,
-                nodes.clone(),
-                peer_clusters,
-            ))],
+            placement: vec![Box::new(placement::DefaultPlacement::new(orchestration_logic))],
             physical_pipeline: vec![
                 Box::new(physical_mapper::PhysicalConnectionMapper::new()),
-                Box::new(pipe_generator::PipeGenerator::new(nodes.clone(), link_controllers.clone())),
+                Box::new(pipe_generator::PipeGenerator::new(link_controllers.clone())),
                 Box::new(compiler::Compiler::new()),
             ],
         }
     }
 
-    pub fn apply_all(&mut self, workflow: &mut super::workflow::ActiveWorkflow) {
+    pub fn apply_all(&mut self, workflow: &mut super::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) {
         for t in &mut self.logical_pipeline {
-            t.apply(workflow);
+            t.apply(workflow, nodes, peer_clusters);
         }
         for t in &mut self.placement {
-            t.apply(workflow);
+            t.apply(workflow, nodes, peer_clusters);
         }
         for t in &mut self.physical_pipeline {
-            t.apply(workflow);
+            t.apply(workflow, nodes, peer_clusters);
         }
     }
 
-    pub fn apply_placement(&mut self, workflow: &mut super::workflow::ActiveWorkflow) {
+    pub fn apply_placement(&mut self, workflow: &mut super::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) {
         for t in &mut self.placement {
-            t.apply(workflow);
+            t.apply(workflow, nodes, peer_clusters);
         }
         for t in &mut self.physical_pipeline {
-            t.apply(workflow);
+            t.apply(workflow, nodes, peer_clusters);
         }
     }
 }

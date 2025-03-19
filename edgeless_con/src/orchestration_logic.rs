@@ -37,38 +37,38 @@ impl OrchestrationLogic {
         runtime: &str,
         reqs: &crate::orchestration_utils::DeploymentRequirements,
         node_id: &uuid::Uuid,
-        capabilities: &edgeless_api::node_registration::NodeCapabilities,
-        resource_providers: &std::collections::HashMap<String, crate::controller::server::ResourceProvider>,
+        node: &dyn crate::ir::Node, // capabilities: &edgeless_api::node_registration::NodeCapabilities,
+                                    // resource_providers: &std::collections::HashMap<String, crate::controller::server::ResourceProvider>,
     ) -> bool {
-        if !Self::runtime_supported(runtime, &capabilities.runtimes[..]) {
+        if !Self::runtime_supported(runtime, &node.available_runtimes()) {
             return false;
         }
         for label in reqs.label_match_all.iter() {
-            if !capabilities.labels.contains(label) {
+            if !node.labels().contains(label) {
                 return false;
             }
         }
         for provider in reqs.resource_match_all.iter() {
-            if resource_providers.get(provider).is_none() {
+            if node.available_resource_providers().get(provider).is_none() {
                 return false;
             }
         }
-        match reqs.tee {
-            crate::orchestration_utils::AffinityLevel::Required => {
-                if !capabilities.is_tee_running {
-                    return false;
-                }
-            }
-            crate::orchestration_utils::AffinityLevel::NotRequired => {}
-        }
-        match reqs.tpm {
-            crate::orchestration_utils::AffinityLevel::Required => {
-                if !capabilities.has_tpm {
-                    return false;
-                }
-            }
-            crate::orchestration_utils::AffinityLevel::NotRequired => {}
-        }
+        // match reqs.tee {
+        //     crate::orchestration_utils::AffinityLevel::Required => {
+        //         if !capabilities.is_tee_running {
+        //             return false;
+        //         }
+        //     }
+        //     crate::orchestration_utils::AffinityLevel::NotRequired => {}
+        // }
+        // match reqs.tpm {
+        //     crate::orchestration_utils::AffinityLevel::Required => {
+        //         if !capabilities.has_tpm {
+        //             return false;
+        //         }
+        //     }
+        //     crate::orchestration_utils::AffinityLevel::NotRequired => {}
+        // }
         true
     }
 
@@ -78,7 +78,7 @@ impl OrchestrationLogic {
     /// capabilities.
     pub fn next(
         &mut self,
-        node_pool: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>,
+        node_pool: &crate::ir::Nodes,
         compute_type: &str,
         annotations: &std::collections::HashMap<String, String>,
     ) -> Option<uuid::Uuid> {
@@ -93,9 +93,12 @@ impl OrchestrationLogic {
                 let mut candidates = vec![];
                 let mut high: f32 = 0.0;
                 for (node_id, node_desc) in node_pool {
-                    if Self::is_node_feasible(compute_type, &reqs, node_id, &node_desc.capabilities, &node_desc.resource_providers) {
-                        candidates.push((*node_id, node_desc.weight));
-                        high += &node_desc.weight;
+                    if Self::is_node_feasible(compute_type, &reqs, node_id, *node_desc as &dyn crate::ir::Node) {
+                        // TODO(raphael) build proper cross-runtime weighting system
+                        // candidates.push((*node_id, node_desc.weight));
+                        // high += &node_desc.weight;
+                        candidates.push((*node_id, 1.0));
+                        high += 1.0;
                     }
                 }
                 if high > 0.0 {
@@ -115,11 +118,11 @@ impl OrchestrationLogic {
         }
     }
 
-    fn runtime_supported(requested_runtime: &str, available_runtimes: &[String]) -> bool {
-        if available_runtimes.iter().any(|x| x.as_str() == requested_runtime) {
+    fn runtime_supported(requested_runtime: &str, available_runtimes: &crate::ir::Runtimes) -> bool {
+        if available_runtimes.iter().any(|(key, _)| key.as_str() == requested_runtime) {
             return true;
         }
-        if requested_runtime == "RUST" && available_runtimes.iter().any(|x| x.as_str() == "RUST_WASM") {
+        if requested_runtime == "RUST" && available_runtimes.iter().any(|(key, _)| key.as_str() == "RUST_WASM") {
             return true;
         }
 

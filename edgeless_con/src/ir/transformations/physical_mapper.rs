@@ -13,7 +13,7 @@ impl PhysicalConnectionMapper {
 }
 
 impl super::Transformation for PhysicalConnectionMapper {
-    fn apply(&mut self, workflow: &mut workflow::ActiveWorkflow) {
+    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let components = workflow
             .components()
             .into_iter()
@@ -82,7 +82,7 @@ impl super::Transformation for PhysicalConnectionMapper {
                 }
             }
 
-            for (input_id, input) in &logical_ports.logical_input_mapping {
+            for (input_id, _input) in &logical_ports.logical_input_mapping {
                 for c_instance in &physical_instances {
                     c_instance
                         .borrow_mut()

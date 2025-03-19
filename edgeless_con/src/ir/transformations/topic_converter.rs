@@ -14,7 +14,7 @@ impl TopicConverter {
 }
 
 impl super::Transformation for TopicConverter {
-    fn apply(&mut self, workflow: &mut workflow::ActiveWorkflow) {
+    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mut targets = std::collections::HashMap::<String, Vec<(String, edgeless_api::function_instance::PortId)>>::new();
 
         // Find Targets

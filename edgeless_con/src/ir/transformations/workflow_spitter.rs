@@ -12,7 +12,7 @@ impl WorkflowSplitter {
 }
 
 impl super::Transformation for WorkflowSplitter {
-    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow) {
+    fn apply(&mut self, _workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         // TODO
     }
 }

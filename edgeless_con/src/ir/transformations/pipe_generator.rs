@@ -6,32 +6,27 @@
 use super::super::*;
 
 pub struct PipeGenerator {
-    nodes:
-        std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>>>,
     link_controllers:
         std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>>,
 }
 
 impl PipeGenerator {
     pub fn new(
-        nodes: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>>,
-        >,
         link_controllers: std::sync::Arc<
             tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
         >,
     ) -> Self {
-        Self { nodes, link_controllers }
+        Self { link_controllers }
     }
 }
 
 impl super::Transformation for PipeGenerator {
-    fn apply(&mut self, workflow: &mut workflow::ActiveWorkflow) {
+    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mcast = edgeless_api::link::LinkType("MULTICAST".to_string());
 
         let mut new_links = Vec::<(edgeless_api::link::LinkInstanceId, link::WorkflowLink)>::new();
 
-        for (c_id, c) in workflow.components() {
+        for (_c_id, c) in workflow.components() {
             let mut current = c.borrow_mut();
             let (logical_ports, physical_instances) = current.split_view();
             for i in &physical_instances {
@@ -52,14 +47,7 @@ impl super::Transformation for PipeGenerator {
                                 .map(|n| {
                                     (
                                         *n,
-                                        self.nodes
-                                            .blocking_lock()
-                                            .get(n)
-                                            .unwrap()
-                                            .supported_link_types
-                                            .get(&mcast)
-                                            .unwrap()
-                                            .clone(),
+                                        nodes.get(n).unwrap().available_link_types().get(&mcast).unwrap().clone(),
                                         self.link_controllers
                                             .blocking_lock()
                                             .get(&mcast)
