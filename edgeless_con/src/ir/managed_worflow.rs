@@ -13,15 +13,15 @@ impl ManagedWorkflow {
     pub fn new(
         request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
         id: edgeless_api::workflow_instance::WorkflowId,
-        orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
         link_controllers: std::sync::Arc<
             tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
         >,
         telementry_provider: Option<Box<dyn super::TelemetryProvider>>,
+        placement_strategy: &str,
     ) -> Self {
         Self {
             wf: super::workflow::ActiveWorkflow::new(request, id),
-            pipeline: super::transformations::TransformationPipeline::new_default(orchestration_logic, link_controllers),
+            pipeline: super::transformations::TransformationPipeline::new_default(placement_strategy, link_controllers),
             telemetry_provider: telementry_provider,
         }
     }

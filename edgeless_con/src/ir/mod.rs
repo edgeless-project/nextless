@@ -53,6 +53,8 @@ pub trait PortStatistics: Sync + Send {
 }
 
 pub trait Node {
+    fn node_id(&self) -> edgeless_api::function_instance::NodeId;
+    fn cluster_id(&self) -> edgeless_api::function_instance::NodeId;
     fn available_runtimes(&self) -> Runtimes;
     fn available_resource_providers(&self) -> ResourceProviders;
     fn available_link_types(&self) -> LinkProviders;
@@ -62,9 +64,10 @@ pub trait Node {
 
 pub type Nodes<'a> = std::collections::HashMap<edgeless_api::function_instance::NodeId, &'a dyn Node>;
 
+#[derive(Clone)]
 pub enum Runtime<'a> {
     WasmBase(&'a dyn WasmRuntime),
-    Native(Box<dyn NativeRuntime>),
+    Native(&'a dyn NativeRuntime),
 }
 
 pub type Runtimes<'a> = std::collections::HashMap<String, Runtime<'a>>;
@@ -81,6 +84,7 @@ pub trait NativeRuntime {
     fn cpu_freq_hz(&self) -> f32;
     fn mem_size_bytes(&self) -> f32;
     fn architecture(&self) -> NodeArchitecture;
+    fn runtime_info(&self) -> Box<dyn WasmRuntimeInfo>;
 }
 
 pub enum NodeArchitecture {

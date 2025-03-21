@@ -19,7 +19,6 @@ pub struct ControllerTask {
     link_controllers:
         std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::super::ir::managed_worflow::ManagedWorkflow>,
-    orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
     telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
     image_repository: super::image_repository::ImageRepository,
 }
@@ -36,6 +35,7 @@ pub struct WorkerNode {
     pub is_proxy: bool,
     telemetry_provider: Box<dyn crate::ir::TelemetryProvider>,
     id: edgeless_api::function_instance::NodeId,
+    cluster_id: edgeless_api::function_instance::NodeId,
 }
 
 pub struct PeerCluster {
@@ -90,6 +90,14 @@ impl crate::ir::Node for WorkerNode {
     fn is_proxy(&self) -> bool {
         self.is_proxy
     }
+
+    fn node_id(&self) -> edgeless_api::function_instance::NodeId {
+        self.id.clone()
+    }
+
+    fn cluster_id(&self) -> edgeless_api::function_instance::NodeId {
+        self.cluster_id.clone()
+    }
 }
 
 impl crate::ir::WasmRuntime for WorkerNode {
@@ -127,9 +135,6 @@ impl ControllerTask {
                 Box::new(edgeless_link_multicast::controller::MulticastController::new()) as Box<dyn edgeless_api::link::LinkController>,
             )]))),
             active_workflows: std::collections::HashMap::new(),
-            orchestration_logic: std::sync::Arc::new(tokio::sync::Mutex::new(crate::orchestration_logic::OrchestrationLogic::new(
-                crate::orchestration_utils::OrchestrationStrategy::Random,
-            ))),
             telemetry_provider,
             image_repository,
         }
@@ -206,9 +211,9 @@ impl ControllerTask {
         let mut wf = super::super::ir::managed_worflow::ManagedWorkflow::new(
             spawn_workflow_request.clone(),
             wf_id.clone(),
-            self.orchestration_logic.clone(),
             self.link_controllers.clone(),
             self.telemetry_provider.clone(),
+            "weighted_random",
         );
 
         let required_changes = {
@@ -381,6 +386,7 @@ impl ControllerTask {
                 supported_link_types: link_providers.into_iter().map(|p| (p.class, p.provider_id)).collect(),
                 is_proxy: true,
                 id: node_id,
+                cluster_id: self.cluster_id.clone(),
                 telemetry_provider: self.telemetry_provider.as_ref().unwrap().clone(),
             },
         );

@@ -8,9 +8,19 @@ pub struct LogicalActor {
 
     pub annotations: std::collections::HashMap<String, String>,
 
+    pub constraints: ActorConstraints,
+
     pub logical_ports: super::LogicalPorts,
 
     pub instances: Vec<std::cell::RefCell<PhysicalActor>>,
+}
+
+pub struct ActorConstraints {
+    pub max_instances: Option<usize>,
+    pub domain_id_match_any: Option<Vec<edgeless_api::function_instance::NodeId>>,
+    pub node_id_match_any: Option<Vec<edgeless_api::function_instance::NodeId>>,
+    pub label_match_all: Vec<String>,
+    pub resource_match_all: Vec<String>,
 }
 
 impl super::LogicalComponent for LogicalActor {
@@ -124,6 +134,7 @@ impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
                 code: function_req.function_class_specification.function_class_code,
             },
             instances: Vec::new(),
+            constraints: ActorConstraints::from_annotations(&function_req.annotations),
             annotations: function_req.annotations,
             logical_ports: super::LogicalPorts {
                 logical_input_mapping: function_req
@@ -148,6 +159,7 @@ impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
         }
     }
 }
+
 impl LogicalActor {
     pub(crate) fn enabled_inputs(&self) -> Vec<edgeless_api::function_instance::PortId> {
         self.logical_ports.logical_input_mapping.iter().map(|i| i.0.clone()).collect()
@@ -155,5 +167,43 @@ impl LogicalActor {
 
     pub(crate) fn enabled_outputs(&self) -> Vec<edgeless_api::function_instance::PortId> {
         self.logical_ports.logical_output_mapping.iter().map(|i| i.0.clone()).collect()
+    }
+}
+
+impl ActorConstraints {
+    /// Deployment requirements from the annotations in the function's spawn request.
+    pub fn from_annotations(annotations: &std::collections::HashMap<String, String>) -> Self {
+        let mut max_instances = None;
+        if let Some(val) = annotations.get("max_instances") {
+            max_instances = Some(val.parse::<usize>().unwrap_or_default());
+        }
+
+        let mut node_id_match_any = None;
+        if let Some(val) = annotations.get("node_id_match_any") {
+            node_id_match_any = Some(val.split(",").filter_map(|x| uuid::Uuid::parse_str(x).ok()).collect());
+        }
+
+        let mut domain_id_match_any = None;
+        if let Some(val) = annotations.get("domain_id_match_any") {
+            domain_id_match_any = Some(val.split(",").filter_map(|x| uuid::Uuid::parse_str(x).ok()).collect());
+        }
+
+        let mut label_match_all = vec![];
+        if let Some(val) = annotations.get("label_match_all") {
+            label_match_all = val.split(",").map(|x| x.to_string()).collect();
+        }
+
+        let mut resource_match_all = vec![];
+        if let Some(val) = annotations.get("resource_match_all") {
+            resource_match_all = val.split(",").map(|x| x.to_string()).collect();
+        }
+
+        Self {
+            max_instances,
+            node_id_match_any,
+            label_match_all,
+            resource_match_all,
+            domain_id_match_any,
+        }
     }
 }

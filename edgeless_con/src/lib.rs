@@ -4,8 +4,6 @@
 // SPDX-License-Identifier: MIT
 mod controller;
 mod ir;
-mod orchestration_logic;
-mod orchestration_utils;
 pub mod prometheus_telemetry_provider;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]

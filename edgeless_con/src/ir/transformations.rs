@@ -24,7 +24,7 @@ pub struct TransformationPipeline {
 
 impl TransformationPipeline {
     pub fn new_default(
-        orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
+        placement_strategy: &str,
         link_controllers: std::sync::Arc<
             tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
         >,
@@ -36,7 +36,7 @@ impl TransformationPipeline {
                 Box::new(workflow_spitter::WorkflowSplitter::new()),
                 Box::new(dead_component_removal::DeadComponentRemoval::new()),
             ],
-            placement: vec![Box::new(placement::DefaultPlacement::new(orchestration_logic))],
+            placement: vec![Box::new(placement::DefaultPlacement::new(placement_strategy))],
             physical_pipeline: vec![
                 Box::new(physical_mapper::PhysicalConnectionMapper::new()),
                 Box::new(pipe_generator::PipeGenerator::new(link_controllers.clone())),

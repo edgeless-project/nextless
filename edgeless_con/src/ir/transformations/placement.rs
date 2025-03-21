@@ -3,15 +3,29 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+mod feasibility;
+mod scoring;
+mod strategy;
+
+use scoring::ScoreableRuntime;
+
 use super::super::*;
 
 pub struct DefaultPlacement {
-    orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>,
+    placement_strategy: Box<dyn strategy::PlacementStrategy>,
 }
 
 impl DefaultPlacement {
-    pub fn new(orchestration_logic: std::sync::Arc<tokio::sync::Mutex<crate::orchestration_logic::OrchestrationLogic>>) -> Self {
-        Self { orchestration_logic }
+    pub fn new(placement_strategy: &str) -> Self {
+        Self {
+            placement_strategy: match placement_strategy {
+                "random" => Box::new(strategy::random::Random::new()),
+                "weighted_random" => Box::new(strategy::weighted_random::WeightedRandom::new()),
+                _ => {
+                    panic!("Bad Placement Strategy");
+                }
+            },
+        }
     }
 }
 
@@ -20,14 +34,17 @@ impl super::Transformation for DefaultPlacement {
         for (f_id, function) in &mut workflow.functions {
             let mut function = function.borrow_mut();
             if function.instances.is_empty() {
-                let dst = self
-                    .orchestration_logic
-                    .blocking_lock()
-                    .next(nodes, &function.image.format, &function.annotations);
+                let candidates = find_candidates_for_actor(&function, nodes);
+                let dst = self.placement_strategy.select_candidate(candidates);
+
+                // let dst = self
+                //     .orchestration_logic
+                //     .blocking_lock()
+                //     .next(nodes, &function.image.format, &function.annotations);
 
                 if let Some(dst) = dst {
                     function.instances.push(std::cell::RefCell::new(actor::PhysicalActor {
-                        id: edgeless_api::function_instance::InstanceId::new(dst),
+                        id: edgeless_api::function_instance::InstanceId::new(dst.node_id),
                         desired_mapping: PhysicalPorts::default(),
                         image: None,
                         materialized: None,
@@ -149,6 +166,27 @@ impl super::Transformation for DefaultPlacement {
             }
         }
     }
+}
+
+#[derive(Clone)]
+struct Candidate<'a> {
+    node_id: edgeless_api::function_instance::NodeId,
+    runtime: crate::ir::Runtime<'a>,
+}
+
+fn find_candidates_for_actor<'a, 'b>(actor: &'a actor::LogicalActor, nodes: &'b crate::ir::Nodes) -> Vec<Candidate<'b>> {
+    let mut candiates = Vec::new();
+
+    for (_node_id, node) in nodes {
+        let mut node_cadidates = feasibility::feasible_node_runtime_candidates(actor, *node);
+
+        node_cadidates.sort_by(|a, b| b.runtime.efficiency_score().total_cmp(&a.runtime.efficiency_score()));
+        if let Some(c) = node_cadidates.pop() {
+            candiates.push(c);
+        }
+    }
+
+    candiates
 }
 
 fn select_node_for_resource(resource: &resource::LogicalResource, nodes: &crate::ir::Nodes) -> Option<edgeless_api::function_instance::NodeId> {
