@@ -11,16 +11,15 @@ use futures::StreamExt;
 
 use crate::ir::RequiredChange;
 
-pub struct ControllerTask {
+pub struct ControllerTask<P: crate::ir::transformations::placement::strategy::PlacementStrategy> {
     request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
     cluster_id: edgeless_api::function_instance::NodeId,
     nodes: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, WorkerNode>>>,
     peer_clusters: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, PeerCluster>>>,
-    link_controllers:
-        std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>>,
-    active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::super::ir::managed_worflow::ManagedWorkflow>,
+    active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::super::ir::managed_worflow::ManagedWorkflow<P>>,
     telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
     image_repository: super::image_repository::ImageRepository,
+    global_pipeline_state: crate::ir::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
 }
 pub struct WorkerNode {
     pub agent_url: String,
@@ -118,25 +117,32 @@ impl crate::ir::WasmRuntime for WorkerNode {
     }
 }
 
-impl ControllerTask {
+impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> ControllerTask<P> {
     pub fn new(
         cluster_id: edgeless_api::function_instance::NodeId,
         request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
         telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
         image_repository: super::image_repository::ImageRepository,
     ) -> Self {
+        let global_pipeline_state = crate::ir::pipeline::default::DefaultTransformationPipelineState::<P::GlobalState> {
+            placement_strategy_state: P::GlobalState::default(),
+            pipe_generator_state: crate::ir::transformations::pipe_generator::PipeGeneratorState {
+                inner: std::collections::HashMap::from([(
+                    edgeless_api::link::LinkType("MULTICAST".to_string()),
+                    Box::new(edgeless_link_multicast::controller::MulticastController::new()) as Box<dyn edgeless_api::link::LinkController>,
+                )]),
+            },
+        };
+
         Self {
             request_receiver,
             nodes: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             cluster_id,
             peer_clusters: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
-            link_controllers: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::from([(
-                edgeless_api::link::LinkType("MULTICAST".to_string()),
-                Box::new(edgeless_link_multicast::controller::MulticastController::new()) as Box<dyn edgeless_api::link::LinkController>,
-            )]))),
             active_workflows: std::collections::HashMap::new(),
             telemetry_provider,
             image_repository,
+            global_pipeline_state,
         }
     }
 
@@ -211,16 +217,16 @@ impl ControllerTask {
         let mut wf = super::super::ir::managed_worflow::ManagedWorkflow::new(
             spawn_workflow_request.clone(),
             wf_id.clone(),
-            self.link_controllers.clone(),
+            // self.link_controllers.clone(),
             self.telemetry_provider.clone(),
-            "weighted_random",
+            P::new(),
         );
 
         let required_changes = {
             let nodes = self.nodes.lock().await;
             let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
                 nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
-            tokio::task::block_in_place(|| wf.initial_spawn(&ir_nodes, &std::collections::HashMap::new()))
+            tokio::task::block_in_place(|| wf.initial_spawn(&ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state))
         };
 
         let desc = edgeless_api::workflow_instance::WorkflowInstance {
@@ -325,7 +331,9 @@ impl ControllerTask {
                 let nodes = self.nodes.lock().await;
                 let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
                     nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
-                tokio::task::block_in_place(|| wf.patch_external_links(req.clone(), &ir_nodes, &std::collections::HashMap::new()))
+                tokio::task::block_in_place(|| {
+                    wf.patch_external_links(req.clone(), &ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state)
+                })
             };
             if let Err(errs) = self.materialize(id.clone(), required_changes).await {
                 log::info!("Failures while stopping workflow: {}", errs.join(";"));
@@ -761,7 +769,14 @@ impl ControllerTask {
                 let nodes = self.nodes.lock().await;
                 let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
                     nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
-                tokio::task::block_in_place(|| wf.node_removal(removed_nodes, &ir_nodes, &std::collections::HashMap::new()))
+                tokio::task::block_in_place(|| {
+                    wf.node_removal(
+                        removed_nodes,
+                        &ir_nodes,
+                        &std::collections::HashMap::new(),
+                        &mut self.global_pipeline_state,
+                    )
+                })
             };
             if let Err(errs) = self.materialize(wf_id, required_changes).await {
                 log::error!("Failures Handling Node Removal: {}", errs.join(";"));
@@ -786,7 +801,7 @@ impl ControllerTask {
                 let nodes = self.nodes.lock().await;
                 let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
                     nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
-                tokio::task::block_in_place(|| wf.periodic_optimize(&ir_nodes, &std::collections::HashMap::new()))
+                tokio::task::block_in_place(|| wf.periodic_optimize(&ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state))
             };
             if let Err(errs) = self.materialize(wf_id, required_changes).await {
                 log::error!("Failures Handling Periodic Optimization: {}", errs.join(";"));
@@ -885,7 +900,7 @@ impl ControllerTask {
         link_id: edgeless_api::link::LinkInstanceId,
         class: edgeless_api::link::LinkType,
     ) -> Result<(), String> {
-        if let Some(lc) = self.link_controllers.lock().await.get_mut(&class) {
+        if let Some(lc) = self.global_pipeline_state.pipe_generator_state.inner.get_mut(&class) {
             lc.instantiate_control_plane(link_id).await;
         }
         Ok(())

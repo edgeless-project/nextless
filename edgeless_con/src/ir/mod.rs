@@ -6,6 +6,7 @@
 pub mod actor;
 pub mod link;
 pub mod managed_worflow;
+pub mod pipeline;
 pub mod proxy;
 pub mod resource;
 pub mod subflow;

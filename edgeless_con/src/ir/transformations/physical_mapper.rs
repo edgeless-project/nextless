@@ -12,7 +12,7 @@ impl PhysicalConnectionMapper {
     }
 }
 
-impl super::Transformation for PhysicalConnectionMapper {
+impl super::StatelessTransformation for PhysicalConnectionMapper {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let components = workflow
             .components()

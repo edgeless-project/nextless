@@ -1,0 +1,55 @@
+// SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
+use super::super::transformations::placement::strategy::PlacementStrategy;
+use crate::ir::transformations::StatefulTransformation;
+
+pub struct DefaultTransformationPipeline<P: PlacementStrategy> {
+    logical_pipeline: super::default_logical::DefaultLogicalPipeline,
+    placement: super::super::transformations::placement::DefaultPlacement<P>,
+    physical_pipeline: super::default_physical::DefaultPhysicalPipeline,
+}
+
+pub struct DefaultTransformationPipelineState<PS> {
+    pub placement_strategy_state: PS,
+    pub pipe_generator_state: crate::ir::transformations::pipe_generator::PipeGeneratorState,
+}
+
+impl<P: PlacementStrategy> DefaultTransformationPipeline<P> {
+    pub fn new_default(placement_strategy: P) -> Self {
+        Self {
+            logical_pipeline: super::default_logical::DefaultLogicalPipeline::new(),
+            placement: crate::ir::transformations::placement::DefaultPlacement::new(placement_strategy),
+            physical_pipeline: super::default_physical::DefaultPhysicalPipeline::new(),
+        }
+    }
+}
+
+impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPipelineState<P::GlobalState>> for DefaultTransformationPipeline<P> {
+    fn apply_all(
+        &mut self,
+        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &mut DefaultTransformationPipelineState<P::GlobalState>,
+    ) {
+        self.logical_pipeline.apply_all(workflow, nodes, peer_clusters, &mut ());
+        self.placement
+            .apply(workflow, nodes, peer_clusters, &mut global_state.placement_strategy_state);
+        self.physical_pipeline
+            .apply_all(workflow, nodes, peer_clusters, &mut global_state.pipe_generator_state);
+    }
+
+    fn apply_dynamic(
+        &mut self,
+        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &mut DefaultTransformationPipelineState<P::GlobalState>,
+    ) {
+        self.placement
+            .apply(workflow, nodes, peer_clusters, &mut global_state.placement_strategy_state);
+        self.physical_pipeline
+            .apply_all(workflow, nodes, peer_clusters, &mut global_state.pipe_generator_state);
+    }
+}

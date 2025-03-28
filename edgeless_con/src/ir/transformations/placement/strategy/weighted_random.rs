@@ -10,18 +10,13 @@ pub struct WeightedRandom {
     rng: rand::rngs::StdRng,
 }
 
-impl WeightedRandom {
-    pub fn new() -> Self {
-        WeightedRandom {
-            rng: rand::rngs::StdRng::from_entropy(),
-        }
-    }
-}
-
 impl super::PlacementStrategy for WeightedRandom {
+    type GlobalState = ();
+
     fn select_candidate<'a, 'b>(
         &'a mut self,
         candidates: Vec<crate::ir::transformations::placement::Candidate<'b>>,
+        _global_state: &mut Self::GlobalState,
     ) -> Option<crate::ir::transformations::placement::Candidate<'b>> {
         let highmark: f64 = candidates.iter().map(|c| c.runtime.capacity_score() as f64).sum();
         let rv = rand::distributions::Uniform::new(0.0, highmark);
@@ -35,5 +30,11 @@ impl super::PlacementStrategy for WeightedRandom {
             }
         }
         None
+    }
+
+    fn new() -> Self {
+        WeightedRandom {
+            rng: rand::rngs::StdRng::from_entropy(),
+        }
     }
 }

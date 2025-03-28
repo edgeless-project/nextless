@@ -5,42 +5,35 @@
 
 mod feasibility;
 mod scoring;
-mod strategy;
+pub mod strategy;
 
 use scoring::ScoreableRuntime;
 
 use super::super::*;
 
-pub struct DefaultPlacement {
-    placement_strategy: Box<dyn strategy::PlacementStrategy>,
+pub struct DefaultPlacement<P: strategy::PlacementStrategy> {
+    placement_strategy: P,
 }
 
-impl DefaultPlacement {
-    pub fn new(placement_strategy: &str) -> Self {
-        Self {
-            placement_strategy: match placement_strategy {
-                "random" => Box::new(strategy::random::Random::new()),
-                "weighted_random" => Box::new(strategy::weighted_random::WeightedRandom::new()),
-                _ => {
-                    panic!("Bad Placement Strategy");
-                }
-            },
-        }
+impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
+    pub fn new(placement_strategy: P) -> Self {
+        Self { placement_strategy }
     }
 }
 
-impl super::Transformation for DefaultPlacement {
-    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) {
+impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalState> for DefaultPlacement<P> {
+    fn apply(
+        &mut self,
+        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &mut P::GlobalState,
+    ) {
         for (f_id, function) in &mut workflow.functions {
             let mut function = function.borrow_mut();
             if function.instances.is_empty() {
                 let candidates = find_candidates_for_actor(&function, nodes);
-                let dst = self.placement_strategy.select_candidate(candidates);
-
-                // let dst = self
-                //     .orchestration_logic
-                //     .blocking_lock()
-                //     .next(nodes, &function.image.format, &function.annotations);
+                let dst = self.placement_strategy.select_candidate(candidates, global_state);
 
                 if let Some(dst) = dst {
                     function.instances.push(std::cell::RefCell::new(actor::PhysicalActor {
@@ -169,7 +162,7 @@ impl super::Transformation for DefaultPlacement {
 }
 
 #[derive(Clone)]
-struct Candidate<'a> {
+pub struct Candidate<'a> {
     node_id: edgeless_api::function_instance::NodeId,
     runtime: crate::ir::Runtime<'a>,
 }

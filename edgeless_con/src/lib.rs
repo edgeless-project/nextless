@@ -16,6 +16,7 @@ pub struct EdgelessConOrcConfig {
 pub struct EdgelessConSettings {
     pub controller_url: String,
     pub prometheus_url: Option<String>,
+    pub placement_strategy: String,
     // pub orchestrators: Vec<EdgelessConOrcConfig>,
 }
 

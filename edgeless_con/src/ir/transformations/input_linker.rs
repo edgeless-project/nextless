@@ -13,7 +13,7 @@ impl InputLinker {
     }
 }
 
-impl super::Transformation for InputLinker {
+impl super::StatelessTransformation for InputLinker {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mut inputs = std::collections::HashMap::<
             String,

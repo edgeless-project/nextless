@@ -99,6 +99,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     let con_conf = edgeless_con::EdgelessConSettings {
         controller_url,
         prometheus_url: Some("http://127.0.0.1:9090".to_string()),
+        placement_strategy: "weighted_random".to_string(),
         // for now only one orchestrator
     };
 

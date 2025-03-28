@@ -3,36 +3,45 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-pub struct ManagedWorkflow {
+use super::pipeline::TransformationPipeline;
+
+pub struct ManagedWorkflow<P: super::transformations::placement::strategy::PlacementStrategy> {
     pub wf: super::workflow::ActiveWorkflow,
-    pub pipeline: super::transformations::TransformationPipeline,
+    pub pipeline: super::pipeline::default::DefaultTransformationPipeline<P>,
     pub telemetry_provider: Option<Box<dyn super::TelemetryProvider>>,
 }
 
-impl ManagedWorkflow {
+impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedWorkflow<P> {
     pub fn new(
         request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
         id: edgeless_api::workflow_instance::WorkflowId,
-        link_controllers: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
-        >,
         telementry_provider: Option<Box<dyn super::TelemetryProvider>>,
-        placement_strategy: &str,
+        placement_strategy: P,
     ) -> Self {
         Self {
             wf: super::workflow::ActiveWorkflow::new(request, id),
-            pipeline: super::transformations::TransformationPipeline::new_default(placement_strategy, link_controllers),
+            pipeline: super::pipeline::default::DefaultTransformationPipeline::new_default(placement_strategy),
             telemetry_provider: telementry_provider,
         }
     }
 
-    pub fn initial_spawn(&mut self, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) -> Vec<super::RequiredChange> {
-        self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters);
+    pub fn initial_spawn(
+        &mut self,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &mut super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
+    ) -> Vec<super::RequiredChange> {
+        self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters, global_state);
         self.materialize()
     }
 
-    pub fn periodic_optimize(&mut self, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) -> Vec<super::RequiredChange> {
-        self.pipeline.apply_placement(&mut self.wf, nodes, peer_clusters);
+    pub fn periodic_optimize(
+        &mut self,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &mut super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
+    ) -> Vec<super::RequiredChange> {
+        self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
         self.materialize()
     }
 
@@ -41,9 +50,10 @@ impl ManagedWorkflow {
         removed_node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
+        global_state: &mut super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
         if self.remove_nodes(removed_node_ids) {
-            self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters);
+            self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
             self.materialize()
         } else {
             Vec::new()
@@ -55,13 +65,14 @@ impl ManagedWorkflow {
         update: edgeless_api::common::PatchRequest,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
+        global_state: &mut super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
         {
             let mut prx = self.wf.proxy.borrow_mut();
             prx.external_ports.external_input_mapping = update.input_mapping;
             prx.external_ports.external_output_mapping = update.output_mapping;
         }
-        self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters);
+        self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
         self.materialize()
     }
 

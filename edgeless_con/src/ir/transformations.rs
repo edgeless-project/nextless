@@ -12,57 +12,16 @@ pub mod placement;
 pub mod topic_converter;
 pub mod workflow_spitter;
 
-trait Transformation: Send + Sync {
+pub trait StatelessTransformation: Send + Sync {
     fn apply(&mut self, workflow: &mut super::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters);
 }
 
-pub struct TransformationPipeline {
-    logical_pipeline: Vec<Box<dyn Transformation>>,
-    placement: Vec<Box<dyn Transformation>>,
-    physical_pipeline: Vec<Box<dyn Transformation>>,
-}
-
-impl TransformationPipeline {
-    pub fn new_default(
-        placement_strategy: &str,
-        link_controllers: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
-        >,
-    ) -> Self {
-        Self {
-            logical_pipeline: vec![
-                Box::new(topic_converter::TopicConverter::new()),
-                Box::new(input_linker::InputLinker::new()),
-                Box::new(workflow_spitter::WorkflowSplitter::new()),
-                Box::new(dead_component_removal::DeadComponentRemoval::new()),
-            ],
-            placement: vec![Box::new(placement::DefaultPlacement::new(placement_strategy))],
-            physical_pipeline: vec![
-                Box::new(physical_mapper::PhysicalConnectionMapper::new()),
-                Box::new(pipe_generator::PipeGenerator::new(link_controllers.clone())),
-                Box::new(compiler::Compiler::new()),
-            ],
-        }
-    }
-
-    pub fn apply_all(&mut self, workflow: &mut super::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) {
-        for t in &mut self.logical_pipeline {
-            t.apply(workflow, nodes, peer_clusters);
-        }
-        for t in &mut self.placement {
-            t.apply(workflow, nodes, peer_clusters);
-        }
-        for t in &mut self.physical_pipeline {
-            t.apply(workflow, nodes, peer_clusters);
-        }
-    }
-
-    pub fn apply_placement(&mut self, workflow: &mut super::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, peer_clusters: &crate::ir::Clusters) {
-        for t in &mut self.placement {
-            t.apply(workflow, nodes, peer_clusters);
-        }
-        for t in &mut self.physical_pipeline {
-            t.apply(workflow, nodes, peer_clusters);
-        }
-    }
+pub trait StatefulTransformation<G>: Send + Sync {
+    fn apply(
+        &mut self,
+        workflow: &mut super::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &mut G,
+    );
 }

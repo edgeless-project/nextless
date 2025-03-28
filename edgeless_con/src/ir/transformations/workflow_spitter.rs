@@ -11,7 +11,7 @@ impl WorkflowSplitter {
     }
 }
 
-impl super::Transformation for WorkflowSplitter {
+impl super::StatelessTransformation for WorkflowSplitter {
     fn apply(&mut self, _workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         // TODO
     }

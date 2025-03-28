@@ -2,8 +2,16 @@
 // SPDX-License-Identifier: MIT
 
 pub mod random;
+pub mod round_robin;
 pub mod weighted_random;
 
 pub trait PlacementStrategy: Send + Sync {
-    fn select_candidate<'a, 'b>(&'a mut self, candidates: Vec<super::Candidate<'b>>) -> Option<super::Candidate<'b>>;
+    type GlobalState: Default;
+    fn select_candidate<'a, 'b>(
+        &'a mut self,
+        candidates: Vec<super::Candidate<'b>>,
+        global_state: &mut Self::GlobalState,
+    ) -> Option<super::Candidate<'b>>;
+
+    fn new() -> Self;
 }

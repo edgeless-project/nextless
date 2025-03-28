@@ -51,20 +51,50 @@ impl Controller {
             let tp = Box::new(crate::prometheus_telemetry_provider::PrometheusTelemetryProvider::new(
                 prometheus_url.clone(),
             ));
-            Self::new(Some(tp))
+            Self::new(Some(tp), controller_settings.placement_strategy)
         } else {
-            Self::new(None)
+            Self::new(None, controller_settings.placement_strategy)
         }
     }
 
-    fn new(telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
+    fn new(
+        telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
+        placement_strategy: String,
+    ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let image_repository = image_repository::ImageRepository::new();
 
         let image_repository_clone = image_repository.clone();
         let main_task = Box::pin(async move {
-            let mut controller_task = server::ControllerTask::new(uuid::Uuid::new_v4(), receiver, telemetry_provider, image_repository_clone);
-            controller_task.run().await;
+            match placement_strategy.as_str() {
+                "weighted_random" => {
+                    let mut controller_task = server::ControllerTask::<
+                        crate::ir::transformations::placement::strategy::weighted_random::WeightedRandom,
+                    >::new(uuid::Uuid::new_v4(), receiver, telemetry_provider, image_repository_clone);
+                    controller_task.run().await;
+                }
+                "round_robin" => {
+                    let mut controller_task = server::ControllerTask::<crate::ir::transformations::placement::strategy::round_robin::RoundRobin>::new(
+                        uuid::Uuid::new_v4(),
+                        receiver,
+                        telemetry_provider,
+                        image_repository_clone,
+                    );
+                    controller_task.run().await;
+                }
+                "random" => {
+                    let mut controller_task = server::ControllerTask::<crate::ir::transformations::placement::strategy::random::Random>::new(
+                        uuid::Uuid::new_v4(),
+                        receiver,
+                        telemetry_provider,
+                        image_repository_clone,
+                    );
+                    controller_task.run().await;
+                }
+                _ => {
+                    panic!("Unknown Orchestration Strategy")
+                }
+            };
         });
 
         (Controller { sender, image_repository }, main_task)

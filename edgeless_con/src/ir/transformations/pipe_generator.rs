@@ -5,23 +5,26 @@
 
 use super::super::*;
 
-pub struct PipeGenerator {
-    link_controllers:
-        std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>>,
-}
+pub struct PipeGenerator {}
 
 impl PipeGenerator {
-    pub fn new(
-        link_controllers: std::sync::Arc<
-            tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>,
-        >,
-    ) -> Self {
-        Self { link_controllers }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
-impl super::Transformation for PipeGenerator {
-    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
+pub struct PipeGeneratorState {
+    pub inner: std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>,
+}
+
+impl super::StatefulTransformation<PipeGeneratorState> for PipeGenerator {
+    fn apply(
+        &mut self,
+        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+        global_state: &mut PipeGeneratorState,
+    ) {
         let mcast = edgeless_api::link::LinkType("MULTICAST".to_string());
 
         let mut new_links = Vec::<(edgeless_api::link::LinkInstanceId, link::WorkflowLink)>::new();
@@ -34,9 +37,8 @@ impl super::Transformation for PipeGenerator {
                     if let edgeless_api::common::Output::All(targets) = out {
                         if targets.len() >= 2 {
                             let target_nodes: std::collections::HashSet<_> = targets.iter().map(|(t_id, _)| t_id.node_id).collect();
-                            let new_link = self
-                                .link_controllers
-                                .blocking_lock()
+                            let new_link = global_state
+                                .inner
                                 .get_mut(&mcast)
                                 .unwrap()
                                 .new_link(target_nodes.clone().into_iter().collect())
@@ -48,12 +50,7 @@ impl super::Transformation for PipeGenerator {
                                     (
                                         *n,
                                         nodes.get(n).unwrap().available_link_types().get(&mcast).unwrap().clone(),
-                                        self.link_controllers
-                                            .blocking_lock()
-                                            .get(&mcast)
-                                            .unwrap()
-                                            .config_for(new_link.clone(), *n)
-                                            .unwrap(),
+                                        global_state.inner.get(&mcast).unwrap().config_for(new_link.clone(), *n).unwrap(),
                                         false,
                                     )
                                 })
