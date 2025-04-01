@@ -106,7 +106,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         if let Some(filename) = instance_specification.configuration.get("filename") {
             let mut lck = self.inner.lock().await;
 
-            let dataplane_handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id).await;
+            let dataplane_handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id, None).await;
 
             match FileLogResource::new(
                 dataplane_handle,

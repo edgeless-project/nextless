@@ -84,7 +84,11 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         log::info!("Start Function {:?} {:?}", spawn_request.instance_id, spawn_request.output_mapping);
         let instance_id = spawn_request.instance_id;
         let cloned_req = spawn_request.clone();
-        let mut data_plane = self.data_plane_provider.get_handle_for(instance_id).await;
+        let telemetry_handle = self.telemetry_handle.fork(std::collections::BTreeMap::from([(
+            "FUNCTION_ID".to_string(),
+            instance_id.function_id.to_string(),
+        )]));
+        let mut data_plane = self.data_plane_provider.get_handle_for(instance_id, Some(telemetry_handle.clone())).await;
         data_plane.update_mapping(spawn_request.input_mapping, spawn_request.output_mapping).await;
         let instance = super::function_instance_runner::FunctionInstanceRunner::new(
             cloned_req,
@@ -93,10 +97,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
             self.state_manager
                 .get_handle(spawn_request.state_specification.state_policy, spawn_request.state_specification.state_id)
                 .await,
-            self.telemetry_handle.fork(std::collections::BTreeMap::from([(
-                "FUNCTION_ID".to_string(),
-                instance_id.function_id.to_string(),
-            )])),
+            telemetry_handle,
         )
         .await;
         self.functions.insert(instance_id, instance);

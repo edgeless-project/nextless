@@ -58,6 +58,7 @@ pub fn edgeless_con_default_conf() -> String {
     String::from(
         r##"controller_url = "http://127.0.0.1:7001"
             prometheus_url = "http://127.0.0.1:9090"
+            placement_strategy = "random"
 "##,
     )
 }

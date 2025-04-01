@@ -138,4 +138,20 @@ pub fn edgeless_port(builder: &mut starlark::environment::GlobalsBuilder) {
     fn topic(topic: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
         Ok(heap.alloc(Mapping::Topic(topic)))
     }
+
+    fn any<'v>(items: starlark::values::Value<'v>, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value<'v>> {
+        if let Some(ports) = <starlark::values::list::ListOf<Port> as starlark::values::UnpackValue>::unpack_value(items) {
+            return Ok(heap.alloc(Mapping::Any(
+                ports
+                    .to_vec()
+                    .into_iter()
+                    .map(|port| DirectTarget {
+                        target_component: port.component_id.clone(),
+                        port: port.port_id.clone(),
+                    })
+                    .collect(),
+            )));
+        }
+        Err(anyhow::anyhow!("Not a list of ports"))
+    }
 }

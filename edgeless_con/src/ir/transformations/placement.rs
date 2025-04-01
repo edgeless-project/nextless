@@ -7,9 +7,8 @@ mod feasibility;
 mod scoring;
 pub mod strategy;
 
-use scoring::ScoreableRuntime;
-
 use super::super::*;
+use scoring::ScoreableRuntime;
 
 pub struct DefaultPlacement<P: strategy::PlacementStrategy> {
     placement_strategy: P,
@@ -30,86 +29,29 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
         global_state: &mut P::GlobalState,
     ) {
         for (f_id, function) in &mut workflow.functions {
-            let mut function = function.borrow_mut();
-            if function.instances.is_empty() {
-                let candidates = find_candidates_for_actor(&function, nodes);
-                let dst = self.placement_strategy.select_candidate(candidates, global_state);
+            let function = function.borrow_mut();
+            for i in &function.instances {
+                let mut i = i.borrow_mut();
+                match &*i {
+                    PhysicalComponentState::Planned => {
+                        log::info!("Planned : {}", function.instances.len());
+                        let candidates = find_candidates_for_actor(&function, nodes);
+                        let dst = self.placement_strategy.select_candidate(candidates, global_state);
 
-                if let Some(dst) = dst {
-                    function.instances.push(std::cell::RefCell::new(actor::PhysicalActor {
-                        id: edgeless_api::function_instance::InstanceId::new(dst.node_id),
-                        desired_mapping: PhysicalPorts::default(),
-                        image: None,
-                        materialized: None,
-                    }))
-                } else {
-                    log::info!("Found no viable node for {} in {}", &f_id, workflow.id.workflow_id);
-                }
-            } else {
-                // This is a test that shows the use of the Materialized Representation
-                for i in &function.instances() {
-                    let instance = i.borrow_mut();
-                    if let Some(materialized) = &instance.materialized_state() {
-                        let mut materialized = materialized.borrow_mut();
-                        if let Some(v) = materialized
-                            .runtime_statistics()
-                            .and_then(|s| s.invocation_rate_abs(std::time::Duration::from_secs(120)))
-                        {
-                            log::debug!("Invocation Rate: {}", v)
+                        if let Some(dst) = dst {
+                            *i = PhysicalComponentState::Existing(actor::PhysicalActor {
+                                id: edgeless_api::function_instance::InstanceId::new(dst.node_id),
+                                desired_mapping: PhysicalPorts::default(),
+                                image: None,
+                                materialized: None,
+                                creation_tine: std::time::Instant::now(),
+                            });
+                        } else {
+                            log::info!("Found no viable node for {} in {}", &f_id, workflow.id.workflow_id);
                         }
-                        if let Some(v) = materialized
-                            .runtime_statistics()
-                            .and_then(|s| Some(s.invocations_rate_abs_by_port(std::time::Duration::from_secs(120))))
-                        {
-                            log::debug!("Invocation Rate By Port: {:?}", v);
-                        }
-
-                        if let Some(v) = materialized
-                            .runtime_statistics()
-                            .and_then(|s| s.duration_mean_secs(std::time::Duration::from_secs(120)))
-                        {
-                            log::debug!("Mean Duration MS: {}", v * 1000.0);
-                        }
-                        if let Some(v) = materialized
-                            .runtime_statistics()
-                            .and_then(|s| s.duration_soft_limit_rate_rel(std::time::Duration::from_secs(120)))
-                        {
-                            log::debug!("Duration Soft Limit Score: {}", v);
-                        }
-
-                        if let Some(v) = materialized
-                            .runtime_statistics()
-                            .and_then(|s| s.error_rate_rel(std::time::Duration::from_secs(120)))
-                        {
-                            log::debug!("Error Rate {}", v);
-                        }
-
-                        for (p_id, p) in &materialized.materialized_ports().materialized_inputs {
-                            if let Some(v) = p
-                                .runtime_statistics()
-                                .and_then(|s| s.message_rate_abs(std::time::Duration::from_secs(120)))
-                            {
-                                log::debug!("Port Rate {}: {}", p_id.0, v);
-                            }
-                            if let Some(v) = p
-                                .runtime_statistics()
-                                .and_then(|s| Some(s.message_rate_abs_by_peer(std::time::Duration::from_secs(120))))
-                            {
-                                log::debug!("Port By Peer Rate {}: {:?}", p_id.0, v);
-                            }
-                            if let Some(v) = p
-                                .runtime_statistics()
-                                .and_then(|s| s.message_size_mean_bytes(std::time::Duration::from_secs(120)))
-                            {
-                                log::debug!("Port Size {}: {}", p_id.0, v);
-                            }
-                            if let Some(v) = p
-                                .runtime_statistics()
-                                .and_then(|s| Some(s.message_size_mean_byte_by_peer(std::time::Duration::from_secs(120))))
-                            {
-                                log::debug!("Port By Peer Size {}: {:?}", p_id.0, v);
-                            }
-                        }
+                    }
+                    _ => {
+                        //NOOP
                     }
                 }
             }
@@ -117,44 +59,75 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
 
         for (_, resource) in &mut workflow.resources {
             let mut resource = resource.borrow_mut();
-            if resource.instances.is_empty() {
-                let dst = select_node_for_resource(&resource, nodes);
-                if let Some(dst) = dst {
-                    resource.instances.push(std::cell::RefCell::new(resource::PhysicalResource {
-                        id: edgeless_api::function_instance::InstanceId::new(dst),
-                        desired_mapping: PhysicalPorts::default(),
-                        materialized: None,
-                    }));
+
+            for r in &resource.instances {
+                let mut r = r.borrow_mut();
+                match &*r {
+                    PhysicalComponentState::Planned => {
+                        let dst = select_node_for_resource(&resource, nodes);
+                        if let Some(dst) = dst {
+                            *r = PhysicalComponentState::Existing(resource::PhysicalResource {
+                                id: edgeless_api::function_instance::InstanceId::new(dst),
+                                desired_mapping: PhysicalPorts::default(),
+                                materialized: None,
+                                creation_time: std::time::Instant::now(),
+                            });
+                        }
+                    }
+                    _ => {
+                        //NOOP
+                    }
                 }
             }
+
+            if resource.instances.is_empty() {}
         }
 
         for (_, subflow) in &mut workflow.subflows {
             let mut subflow = subflow.borrow_mut();
-            if subflow.instances.is_empty() && subflow.instances.is_empty() {
-                let dst = select_cluster_for_subflow(&subflow, peer_clusters);
-                if let Some(dst) = dst {
-                    subflow.instances.push(std::cell::RefCell::new(subflow::PhysicalSubFlow {
-                        id: edgeless_api::function_instance::InstanceId::new(dst),
-                        desired_mapping: PhysicalPorts::default(),
-                        materialized: None,
-                    }))
+
+            for s in &subflow.instances {
+                let mut s = s.borrow_mut();
+                match &*s {
+                    PhysicalComponentState::Planned => {
+                        let dst = select_cluster_for_subflow(&subflow, peer_clusters);
+                        if let Some(dst) = dst {
+                            *s = PhysicalComponentState::Existing(subflow::PhysicalSubFlow {
+                                id: edgeless_api::function_instance::InstanceId::new(dst),
+                                desired_mapping: PhysicalPorts::default(),
+                                materialized: None,
+                                creation_time: std::time::Instant::now(),
+                            });
+                        }
+                    }
+                    _ => {
+                        //NOOP
+                    }
                 }
             }
+
+            if subflow.instances.is_empty() && subflow.instances.is_empty() {}
         }
 
         {
             let mut proxy = workflow.proxy.borrow_mut();
-            if (!proxy.logical_ports.logical_input_mapping.is_empty() || !proxy.logical_ports.logical_output_mapping.is_empty())
-                && proxy.instances.is_empty()
-            {
-                let dst = select_node_for_proxy(&proxy, nodes);
-                if let Some(dst) = dst {
-                    proxy.instances.push(std::cell::RefCell::new(proxy::PhyiscalProxy {
-                        id: edgeless_api::function_instance::InstanceId::new(dst),
-                        desired_mapping: PhysicalPorts::default(),
-                        materialized: None,
-                    }));
+            for p in &proxy.instances {
+                let mut p = p.borrow_mut();
+                match &*p {
+                    PhysicalComponentState::Planned => {
+                        let dst = select_node_for_proxy(&proxy, nodes);
+                        if let Some(dst) = dst {
+                            *p = PhysicalComponentState::Existing(proxy::PhyiscalProxy {
+                                id: edgeless_api::function_instance::InstanceId::new(dst),
+                                desired_mapping: PhysicalPorts::default(),
+                                materialized: None,
+                                creation_time: std::time::Instant::now(),
+                            });
+                        }
+                    }
+                    _ => {
+                        //NOOP
+                    }
                 }
             }
         }

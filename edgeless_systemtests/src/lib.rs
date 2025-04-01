@@ -31,6 +31,7 @@ mod tests {
         let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
             prometheus_url: None, // orchestrators: vec![],
+            placement_strategy: "random".to_string(),
         }));
         tokio::spawn(task);
         handles.push(handle);

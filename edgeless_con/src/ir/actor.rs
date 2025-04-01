@@ -3,16 +3,14 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use super::MaybePhyiscalInstance;
+
 pub struct LogicalActor {
     pub image: ActorImage,
-
     pub annotations: std::collections::HashMap<String, String>,
-
     pub constraints: ActorConstraints,
-
     pub logical_ports: super::LogicalPorts,
-
-    pub instances: Vec<std::cell::RefCell<PhysicalActor>>,
+    pub instances: Vec<std::cell::RefCell<super::PhysicalComponentState<PhysicalActor>>>,
 }
 
 pub struct ActorConstraints {
@@ -29,29 +27,30 @@ impl super::LogicalComponent for LogicalActor {
     }
 
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId> {
-        self.instances.iter().map(|i| i.borrow().id).collect()
+        self.instances.iter().filter_map(|i| i.borrow().id()).collect()
     }
 
-    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn super::PhysicalComponent>> {
-        self.instances
-            .iter()
-            .map(|i| i as &std::cell::RefCell<dyn super::PhysicalComponent>)
-            .collect()
-    }
-
-    fn split_view(&mut self) -> (&mut super::LogicalPorts, Vec<&std::cell::RefCell<dyn super::PhysicalComponent>>) {
+    fn split_view(&mut self) -> (&mut super::LogicalPorts, Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>>) {
         (
             &mut self.logical_ports,
             self.instances
                 .iter()
-                .map(|i| i as &std::cell::RefCell<dyn super::PhysicalComponent>)
+                .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)
                 .collect(),
         )
+    }
+
+    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>> {
+        self.instances
+            .iter()
+            .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)
+            .collect()
     }
 }
 
 pub struct PhysicalActor {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
+    pub(crate) creation_tine: std::time::Instant,
     pub(crate) image: Option<ActorImage>,
     pub(crate) desired_mapping: super::PhysicalPorts,
     pub(crate) materialized: Option<std::cell::RefCell<MaterializedActor>>,
@@ -66,6 +65,14 @@ impl super::PhysicalComponent for PhysicalActor {
         self.materialized
             .as_ref()
             .map(|v| v as &std::cell::RefCell<dyn super::MaterializedComponent>)
+    }
+
+    fn id(&self) -> edgeless_api::function_instance::InstanceId {
+        self.id.clone()
+    }
+
+    fn creation_time(&self) -> std::time::Instant {
+        self.creation_tine.clone()
     }
 }
 

@@ -35,6 +35,18 @@ pub enum Message {
     Err,
 }
 
+impl Message {
+    pub fn payload_len(&self) -> usize {
+        match self {
+            Message::Cast(data) => data.as_bytes().len(),
+            Message::Call(data) => data.as_bytes().len(),
+            Message::CallRet(data) => data.as_bytes().len(),
+            Message::CallNoRet => 0,
+            Message::Err => 0,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct DataplaneEvent {
     pub source_id: edgeless_api::function_instance::InstanceId,

@@ -13,7 +13,7 @@ struct PingType {
     msg: String,
 }
 
-impl edgeless_function_core::Deserialize for PingType {
+impl edgeless_function_core::Deserialize<'_> for PingType {
     fn deserialize(data: &[u8]) -> Self {
         PingType {
             msg: String::from_utf8(data.to_vec()).unwrap(),
@@ -21,7 +21,7 @@ impl edgeless_function_core::Deserialize for PingType {
     }
 }
 
-impl edgeless_function_core::Serialize for PongType {
+impl edgeless_function_core::Serialize<'_> for PongType {
     fn serialize(&self) -> Vec<u8> {
         self.msg.as_bytes().to_vec()
     }
@@ -35,6 +35,9 @@ impl PongAsyncAPI<'_> for PongerFun {
 
     fn handle_cast_ping(src: InstanceId, ping_msg: PingType) {
         log::info!("AsyncPonger: 'Cast' called, MSG: {:?}", ping_msg);
+        for i in 0..200_000 {
+            slf();
+        }
         cast_pong(&PongType { msg: "PONG2".to_string() });
     }
 

@@ -542,6 +542,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                     self.start_proxy_on_node(proxy_id, internal_inputs, internal_outputs, external_inputs, external_outputs)
                         .await
                 }
+                RequiredChange::StopFunction { function_id } => self.stop_workflow_function_on_node(function_id).await,
             });
         }
 
@@ -616,6 +617,18 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => Ok(()),
             },
             Err(err) => Err(format!("failed interaction when creating a function instance: {}", err)),
+        }
+    }
+
+    async fn stop_workflow_function_on_node(&mut self, function_id: edgeless_api::function_instance::InstanceId) -> Result<(), String> {
+        if let Some(node_api) = self.nodes.lock().await.get_mut(&function_id.node_id) {
+            if let Err(e) = node_api.api.function_instance_api().stop(function_id).await {
+                Err(format!("Stopping Node Failed: {}", e))
+            } else {
+                Ok(())
+            }
+        } else {
+            Err("Invalid Function ID".to_string())
         }
     }
 

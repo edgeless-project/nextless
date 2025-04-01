@@ -16,11 +16,76 @@ pub mod workflow;
 pub trait LogicalComponent {
     fn logical_ports(&mut self) -> &mut LogicalPorts;
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId>;
-    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn PhysicalComponent>>;
-    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn PhysicalComponent>>);
+    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn MaybePhyiscalInstance>>;
+    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn MaybePhyiscalInstance>>);
+}
+
+pub enum PhysicalComponentState<C: PhysicalComponent> {
+    Planned,
+    Existing(C),
+    StopPlanned(C),
+    Stopped(C),
+}
+
+pub trait MaybePhyiscalInstance {
+    fn try_unpack<'a>(&'a mut self) -> Option<&'a mut dyn PhysicalComponent>;
+    fn id(&self) -> Option<edgeless_api::function_instance::InstanceId>;
+}
+
+impl<C: PhysicalComponent> MaybePhyiscalInstance for PhysicalComponentState<C>
+where
+    C: PhysicalComponent,
+{
+    fn try_unpack<'a>(&'a mut self) -> Option<&'a mut dyn PhysicalComponent> {
+        match self {
+            PhysicalComponentState::Planned => None,
+            PhysicalComponentState::Existing(inner) => Some(inner),
+            PhysicalComponentState::StopPlanned(inner) => Some(inner),
+            PhysicalComponentState::Stopped(inner) => Some(inner),
+        }
+    }
+
+    fn id(&self) -> Option<edgeless_api::function_instance::InstanceId> {
+        match self {
+            PhysicalComponentState::Planned => None,
+            PhysicalComponentState::Existing(inner) => Some(inner.id()),
+            PhysicalComponentState::StopPlanned(inner) => Some(inner.id()),
+            PhysicalComponentState::Stopped(inner) => Some(inner.id()),
+        }
+    }
+}
+
+impl<C: PhysicalComponent> PhysicalComponentState<C> {
+    fn new() -> Self {
+        PhysicalComponentState::Planned
+    }
+
+    fn plan_stop(&mut self) -> Self {
+        let old = std::mem::replace(self, PhysicalComponentState::Planned);
+        match old {
+            PhysicalComponentState::Existing(inner) => PhysicalComponentState::StopPlanned(inner),
+            _ => {
+                log::error!("Tried to mark bad function");
+                old
+            }
+        }
+    }
+
+    fn mark_stopped(&mut self) -> Self {
+        let old = std::mem::replace(self, PhysicalComponentState::Planned);
+        match old {
+            PhysicalComponentState::StopPlanned(inner) => PhysicalComponentState::Stopped(inner),
+            _ => {
+                log::error!("Tried to mark bad function");
+                old
+            }
+        }
+    }
 }
 
 pub trait PhysicalComponent {
+    fn id(&self) -> edgeless_api::function_instance::InstanceId;
+    fn creation_time(&self) -> std::time::Instant;
     fn physical_ports(&mut self) -> &mut PhysicalPorts;
     fn materialized_state(&self) -> Option<&std::cell::RefCell<dyn MaterializedComponent>>;
 }
@@ -245,6 +310,9 @@ pub enum RequiredChange {
         input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
         output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
         annotations: std::collections::HashMap<String, String>,
+    },
+    StopFunction {
+        function_id: edgeless_api::function_instance::InstanceId,
     },
     StartResource {
         resource_id: edgeless_api::function_instance::InstanceId,

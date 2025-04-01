@@ -1782,6 +1782,7 @@ dependencies = [
  "clap",
  "edgeless_api",
  "edgeless_link_multicast",
+ "edgeless_telemetry",
  "env_logger",
  "futures",
  "log",

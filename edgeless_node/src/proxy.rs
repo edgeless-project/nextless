@@ -164,9 +164,9 @@ impl ProxyManagerTask {
                                 proxy_spec.instance_id,
                                 ProxyInstance::create(
                                     proxy_spec.clone(),
-                                    self.dataplane_provider.get_handle_for(proxy_spec.instance_id).await,
+                                    self.dataplane_provider.get_handle_for(proxy_spec.instance_id, None).await,
                                     self.dataplane_provider
-                                        .get_handle_for(edgeless_api::function_instance::InstanceId::new(proxy_spec.instance_id.node_id))
+                                        .get_handle_for(edgeless_api::function_instance::InstanceId::new(proxy_spec.instance_id.node_id), None)
                                         .await,
                                 )
                                 .await,

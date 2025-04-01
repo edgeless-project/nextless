@@ -13,18 +13,12 @@ ponger = edgeless_actor(
     annotations = {}
 )
 
-ponger2 = edgeless_actor(
-    id = "ponger_i_2",
-    klass = Ponger,
-    annotations = {}
-)
-
-pinger.ping >> ponger.ping
+pinger.ping >> any([ponger.ping])
 ponger.pong >> pinger.pong
 
 wf = edgeless_workflow(
     "ping_pong_async",
-    [pinger, ponger, ponger2],
+    [pinger, ponger],
     annotations = {}
 )
 
@@ -67,4 +61,4 @@ el_main = wf
 
 # a.foo >> b.bar
 
-# 
+#

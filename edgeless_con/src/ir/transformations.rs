@@ -9,6 +9,7 @@ pub mod input_linker;
 pub mod physical_mapper;
 pub mod pipe_generator;
 pub mod placement;
+pub mod scaler;
 pub mod topic_converter;
 pub mod workflow_spitter;
 

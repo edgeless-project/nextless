@@ -256,16 +256,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         let context = opentelemetry::Context::with_span(&opentelemetry::Context::new(), span);
         self.tracing_context.lock().await.parent_context = context;
 
-        self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::MessageReceived(payload.len() as u64),
-            std::collections::BTreeMap::from([
-                ("SOURCE_NODE_ID".to_string(), source_id.node_id.to_string()),
-                ("SOURCE_FUNCTION_ID".to_string(), source_id.function_id.to_string()),
-                ("SOURCE_PORT".to_string(), "UNKNOWN".to_string()),
-                ("DEST_PORT".to_string(), target_port.0.clone()),
-            ]),
-        );
-
         let exec_result = self
             .function_instance
             .as_mut()

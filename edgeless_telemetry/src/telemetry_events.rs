@@ -59,9 +59,27 @@ pub struct TelemetryHandle {
     sender: tokio::sync::mpsc::UnboundedSender<TelemetryProcessorInput>,
 }
 
-pub trait TelemetryHandleAPI: Send {
+pub trait TelemetryHandleAPI: TelemetryHandleAPIClone + Sync + Send {
     fn observe(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>);
     fn fork(&mut self, child_tags: std::collections::BTreeMap<String, String>) -> Box<dyn TelemetryHandleAPI>;
+}
+
+// https://stackoverflow.com/a/30353928
+pub trait TelemetryHandleAPIClone {
+    fn clone_box(&self) -> Box<dyn TelemetryHandleAPI>;
+}
+impl<T> TelemetryHandleAPIClone for T
+where
+    T: 'static + TelemetryHandleAPI + Clone,
+{
+    fn clone_box(&self) -> Box<dyn TelemetryHandleAPI> {
+        Box::new(self.clone())
+    }
+}
+impl Clone for Box<dyn TelemetryHandleAPI> {
+    fn clone(&self) -> Box<dyn TelemetryHandleAPI> {
+        self.clone_box()
+    }
 }
 
 impl TelemetryHandleAPI for TelemetryHandle {

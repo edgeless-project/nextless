@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 use super::super::transformations::placement::strategy::PlacementStrategy;
-use crate::ir::transformations::StatefulTransformation;
 
 pub struct DefaultTransformationPipeline<P: PlacementStrategy> {
     logical_pipeline: super::default_logical::DefaultLogicalPipeline,
-    placement: super::super::transformations::placement::DefaultPlacement<P>,
+    orchestration: super::default_orchestration::DefaultOrchestrationPipeline<P>,
     physical_pipeline: super::default_physical::DefaultPhysicalPipeline,
 }
 
@@ -19,7 +18,7 @@ impl<P: PlacementStrategy> DefaultTransformationPipeline<P> {
     pub fn new_default(placement_strategy: P) -> Self {
         Self {
             logical_pipeline: super::default_logical::DefaultLogicalPipeline::new(),
-            placement: crate::ir::transformations::placement::DefaultPlacement::new(placement_strategy),
+            orchestration: super::default_orchestration::DefaultOrchestrationPipeline::new(placement_strategy),
             physical_pipeline: super::default_physical::DefaultPhysicalPipeline::new(),
         }
     }
@@ -34,8 +33,8 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
         global_state: &mut DefaultTransformationPipelineState<P::GlobalState>,
     ) {
         self.logical_pipeline.apply_all(workflow, nodes, peer_clusters, &mut ());
-        self.placement
-            .apply(workflow, nodes, peer_clusters, &mut global_state.placement_strategy_state);
+        self.orchestration
+            .apply_all(workflow, nodes, peer_clusters, &mut global_state.placement_strategy_state);
         self.physical_pipeline
             .apply_all(workflow, nodes, peer_clusters, &mut global_state.pipe_generator_state);
     }
@@ -47,8 +46,8 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
         peer_clusters: &crate::ir::Clusters,
         global_state: &mut DefaultTransformationPipelineState<P::GlobalState>,
     ) {
-        self.placement
-            .apply(workflow, nodes, peer_clusters, &mut global_state.placement_strategy_state);
+        self.orchestration
+            .apply_all(workflow, nodes, peer_clusters, &mut global_state.placement_strategy_state);
         self.physical_pipeline
             .apply_all(workflow, nodes, peer_clusters, &mut global_state.pipe_generator_state);
     }

@@ -10,6 +10,7 @@ use edgeless_dataplane::core::CallRet;
 use edgeless_dataplane::handle::DataplaneHandle;
 use edgeless_telemetry::telemetry_events::TelemetryEvent;
 
+#[derive(Clone)]
 struct MockTelemetryHandle {
     sender: std::sync::mpsc::Sender<(
         edgeless_telemetry::telemetry_events::TelemetryEvent,
@@ -205,10 +206,10 @@ async fn messaging_test_setup() -> (
 
     // shared insert
     let test_peer_fid = edgeless_api::function_instance::InstanceId::new(node_id);
-    let test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid).await;
+    let test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid, None).await;
 
     let next_fid = edgeless_api::function_instance::InstanceId::new(node_id);
-    let next_handle = dataplane_provider.get_handle_for(next_fid).await;
+    let next_handle = dataplane_provider.get_handle_for(next_fid, None).await;
     // end shared insert
 
     let (telemetry_mock_sender, telemetry_mock_receiver) = std::sync::mpsc::channel::<(
@@ -652,7 +653,7 @@ async fn state_management() {
     });
 
     let test_peer_fid = edgeless_api::function_instance::InstanceId::new(node_id);
-    let mut test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid).await;
+    let mut test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid, None).await;
 
     let (mut client, mut rt_task) = crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(
         dataplane_provider,

@@ -150,7 +150,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         let mut lck = self.inner.lock().await;
 
-        let dataplane_handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id).await;
+        let dataplane_handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id, None).await;
 
         lck.egress_instances
             .insert(instance_specification.resource_id, EgressResource::new(dataplane_handle).await);

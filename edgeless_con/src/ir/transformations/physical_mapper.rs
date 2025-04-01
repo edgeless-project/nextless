@@ -30,11 +30,12 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                         let mut instances = components.get(target_component).unwrap().clone();
                         if let Some(id) = instances.pop() {
                             for c_instance in &physical_instances {
-                                c_instance
-                                    .borrow_mut()
-                                    .physical_ports()
-                                    .physical_output_mapping
-                                    .insert(output_id.clone(), PhysicalOutput::Single(id, target_port_id.clone()));
+                                if let Some(c_instance) = c_instance.borrow_mut().try_unpack() {
+                                    c_instance
+                                        .physical_ports()
+                                        .physical_output_mapping
+                                        .insert(output_id.clone(), PhysicalOutput::Single(id, target_port_id.clone()));
+                                }
                             }
                         }
                     }
@@ -51,11 +52,12 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                             )
                         }
                         for c_instance in &physical_instances {
-                            c_instance
-                                .borrow_mut()
-                                .physical_ports()
-                                .physical_output_mapping
-                                .insert(output_id.clone(), PhysicalOutput::Any(instances.clone()));
+                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack() {
+                                c_instance
+                                    .physical_ports()
+                                    .physical_output_mapping
+                                    .insert(output_id.clone(), PhysicalOutput::Any(instances.clone()));
+                            }
                         }
                     }
                     LogicalOutput::AllOfTargets(targets) => {
@@ -71,11 +73,12 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                             )
                         }
                         for c_instance in &physical_instances {
-                            c_instance
-                                .borrow_mut()
-                                .physical_ports()
-                                .physical_output_mapping
-                                .insert(output_id.clone(), PhysicalOutput::All(instances.clone()));
+                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack() {
+                                c_instance
+                                    .physical_ports()
+                                    .physical_output_mapping
+                                    .insert(output_id.clone(), PhysicalOutput::All(instances.clone()));
+                            }
                         }
                     }
                     LogicalOutput::Topic(_) => {}
@@ -84,11 +87,12 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
 
             for (input_id, _input) in &logical_ports.logical_input_mapping {
                 for c_instance in &physical_instances {
-                    c_instance
-                        .borrow_mut()
-                        .physical_ports()
-                        .physical_input_mapping
-                        .insert(input_id.clone(), edgeless_api::common::Input::Stub);
+                    if let Some(c_instance) = c_instance.borrow_mut().try_unpack() {
+                        c_instance
+                            .physical_ports()
+                            .physical_input_mapping
+                            .insert(input_id.clone(), edgeless_api::common::Input::Stub);
+                    }
                 }
             }
         }

@@ -12,7 +12,7 @@ use rand::seq::SliceRandom;
 
 #[derive(Clone)]
 struct IncommingLink {
-    sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
+    sender: tokio::sync::mpsc::UnboundedSender<DataplaneEvent>,
     target_id: edgeless_api::function_instance::InstanceId,
     target_port: edgeless_api::function_instance::PortId,
 }
@@ -31,7 +31,6 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
                 message: crate::core::Message::Cast(String::from_utf8(msg).unwrap()),
                 context: opentelemetry::trace::SpanContext::empty_context(),
             })
-            .await
             .unwrap();
     }
 }
@@ -43,13 +42,14 @@ pub struct DataplaneHandle {
     alias_mapping: crate::alias_mapping::AliasMapping,
     slf: edgeless_api::function_instance::InstanceId,
     incomming_links: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkInstanceId, Box<IncommingLink>>>>,
-    sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
-    receiver: std::sync::Arc<tokio::sync::Mutex<futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>>>,
+    sender: tokio::sync::mpsc::UnboundedSender<DataplaneEvent>,
+    receiver: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<DataplaneEvent>>>,
     link_manager: Box<dyn edgeless_api::link::LinkManager>,
     links: std::collections::HashMap<edgeless_api::link::LinkInstanceId, std::sync::Arc<tokio::sync::Mutex<Box<dyn edgeless_api::link::LinkWriter>>>>,
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
+    telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
 }
 
 impl DataplaneHandle {
@@ -58,8 +58,9 @@ impl DataplaneHandle {
         link_manager: Box<dyn edgeless_api::link::LinkManager>,
         output_chain: Vec<Box<dyn DataPlaneLink>>,
         receiver: futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>,
+        telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
     ) -> Self {
-        let (main_sender, main_receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
+        let (main_sender, main_receiver) = tokio::sync::mpsc::unbounded_channel::<DataplaneEvent>();
         let receiver_overwrites = std::sync::Arc::new(tokio::sync::Mutex::new(TemporaryReceivers {
             temporary_receivers: std::collections::HashMap::new(),
         }));
@@ -68,6 +69,7 @@ impl DataplaneHandle {
         // This task intercepts the messages received and routes responses towards temporary receivers while routing other events towards the main receiver used in `receive_next`.
 
         let mut cloned_sender = main_sender.clone();
+        let mut cloned_telemetry = telemetry_handle.clone();
 
         tokio::spawn(async move {
             let mut receiver = receiver;
@@ -80,6 +82,17 @@ impl DataplaneHandle {
                     context,
                 }) = receiver.next().await
                 {
+                    if let Some(telemetry_handle) = &mut cloned_telemetry {
+                        telemetry_handle.observe(
+                            edgeless_telemetry::telemetry_events::TelemetryEvent::MessageReceived(message.payload_len() as u64),
+                            std::collections::BTreeMap::from([
+                                ("SOURCE_NODE_ID".to_string(), source_id.node_id.to_string()),
+                                ("SOURCE_FUNCTION_ID".to_string(), source_id.function_id.to_string()),
+                                ("SOURCE_PORT".to_string(), "UNKNOWN".to_string()),
+                                ("DEST_PORT".to_string(), target_port.0.clone()),
+                            ]),
+                        );
+                    }
                     if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
                         match sender.send((source_id, message.clone())) {
                             Ok(_) => {
@@ -90,16 +103,13 @@ impl DataplaneHandle {
                             }
                         }
                     }
-                    match cloned_sender
-                        .send(DataplaneEvent {
-                            source_id,
-                            channel_id,
-                            message,
-                            target_port,
-                            context,
-                        })
-                        .await
-                    {
+                    match cloned_sender.send(DataplaneEvent {
+                        source_id,
+                        channel_id,
+                        message,
+                        target_port,
+                        context,
+                    }) {
                         Ok(_) => {}
                         Err(_) => {
                             break;
@@ -120,6 +130,7 @@ impl DataplaneHandle {
             links: std::collections::HashMap::new(),
             receiver_overwrites,
             next_id: 1,
+            telemetry_handle,
         }
     }
 
@@ -127,13 +138,14 @@ impl DataplaneHandle {
     /// This is NOT used for processing replies to return values.
     pub async fn receive_next(&mut self) -> DataplaneEvent {
         loop {
+            // log::info!("Q: {}", self.receiver.lock().await.len());
             if let Some(DataplaneEvent {
                 source_id,
                 channel_id,
                 message,
                 target_port: target_channel,
                 context,
-            }) = self.receiver.lock().await.next().await
+            }) = self.receiver.lock().await.recv().await
             {
                 if std::mem::discriminant(&message) == std::mem::discriminant(&Message::Cast("".to_string()))
                     || std::mem::discriminant(&message) == std::mem::discriminant(&Message::Call("".to_string()))
@@ -444,13 +456,24 @@ impl DataplaneProvider {
         }
     }
 
-    pub async fn get_handle_for(&mut self, target: edgeless_api::function_instance::InstanceId) -> DataplaneHandle {
+    pub async fn get_handle_for(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
+    ) -> DataplaneHandle {
         let (sender, receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
         let output_chain = vec![
             self.local_provider.lock().await.new_link(target, sender.clone()).await,
             self.remote_provider.lock().await.new_link(target, sender.clone()).await,
         ];
-        DataplaneHandle::new(target, edgeless_api::link::LinkManagerClone::clone_box(self), output_chain, receiver).await
+        DataplaneHandle::new(
+            target,
+            edgeless_api::link::LinkManagerClone::clone_box(self),
+            output_chain,
+            receiver,
+            telemetry_handle,
+        )
+        .await
     }
 
     pub async fn add_peer(&mut self, peer: EdgelessDataplanePeerSettings) {
@@ -540,8 +563,8 @@ mod test {
 
         let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string(), None).await;
 
-        let mut handle_1 = provider.get_handle_for(fid_1).await;
-        let mut handle_2 = provider.get_handle_for(fid_2).await;
+        let mut handle_1 = provider.get_handle_for(fid_1, None).await;
+        let mut handle_2 = provider.get_handle_for(fid_2, None).await;
 
         handle_1
             .send(
@@ -567,8 +590,8 @@ mod test {
 
         let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string(), None).await;
 
-        let mut handle_1 = provider.get_handle_for(fid_1).await;
-        let mut handle_2 = provider.get_handle_for(fid_2).await;
+        let mut handle_1 = provider.get_handle_for(fid_1, None).await;
+        let mut handle_2 = provider.get_handle_for(fid_2, None).await;
 
         let return_handle = tokio::spawn(async move {
             handle_1
@@ -631,8 +654,8 @@ mod test {
         let mut provider_1 = provider_1_r.unwrap().unwrap();
         let mut provider_2 = provider_2_r.unwrap().unwrap();
 
-        let mut handle_1 = provider_1.get_handle_for(fid_1).await;
-        let mut handle_2 = provider_2.get_handle_for(fid_2).await;
+        let mut handle_1 = provider_1.get_handle_for(fid_1, None).await;
+        let mut handle_2 = provider_2.get_handle_for(fid_2, None).await;
 
         handle_1
             .send(
