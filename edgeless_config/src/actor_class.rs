@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 use starlark::values::list::UnpackList;
 
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
@@ -15,7 +17,7 @@ pub struct EdgelessActorClass {
 starlark::starlark_simple_value!(EdgelessActorClass);
 
 impl std::fmt::Display for EdgelessActorClass {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -42,13 +44,13 @@ pub fn edgeless_actor_class(builder: &mut starlark::environment::GlobalsBuilder)
         heap: &'v starlark::values::Heap,
     ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(EdgelessActorClass {
-            id: id,
-            version: version,
+            id,
+            version,
             inputs: inputs.into_iter().map(|i| (i.id.clone(), i)).collect(),
             outputs: outputs.into_iter().map(|o| (o.id.clone(), o)).collect(),
             inner_structure: inner_structure.into_iter().collect(),
-            code: code,
-            code_type: code_type,
+            code,
+            code_type,
         }))
     }
 }

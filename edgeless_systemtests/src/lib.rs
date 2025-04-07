@@ -11,7 +11,7 @@ mod tests {
     async fn setup(
         num_domains: u32,
         num_nodes_per_domain: u32,
-        redis_url: Option<&str>,
+        _redis_url: Option<&str>,
     ) -> (Vec<futures::future::AbortHandle>, Box<(dyn WorkflowInstanceAPI)>) {
         assert!(num_domains > 0);
         assert!(num_nodes_per_domain > 0);
@@ -81,10 +81,7 @@ mod tests {
     }
 
     async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowInstance> {
-        match client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
-            Ok(instances) => instances,
-            Err(_) => vec![],
-        }
+        (client.list(edgeless_api::workflow_instance::WorkflowId::none()).await).unwrap_or_default()
     }
 
     fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {

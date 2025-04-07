@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 use futures::FutureExt;
-use opentelemetry::trace::Tracer;
 
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
@@ -98,7 +97,6 @@ impl GuestAPIHost {
         // let cloned_context = self.tracing_context.lock().await.parent_context.clone();
 
         tokio::spawn(async move {
-            let span = opentelemetry::global::tracer("actor_runtime_guest").start("wait");
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
             cloned_plane
                 .send_alias(cloned_alias, cloned_msg, opentelemetry::Context::new())

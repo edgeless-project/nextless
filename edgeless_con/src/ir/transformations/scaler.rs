@@ -11,15 +11,10 @@ impl Scaler {
 
 impl super::StatelessTransformation for Scaler {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
-        for (_fid, f) in &mut workflow.functions {
+        for f in workflow.functions.values_mut() {
             let mut f = f.borrow_mut();
 
-            let number_of_existing_instances = f.instances.iter().fold(0, |acc, i| match &*i.borrow() {
-                super::super::PhysicalComponentState::Existing(_) => acc + 1,
-                _ => acc,
-            });
-
-            if f.instances.len() == 0 {
+            if f.instances.is_empty() {
                 f.instances.push(std::cell::RefCell::new(super::super::PhysicalComponentState::new()));
             }
 
@@ -46,7 +41,7 @@ impl super::StatelessTransformation for Scaler {
                             processing_rate += instance_rate;
                         }
 
-                        for (_pid, p) in &mut materialized.borrow_mut().mapping.materialized_inputs {
+                        for p in materialized.borrow_mut().mapping.materialized_inputs.values_mut() {
                             if let Some(stats) = &p.port_statistics {
                                 message_rate += stats.message_rate_abs(std::time::Duration::from_secs(60)).unwrap_or(0f64)
                             }
@@ -56,7 +51,7 @@ impl super::StatelessTransformation for Scaler {
             });
 
             let should_scale_up = message_rate > 1.1 * processing_rate;
-            let should_scale_down = processing_rate < number_of_existing_instances as f64;
+            // let should_scale_down = processing_rate < number_of_existing_instances as f64;
             let wait_period_exceeded = if let Some(last_start) = last_start {
                 last_start.elapsed() > std::time::Duration::from_secs(60)
             } else {
@@ -76,15 +71,10 @@ impl super::StatelessTransformation for Scaler {
             //     f.instances.last().unwrap().borrow_mut().plan_stop();
             // }
         }
-        for (_rid, r) in &mut workflow.resources {
+        for r in workflow.resources.values_mut() {
             let mut r = r.borrow_mut();
 
-            let number_of_existing_instances = r.instances.iter().fold(0, |acc, i| match &*i.borrow() {
-                super::super::PhysicalComponentState::Existing(_) => acc + 1,
-                _ => acc,
-            });
-
-            if r.instances.len() == 0 {
+            if r.instances.is_empty() {
                 r.instances.push(std::cell::RefCell::new(super::super::PhysicalComponentState::new()));
             }
         }

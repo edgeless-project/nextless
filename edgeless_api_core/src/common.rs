@@ -51,7 +51,9 @@ impl<C, const N: usize> minicbor::Decode<'_, C> for TargetVec<N> {
         let mut s = Self(heapless::Vec::<Target, N>::new());
         for item in d.array_iter::<Target>().unwrap() {
             if let Ok(item) = item {
-                s.0.push(item);
+                if s.0.push(item).is_err() {
+                    log::error!("Too many Targets!");
+                }
             }
         }
         Ok(s)

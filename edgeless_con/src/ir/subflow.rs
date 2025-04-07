@@ -64,11 +64,11 @@ impl super::PhysicalComponent for PhysicalSubFlow {
     }
 
     fn id(&self) -> edgeless_api::function_instance::InstanceId {
-        self.id.clone()
+        self.id
     }
 
     fn creation_time(&self) -> std::time::Instant {
-        self.creation_time.clone()
+        self.creation_time
     }
 }
 

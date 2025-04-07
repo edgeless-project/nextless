@@ -3,10 +3,7 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-pub fn feasible_node_runtime_candidates<'a, 'b>(
-    actor: &'a crate::ir::actor::LogicalActor,
-    node: &'b dyn crate::ir::Node,
-) -> Vec<super::Candidate<'b>> {
+pub fn feasible_node_runtime_candidates<'b>(actor: &crate::ir::actor::LogicalActor, node: &'b dyn crate::ir::Node) -> Vec<super::Candidate<'b>> {
     let mut candidates = Vec::new();
 
     if !node_fulfills_constraints(actor, node) {
@@ -45,11 +42,10 @@ fn node_fulfills_constraints(actor: &crate::ir::actor::LogicalActor, node: &dyn 
     }
 
     for required_resource_class in &actor.constraints.resource_match_all {
-        if node
+        if !node
             .available_resource_providers()
             .iter()
-            .find(|r| r.1.class_type().as_str() == required_resource_class.as_str())
-            .is_none()
+            .any(|r| r.1.class_type().as_str() == required_resource_class.as_str())
         {
             return false;
         }
@@ -60,7 +56,7 @@ fn node_fulfills_constraints(actor: &crate::ir::actor::LogicalActor, node: &dyn 
 
 fn runtime_supported(code_format: &str, runtime: &crate::ir::Runtime) -> bool {
     match runtime {
-        super::Runtime::WasmBase(_wasm_runtime) => vec!["RUST", "RUST_WASM"].contains(&code_format),
-        super::Runtime::Native(_native_runtime) => vec!["RUST", "RUST_WASM"].contains(&code_format),
+        super::Runtime::WasmBase(_wasm_runtime) => ["RUST", "RUST_WASM"].contains(&code_format),
+        super::Runtime::Native(_native_runtime) => ["RUST", "RUST_WASM"].contains(&code_format),
     }
 }

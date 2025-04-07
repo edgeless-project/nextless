@@ -10,6 +10,7 @@ pub struct FileLogResourceProvider {
 }
 
 struct FileLogResourceProviderInner {
+    #[allow(unused)]
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, FileLogResource>,
@@ -40,7 +41,7 @@ impl FileLogResource {
                     channel_id,
                     message,
                     target_port,
-                    context,
+                    ..
                 } = dataplane_handle.receive_next().await;
 
                 let mut need_reply = false;

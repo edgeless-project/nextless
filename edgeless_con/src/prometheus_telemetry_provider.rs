@@ -13,7 +13,7 @@ impl PrometheusTelemetryProvider {
 
 impl crate::ir::TelemetryProvider for PrometheusTelemetryProvider {
     fn component_statistics_for(&self, component_id: &edgeless_api::function_instance::InstanceId) -> Box<dyn crate::ir::ComponentRuntimeStatistics> {
-        Box::new(PrometheusComponentRuntimeStatistics::new(component_id.clone(), &self.url))
+        Box::new(PrometheusComponentRuntimeStatistics::new(*component_id, &self.url))
     }
 
     fn input_port_statistics_for(
@@ -22,7 +22,7 @@ impl crate::ir::TelemetryProvider for PrometheusTelemetryProvider {
         port_id: &edgeless_api::function_instance::PortId,
     ) -> Box<dyn crate::ir::PortStatistics> {
         Box::new(PrometheusPortStatistics::new(
-            component_id.clone(),
+            *component_id,
             port_id.clone(),
             PortDirection::Input,
             &self.url,
@@ -35,7 +35,7 @@ impl crate::ir::TelemetryProvider for PrometheusTelemetryProvider {
         port_id: &edgeless_api::function_instance::PortId,
     ) -> Box<dyn crate::ir::PortStatistics> {
         Box::new(PrometheusPortStatistics::new(
-            component_id.clone(),
+            *component_id,
             port_id.clone(),
             PortDirection::Output,
             &self.url,
@@ -60,7 +60,9 @@ struct PrometheusPortStatistics {
 }
 
 struct PrometheusWasmRuntimeInfo {
+    #[allow(unused)]
     node_id: edgeless_api::function_instance::NodeId,
+    #[allow(unused)]
     client: prometheus_http_query::Client,
 }
 
@@ -72,7 +74,7 @@ enum PortDirection {
 impl PrometheusComponentRuntimeStatistics {
     fn new(component_id: edgeless_api::function_instance::InstanceId, url: &str) -> Self {
         PrometheusComponentRuntimeStatistics {
-            component_id: component_id.clone(),
+            component_id,
             client: prometheus_http_query::Client::from_str(url).expect("Critical Prometheus Configuration Error"),
         }
     }
@@ -279,7 +281,7 @@ impl crate::ir::PortStatistics for PrometheusPortStatistics {
 impl PrometheusWasmRuntimeInfo {
     fn new(node_id: &edgeless_api::function_instance::NodeId, url: &str) -> Self {
         Self {
-            node_id: node_id.clone(),
+            node_id: *node_id,
             client: prometheus_http_query::Client::from_str(url).expect("Critical Prometheus Configuration Error"),
         }
     }
@@ -304,7 +306,7 @@ fn single_value_helper(client: &prometheus_http_query::Client, query: String) ->
     let res = tokio::runtime::Handle::current().block_on(res_f);
     if let Ok(res) = res {
         if let Ok(val) = res.into_inner().0.into_vector() {
-            return Some(val.get(0)?.sample().value());
+            return Some(val.first()?.sample().value());
         }
     }
     log::debug!("Prometheus Quert Failed: {}", query);

@@ -13,7 +13,7 @@ impl ScoreableRuntime for crate::ir::Runtime<'_> {
             crate::ir::Runtime::WasmBase(wasm_runtime) => {
                 if let Some(runtime_info) = wasm_runtime.runtime_info() {
                     let cpu_load_score = 1.0 - (runtime_info.cpu_load() / wasm_runtime.num_cores() as f32);
-                    let memory_load_score = 1.0 - (runtime_info.mem_used() as f32 / wasm_runtime.mem_size_bytes() as f32);
+                    let memory_load_score = 1.0 - (runtime_info.mem_used() / wasm_runtime.mem_size_bytes() as f32);
                     0.5 * cpu_load_score + 0.5 * memory_load_score
                 } else {
                     0.01f32
@@ -22,7 +22,7 @@ impl ScoreableRuntime for crate::ir::Runtime<'_> {
             crate::ir::Runtime::Native(native_runtime) => {
                 if let Some(runtime_info) = native_runtime.runtime_info() {
                     let cpu_load_score = 1.0 - (runtime_info.cpu_load() / native_runtime.num_cores() as f32);
-                    let memory_load_score = 1.0 - (runtime_info.mem_used() as f32 / native_runtime.mem_size_bytes() as f32);
+                    let memory_load_score = 1.0 - (runtime_info.mem_used() / native_runtime.mem_size_bytes() as f32);
                     0.5 * cpu_load_score + 0.5 * memory_load_score
                 } else {
                     0.01f32

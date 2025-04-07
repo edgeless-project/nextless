@@ -34,6 +34,12 @@ struct WasmiFunctionInstanceWrapper {
     inner: WasmiFunctionInstance,
 }
 
+impl Default for WasmiRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WasmiRuntime {
     pub fn new() -> Self {
         Self {
@@ -49,7 +55,7 @@ impl WasmiRuntime {
             }
         }
 
-        return false;
+        false
     }
 
     pub async fn launch(&mut self, agent: crate::agent::EmbeddedAgent) {
@@ -62,7 +68,7 @@ impl crate::invocation::InvocationAPI for WasmiRuntime {
         if let Some(f) = self.functions.iter_mut().find(|f| f.instance_id == event.target) {
             return f.handle(event).await;
         }
-        return Ok(edgeless_api_core::invocation::LinkProcessingResult::PASSED);
+        Ok(edgeless_api_core::invocation::LinkProcessingResult::PASSED)
     }
 }
 
@@ -81,12 +87,7 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
             .expect("Bad Image");
         let image2 = image.image().unwrap();
 
-        if self
-            .functions
-            .iter()
-            .find(|f| f.instance_id == instance_specification.instance_id)
-            .is_some()
-        {
+        if self.functions.iter().any(|f| f.instance_id == instance_specification.instance_id) {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Function Id Exists",
                 detail: None,
@@ -101,9 +102,9 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
 
         let mut inner_fun = WasmiFunctionInstance::instantiate(
             guest_api::GuestAPIHost {
-                instance_id: instance_specification.instance_id.clone(),
+                instance_id: instance_specification.instance_id,
                 data_plane: core::cell::RefCell::new(crate::dataplane::EmbeddedDataplaneHandle::new(
-                    instance_specification.instance_id.clone(),
+                    instance_specification.instance_id,
                     self.agent.clone().unwrap(),
                     output_mapping,
                 )),
@@ -117,7 +118,7 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
 
         let fun = WasmiFunctionInstanceWrapper {
             inner: inner_fun,
-            instance_id: instance_specification.instance_id.clone(),
+            instance_id: instance_specification.instance_id,
         };
 
         self.functions.push(fun);
@@ -231,7 +232,7 @@ impl WasmiFunctionInstance {
         let _comfig = wasmi::Config::default();
 
         let engine = wasmi::Engine::default();
-        let module = wasmi::Module::new(&engine, &code[..]).unwrap();
+        let module = wasmi::Module::new(&engine, code).unwrap();
         let mut store = wasmi::Store::new(&engine, guest_api_binding::GuestAPI { host: guest_api_host });
         let mut linker = wasmi::Linker::<guest_api_binding::GuestAPI>::new(&engine);
 
@@ -292,9 +293,7 @@ impl WasmiFunctionInstance {
             edgefunctione_handle_stop: instance
                 .get_typed_func::<(), ()>(&mut store, "handle_stop_asm")
                 .map_err(|_| FunctionInstanceError::BadCode)?,
-            memory: instance
-                .get_memory(&mut store, "memory")
-                .ok_or_else(|| (FunctionInstanceError::BadCode))?,
+            memory: instance.get_memory(&mut store, "memory").ok_or(FunctionInstanceError::BadCode)?,
             store,
         })
     }
@@ -370,7 +369,7 @@ impl WasmiFunctionInstance {
         )
         .map_err(|_| FunctionInstanceError::BadCode)?;
 
-        let port_len = port.as_bytes().len();
+        let port_len = port.len();
         let port_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
             .map_err(|_| FunctionInstanceError::BadCode)?;
 
@@ -426,7 +425,7 @@ impl WasmiFunctionInstance {
         )
         .map_err(|_| FunctionInstanceError::BadCode)?;
 
-        let port_len = port.as_bytes().len();
+        let port_len = port.len();
         let port_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
             .map_err(|_| FunctionInstanceError::BadCode)?;
 

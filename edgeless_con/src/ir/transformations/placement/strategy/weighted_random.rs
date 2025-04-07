@@ -13,12 +13,12 @@ pub struct WeightedRandom {
 impl super::PlacementStrategy for WeightedRandom {
     type GlobalState = ();
 
-    fn select_candidate<'a, 'b>(
-        &'a mut self,
+    fn select_candidate<'b>(
+        &mut self,
         candidates: Vec<crate::ir::transformations::placement::Candidate<'b>>,
         _global_state: &mut Self::GlobalState,
     ) -> Option<crate::ir::transformations::placement::Candidate<'b>> {
-        let highmark: f64 = candidates.iter().map(|c| c.runtime.capacity_score() as f64).sum();
+        let highmark: f64 = candidates.iter().map(|c| c.runtime.capacity_score()).sum();
         let rnd = if highmark > 0.0 {
             let rv = rand::distributions::Uniform::new(0.0, highmark);
             rv.sample(&mut self.rng)
@@ -28,7 +28,7 @@ impl super::PlacementStrategy for WeightedRandom {
 
         let mut sum = 0.0_f64;
         for c in candidates {
-            sum += c.runtime.capacity_score() as f64;
+            sum += c.runtime.capacity_score();
             if sum >= rnd {
                 return Some(c.clone());
             }

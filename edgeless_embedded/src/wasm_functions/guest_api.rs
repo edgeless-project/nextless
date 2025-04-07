@@ -33,11 +33,7 @@ impl From<crate::dataplane::DataplaneError> for GuestAPIError {
 
 impl GuestAPIHost {
     pub async fn cast_alias(&self, alias: &str, msg: &[u8]) -> Result<(), GuestAPIError> {
-        self.data_plane
-            .borrow_mut()
-            .send_alias(alias, msg)
-            .await
-            .map_err(|e| GuestAPIError::from(e))?;
+        self.data_plane.borrow_mut().send_alias(alias, msg).await.map_err(GuestAPIError::from)?;
         Ok(())
     }
 
@@ -49,9 +45,9 @@ impl GuestAPIHost {
     ) -> Result<(), GuestAPIError> {
         self.data_plane
             .borrow_mut()
-            .send(self.instance_id.clone(), target, target_port, msg)
+            .send(self.instance_id, target, target_port, msg)
             .await
-            .map_err(|e| GuestAPIError::from(e))?;
+            .map_err(GuestAPIError::from)?;
         Ok(())
     }
 

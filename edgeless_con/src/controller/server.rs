@@ -28,7 +28,6 @@ pub struct WorkerNode {
     pub resource_providers: std::collections::HashMap<String, ResourceProvider>,
     pub capabilities: edgeless_api::node_registration::NodeCapabilities,
     pub health_status: edgeless_api::node_management::HealthStatus,
-    pub weight: f32,
     pub supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
     // This should probably be based on link types and is a placeholder
     pub is_proxy: bool,
@@ -38,9 +37,9 @@ pub struct WorkerNode {
 }
 
 pub struct PeerCluster {
-    pub controller_url: String,
+    pub _controller_url: String,
     pub api: Box<dyn edgeless_api::controller::ControllerAPI + Send>,
-    pub supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
+    pub _supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
 }
 
 #[derive(serde::Serialize)]
@@ -92,11 +91,11 @@ impl crate::ir::Node for WorkerNode {
     }
 
     fn node_id(&self) -> edgeless_api::function_instance::NodeId {
-        self.id.clone()
+        self.id
     }
 
     fn cluster_id(&self) -> edgeless_api::function_instance::NodeId {
-        self.cluster_id.clone()
+        self.cluster_id
     }
 }
 
@@ -114,8 +113,7 @@ impl crate::ir::WasmRuntime for WorkerNode {
     }
 
     fn runtime_info(&self) -> Option<Box<dyn crate::ir::WasmRuntimeInfo>> {
-        // self.telemetry_provider.wasm_runtime_statistics_for(&self.id)
-        None
+        self.telemetry_provider.as_ref().map(|t| t.wasm_runtime_statistics_for(&self.id))
     }
 }
 
@@ -145,8 +143,7 @@ impl crate::ir::NativeRuntime for WorkerNode {
     }
 
     fn runtime_info(&self) -> Option<Box<dyn crate::ir::WasmRuntimeInfo>> {
-        // todo!()
-        None
+        todo!()
     }
 }
 
@@ -258,7 +255,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         let required_changes = {
             let nodes = self.nodes.lock().await;
             let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
-                nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
+                nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
             tokio::task::block_in_place(|| wf.initial_spawn(&ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state))
         };
 
@@ -320,9 +317,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         &mut self,
         workflow_id: &edgeless_api::workflow_instance::WorkflowId,
     ) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>> {
-        let mut ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = vec![];
-        if let Some(wf) = self.active_workflows.get(workflow_id) {
-            ret = vec![edgeless_api::workflow_instance::WorkflowInstance {
+        let ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = if let Some(wf) = self.active_workflows.get(workflow_id) {
+            vec![edgeless_api::workflow_instance::WorkflowInstance {
                 workflow_id: workflow_id.clone(),
                 node_mapping: wf
                     .wf
@@ -333,10 +329,9 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                         node_ids: a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect(),
                     })
                     .collect(),
-            }];
+            }]
         } else {
-            ret = self
-                .active_workflows
+            self.active_workflows
                 .iter()
                 .map(|(wf_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: wf_id.clone(),
@@ -350,8 +345,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                         })
                         .collect(),
                 })
-                .collect();
-        }
+                .collect()
+        };
         Ok(ret)
     }
 
@@ -363,7 +358,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
             let required_changes = {
                 let nodes = self.nodes.lock().await;
                 let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
-                    nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
+                    nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
                 tokio::task::block_in_place(|| {
                     wf.patch_external_links(req.clone(), &ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state)
                 })
@@ -397,14 +392,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
 
         let api = Self::get_api_for_url(&agent_url).await;
 
-        let mut node_weight = (std::cmp::max(capabilities.num_cores, capabilities.num_cpus) as f32) * capabilities.clock_freq_cpu;
-        if node_weight == 0.0 {
-            // Force a vanishing weight to an arbitrary value.
-            node_weight = 1.0;
-        };
-
         self.nodes.lock().await.insert(
-            node_id.clone(),
+            node_id,
             WorkerNode {
                 agent_url,
                 invocation_url: invocation_url.clone(),
@@ -423,11 +412,10 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                     .collect(),
                 capabilities,
                 health_status: edgeless_api::node_management::HealthStatus::empty(),
-                weight: node_weight,
                 supported_link_types: link_providers.into_iter().map(|p| (p.class, p.provider_id)).collect(),
                 is_proxy: true,
                 id: node_id,
-                cluster_id: self.cluster_id.clone(),
+                cluster_id: self.cluster_id,
                 telemetry_provider: self.telemetry_provider.clone(),
             },
         );
@@ -644,10 +632,10 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         match response {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    log::warn!("function instance creation rejected: {}", error);
+                    log::warn!("function instance {}:{} creation rejected: {}", wf_id.to_string(), f_name, error);
                     Err(format!("function instance creation rejected: {} ", error))
                 }
-                edgeless_api::common::StartComponentResponse::InstanceId(id) => Ok(()),
+                edgeless_api::common::StartComponentResponse::InstanceId(_id) => Ok(()),
             },
             Err(err) => Err(format!("failed interaction when creating a function instance: {}", err)),
         }
@@ -814,7 +802,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
             let required_changes = {
                 let nodes = self.nodes.lock().await;
                 let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
-                    nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
+                    nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
                 tokio::task::block_in_place(|| {
                     wf.node_removal(
                         removed_nodes,
@@ -846,7 +834,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
             let required_changes = {
                 let nodes = self.nodes.lock().await;
                 let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
-                    nodes.iter().map(|(n_id, node)| (n_id.clone(), node as &dyn crate::ir::Node)).collect();
+                    nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
                 tokio::task::block_in_place(|| wf.periodic_optimize(&ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state))
             };
             if let Err(errs) = self.materialize(wf_id, required_changes).await {

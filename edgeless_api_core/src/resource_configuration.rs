@@ -47,13 +47,17 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
 
         for item in d.array_iter::<(&str, crate::common::Output)>().unwrap() {
             if let Ok(item) = item {
-                outputs.push(item);
+                if outputs.push(item).is_err() {
+                    log::info!("Too many Outputs");
+                }
             }
         }
 
         for item in d.array_iter::<(&str, &str)>().unwrap() {
             if let Ok(item) = item {
-                configuration.push(item);
+                if configuration.push(item).is_err() {
+                    log::info!("Too many Configuration Options");
+                }
             }
         }
 
@@ -100,7 +104,9 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedPatchRequest<'b> {
 
         for item in d.array_iter::<(&str, crate::common::Output)>().unwrap() {
             if let Ok(item) = item {
-                outputs.push(item);
+                if outputs.push(item).is_err() {
+                    log::error!("Too many Outputs");
+                }
             }
         }
 

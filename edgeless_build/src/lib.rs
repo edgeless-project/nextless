@@ -110,7 +110,7 @@ pub fn package_rust(function_source_dir: String) -> anyhow::Result<String> {
         tar.append_path_with_name(src_src, src_dest).unwrap();
     }
 
-    return Ok(build_file.to_str().unwrap().to_string());
+    Ok(build_file.to_str().unwrap().to_string())
 }
 
 pub fn unpack_rust_package(rust_tar: &[u8]) -> anyhow::Result<String> {

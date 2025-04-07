@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
 pub enum Mapping {
     Unmapped,
@@ -13,7 +15,7 @@ starlark::starlark_simple_value!(Mapping);
 impl<'v> starlark::values::StarlarkValue<'v> for Mapping {}
 
 impl std::fmt::Display for Mapping {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -35,11 +37,13 @@ pub struct PortGen<MappingType> {
 pub type Port = PortGen<std::rc::Rc<std::cell::RefCell<Mapping>>>;
 pub type FrozenPort = PortGen<Mapping>;
 
+#[allow(clippy::needless_lifetimes)]
 #[starlark::values::starlark_value(type = "edgeless_frozen_port_C")]
 impl<'v> starlark::values::StarlarkValue<'v> for FrozenPort {
     type Canonical = FrozenPort;
 }
 
+#[allow(clippy::needless_lifetimes)]
 #[starlark::values::starlark_value(type = "edgeless_port_C")]
 impl<'v> starlark::values::StarlarkValue<'v> for Port {
     type Canonical = Port;
@@ -47,7 +51,7 @@ impl<'v> starlark::values::StarlarkValue<'v> for Port {
     fn right_shift(
         &self,
         other: starlark::values::Value<'v>,
-        heap: &'v starlark::values::Heap,
+        _heap: &'v starlark::values::Heap,
     ) -> Result<starlark::values::Value<'v>, starlark::Error> {
         if let Some(port) = starlark::values::ValueLike::downcast_ref::<Port>(other) {
             log::info!("{}", port.port_id);
@@ -86,7 +90,7 @@ impl<'v> starlark::values::StarlarkValue<'v> for Port {
     fn left_shift(
         &self,
         other: starlark::values::Value<'v>,
-        heap: &'v starlark::values::Heap,
+        _heap: &'v starlark::values::Heap,
     ) -> Result<starlark::values::Value<'v>, starlark::Error> {
         if let Some(filter) = starlark::values::ValueLike::downcast_ref::<Mapping>(other) {
             *self.mapping.borrow_mut() = filter.clone();
@@ -103,7 +107,7 @@ impl<'v> starlark::values::AllocValue<'v> for Port {
 }
 
 impl<V> std::fmt::Display for PortGen<V> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -128,14 +132,14 @@ impl starlark::values::Freeze for Port {
 }
 
 unsafe impl<'v> starlark::values::Trace<'v> for Port {
-    fn trace(&mut self, tracer: &starlark::values::Tracer<'v>) {
+    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {
         todo!()
     }
 }
 
 #[starlark::starlark_module]
 pub fn edgeless_port(builder: &mut starlark::environment::GlobalsBuilder) {
-    fn topic(topic: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
+    fn topic<'v>(topic: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(Mapping::Topic(topic)))
     }
 

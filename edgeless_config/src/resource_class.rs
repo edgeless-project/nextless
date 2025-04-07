@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
 pub struct EdgelessResourceClass {
     pub id: String,
@@ -9,7 +11,7 @@ pub struct EdgelessResourceClass {
 starlark::starlark_simple_value!(EdgelessResourceClass);
 
 impl std::fmt::Display for EdgelessResourceClass {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -25,17 +27,15 @@ impl<'v> starlark::values::UnpackValue<'v> for EdgelessResourceClass {
 
 #[starlark::starlark_module]
 pub fn edgeless_resource_class(builder: &mut starlark::environment::GlobalsBuilder) {
-    fn edgeless_resource_class(
+    fn edgeless_resource_class<'v>(
         id: String,
-        // version: String,
         outputs: starlark::values::list::UnpackList<crate::port_class::PortSpec>,
         inputs: starlark::values::list::UnpackList<crate::port_class::PortSpec>,
         inner_structure: starlark::values::list::UnpackList<super::inner_structure::Mapping>,
         heap: &'v starlark::values::Heap,
-    ) -> anyhow::Result<starlark::values::Value> {
+    ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(EdgelessResourceClass {
-            id: id,
-            // version: version,
+            id,
             inputs: inputs.into_iter().map(|i| (i.id.clone(), i)).collect(),
             ouputs: outputs.into_iter().map(|o| (o.id.clone(), o)).collect(),
             inner_structure: inner_structure.into_iter().collect(),

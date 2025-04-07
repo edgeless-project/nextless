@@ -30,7 +30,7 @@ pub struct EncodedFunctionClassSpecification {
 }
 
 impl<C> minicbor::Encode<C> for EncodedFunctionInstanceSpecification<'_> {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         e.encode(self.instance_id)?;
         e.encode(&self.class)?;
 
@@ -62,7 +62,7 @@ impl<C> minicbor::CborLen<C> for EncodedFunctionInstanceSpecification<'_> {
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for EncodedFunctionInstanceSpecification<'b> {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let instance_id = d.decode::<crate::instance_id::InstanceId>()?;
         let class = d.decode::<EncodedFunctionClassSpecification>()?;
 
@@ -92,7 +92,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedFunctionInstanceSpecification<'b>
 }
 
 impl<C> minicbor::Encode<C> for EncodedFunctionClassSpecification {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         e.encode(self.class_id.as_str())?;
         e.encode(self.class_type.as_str())?;
         e.encode(self.version.as_str())?;
@@ -113,13 +113,13 @@ impl<C> minicbor::CborLen<C> for EncodedFunctionClassSpecification {
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for EncodedFunctionClassSpecification {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let class_id: heapless::String<32> =
-            heapless::String::<32>::from_str(d.str()?).map_err(|e| minicbor::decode::Error::message("Bad String"))?;
+            heapless::String::<32>::from_str(d.str()?).map_err(|_| minicbor::decode::Error::message("Bad String"))?;
         let class_type: heapless::String<32> =
-            heapless::String::<32>::from_str(d.str()?).map_err(|e| minicbor::decode::Error::message("Bad String"))?;
-        let version: heapless::String<8> = heapless::String::<8>::from_str(d.str()?).map_err(|e| minicbor::decode::Error::message("Bad String"))?;
-        let config_hash: [u8; 32] = d.bytes()?.try_into().map_err(|e| minicbor::decode::Error::message("Bad Hash"))?;
+            heapless::String::<32>::from_str(d.str()?).map_err(|_| minicbor::decode::Error::message("Bad String"))?;
+        let version: heapless::String<8> = heapless::String::<8>::from_str(d.str()?).map_err(|_| minicbor::decode::Error::message("Bad String"))?;
+        let config_hash: [u8; 32] = d.bytes()?.try_into().map_err(|_| minicbor::decode::Error::message("Bad Hash"))?;
         let image_size: u64 = d.u64()?;
         Ok(EncodedFunctionClassSpecification {
             class_id,
@@ -134,7 +134,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedFunctionClassSpecification {
 impl EncodedFunctionInstanceSpecification<'_> {
     pub fn to_owned_spec(&self) -> OwnedFunctionInstanceSpecification {
         OwnedFunctionInstanceSpecification {
-            instance_id: self.instance_id.clone(),
+            instance_id: self.instance_id,
             class: self.class.clone(),
             input_mapping: self
                 .input_mapping
@@ -149,9 +149,9 @@ impl EncodedFunctionInstanceSpecification<'_> {
         }
     }
 
-    pub fn from_owned_spec<'a>(owned: &'a OwnedFunctionInstanceSpecification) -> EncodedFunctionInstanceSpecification<'a> {
+    pub fn from_owned_spec(owned: &OwnedFunctionInstanceSpecification) -> EncodedFunctionInstanceSpecification<'_> {
         EncodedFunctionInstanceSpecification {
-            instance_id: owned.instance_id.clone(),
+            instance_id: owned.instance_id,
             class: owned.class.clone(),
             input_mapping: owned.input_mapping.iter().map(|(k, v)| (k.as_str(), v.clone())).collect(),
             output_mapping: owned.output_mapping.iter().map(|(k, v)| (k.as_str(), v.clone())).collect(),

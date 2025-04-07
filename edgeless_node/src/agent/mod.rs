@@ -29,6 +29,7 @@ enum AgentRequest {
 
 pub struct Agent {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
+    #[allow(unused)]
     node_id: uuid::Uuid,
 }
 
@@ -347,10 +348,7 @@ impl Agent {
 
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::agent::AgentAPI + Send> {
         Box::new(AgentClient {
-            function_instance_client: Box::new(FunctionInstanceNodeClient {
-                sender: self.sender.clone(),
-                node_id: self.node_id,
-            }),
+            function_instance_client: Box::new(FunctionInstanceNodeClient { sender: self.sender.clone() }),
             node_management_client: Box::new(NodeManagementClient { sender: self.sender.clone() }),
             resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
             link_instance_client: Box::new(LinkInstanceAPIClient { sender: self.sender.clone() }),
@@ -362,7 +360,6 @@ impl Agent {
 #[derive(Clone)]
 pub struct FunctionInstanceNodeClient {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
-    node_id: uuid::Uuid,
 }
 
 #[derive(Clone)]
@@ -517,13 +514,22 @@ impl edgeless_api::link::LinkInstanceAPI for LinkInstanceAPIClient {
 #[async_trait::async_trait]
 impl edgeless_api::proxy_instance::ProxyInstanceAPI for ProxyInstanceAPIClient {
     async fn start(&mut self, request: edgeless_api::proxy_instance::ProxySpec) -> anyhow::Result<()> {
-        Ok(())
+        match self.sender.send(AgentRequest::StartProxy(request)).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!("Agent channel error: {}", err.to_string())),
+        }
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        Ok(())
+        match self.sender.send(AgentRequest::StopProxy(id)).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!("Agent channel error: {}", err.to_string())),
+        }
     }
     async fn patch(&mut self, update: edgeless_api::proxy_instance::ProxySpec) -> anyhow::Result<()> {
-        Ok(())
+        match self.sender.send(AgentRequest::PatchProxy(update)).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!("Agent channel error: {}", err.to_string())),
+        }
     }
 }
 

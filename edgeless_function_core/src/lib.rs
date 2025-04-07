@@ -88,9 +88,7 @@ impl<'a> Serialize<'a> for () {
 }
 
 impl Deserialize<'_> for () {
-    fn deserialize(raw: &[u8]) -> Self {
-        ()
-    }
+    fn deserialize(_raw: &[u8]) -> Self {}
 }
 
 impl<'a> Serialize<'a> for &'a str {

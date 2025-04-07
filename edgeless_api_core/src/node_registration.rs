@@ -23,7 +23,7 @@ pub struct ResourceProviderSpecification<'a> {
 }
 
 impl<C> minicbor::Encode<C> for NodeId {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let n_id = *self.0.as_bytes();
         e.bytes(&n_id)?;
         Ok(())
@@ -31,7 +31,7 @@ impl<C> minicbor::Encode<C> for NodeId {
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for NodeId {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let n_id: [u8; 16] = (*d.bytes()?).try_into().unwrap();
         Ok(NodeId(uuid::Uuid::from_bytes(n_id)))
     }
@@ -45,7 +45,7 @@ impl<C> minicbor::CborLen<C> for NodeId {
 }
 
 impl<C> minicbor::Encode<C> for EncodedNodeRegistration<'_> {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e;
         e = e.encode(self.node_id.clone())?;
         e = e.encode(self.agent_url.as_str())?;
@@ -69,7 +69,7 @@ impl<C> minicbor::Encode<C> for EncodedNodeRegistration<'_> {
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let id: NodeId = d.decode()?;
         let agent_url: &str = d.str()?;
         let invocation_url: &str = d.str()?;
@@ -78,14 +78,21 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
 
         for item in d.array_iter::<ResourceProviderSpecification<'b>>().unwrap() {
             if let Ok(item) = item {
-                resources.push(item);
+                if resources.push(item).is_err() {
+                    log::error!("Too many Resources");
+                }
             }
         }
 
         let mut runtimes = heapless::Vec::<heapless::String<32>, 4>::new();
         for item in d.array_iter::<&'b str>().unwrap() {
             if let Ok(item) = item {
-                runtimes.push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?);
+                if runtimes
+                    .push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?)
+                    .is_err()
+                {
+                    log::error!("Too many Runtimes");
+                }
             }
         }
 
@@ -103,7 +110,7 @@ impl<C> minicbor::CborLen<C> for EncodedNodeRegistration<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let mut len = self.node_id.cbor_len(ctx) + self.agent_url.cbor_len(ctx) + self.invocation_url.cbor_len(ctx);
 
-        len = len + self.resources[..self.resources.len()].cbor_len(ctx);
+        len += self.resources[..self.resources.len()].cbor_len(ctx);
 
         let rts: heapless::Vec<&str, 16> = self.runtimes.iter().map(|i| i.as_str()).collect();
 
@@ -112,7 +119,7 @@ impl<C> minicbor::CborLen<C> for EncodedNodeRegistration<'_> {
 }
 
 impl<C> minicbor::Encode<C> for ResourceProviderSpecification<'_> {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e;
         e = e.encode(self.provider_id)?;
         e = e.encode(self.class_type)?;

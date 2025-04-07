@@ -33,7 +33,7 @@ pub fn load(main_file: std::path::PathBuf) -> anyhow::Result<LoadResult> {
         }
     }
 
-    return Err(anyhow::anyhow!("Tried to load unknown entity!"));
+    Err(anyhow::anyhow!("Tried to load unknown entity!"))
 }
 
 fn load_module(file: &std::path::PathBuf) -> starlark::Result<starlark::environment::FrozenModule> {

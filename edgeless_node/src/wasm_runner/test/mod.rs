@@ -86,7 +86,7 @@ async fn basic_lifecycle() {
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: instance_id,
+        instance_id,
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
@@ -226,7 +226,7 @@ async fn messaging_test_setup() -> (
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: instance_id,
+        instance_id,
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
@@ -664,7 +664,7 @@ async fn state_management() {
     tokio::spawn(async move { rt_task.run().await });
 
     let mut spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: instance_id,
+        instance_id,
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),

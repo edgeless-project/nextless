@@ -141,7 +141,7 @@ pub async fn scd30_sensor_task(
         let lck = state.lock().await;
 
         if let (Some(instance_id), Some(data_out_id)) = (lck.instance_id, lck.data_out_id.clone()) {
-            let mut dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id.clone(), agent.clone(), heapless::Vec::new());
+            let mut dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id, agent.clone(), heapless::Vec::new());
 
             let mut buffer = heapless::String::<150>::new();
             if core::fmt::write(
@@ -152,21 +152,28 @@ pub async fn scd30_sensor_task(
             {
                 match data_out_id {
                     edgeless_api_core::common::Output::Single(id) => {
-                        dataplane_handle.send(instance_id, id.instance_id, id.port_id, buffer.as_bytes()).await;
+                        dataplane_handle
+                            .send(instance_id, id.instance_id, id.port_id, buffer.as_bytes())
+                            .await
+                            .unwrap();
                     }
                     edgeless_api_core::common::Output::Any(ids) => {
                         let id = ids.0.first();
                         if let Some(id) = id {
                             dataplane_handle
                                 .send(instance_id, id.instance_id, id.port_id.clone(), buffer.as_bytes())
-                                .await;
+                                .await
+                                .unwrap();
                         } else {
                             // return Err(GuestAPIError::UnknownAlias)
                         }
                     }
                     edgeless_api_core::common::Output::All(ids) => {
                         for id in ids.0 {
-                            dataplane_handle.send(instance_id, id.instance_id, id.port_id, buffer.as_bytes()).await;
+                            dataplane_handle
+                                .send(instance_id, id.instance_id, id.port_id, buffer.as_bytes())
+                                .await
+                                .unwrap();
                         }
                     }
                 }

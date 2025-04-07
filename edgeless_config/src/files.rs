@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
 pub struct File {
     pub path: String,
@@ -6,7 +8,7 @@ pub struct File {
 starlark::starlark_simple_value!(File);
 
 impl std::fmt::Display for File {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }

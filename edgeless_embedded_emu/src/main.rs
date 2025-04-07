@@ -47,9 +47,9 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
     let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
     static APP_TX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-    let app_tx = APP_TX_RAW.init_with(|| [0 as u8; 2500]);
+    let app_tx = APP_TX_RAW.init_with(|| [0_u8; 2500]);
     static APP_RX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-    let app_rx = APP_RX_RAW.init_with(|| [0 as u8; 2500]);
+    let app_rx = APP_RX_RAW.init_with(|| [0_u8; 2500]);
 
     let device = embassy_net_tuntap::TunTapDevice::new("tap0").unwrap();
     let config = embassy_net::Config::ipv4_static(embassy_net::StaticConfigV4 {
@@ -73,7 +73,7 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     let resources = RESOURCES_RAW.init_with(|| [display, sensor_scd30]);
 
     static WASM_RUNTIME_RAW: static_cell::StaticCell<edgeless_embedded::wasm_functions::WasmiRuntime> = static_cell::StaticCell::new();
-    let wasm_runtime = WASM_RUNTIME_RAW.init_with(|| edgeless_embedded::wasm_functions::WasmiRuntime::new());
+    let wasm_runtime = WASM_RUNTIME_RAW.init_with(edgeless_embedded::wasm_functions::WasmiRuntime::new);
 
     let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID, Some(wasm_runtime), resources).await;
 

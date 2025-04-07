@@ -50,7 +50,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         let instance_id = spawn_req.instance_id;
         let mut telemetry_handle = telemetry_handle;
         let mut state_handle = state_handle;
-        let mut data_plane = data_plane;
+        let data_plane = data_plane;
 
         let (poison_pill_sender, poison_pill_receiver) = tokio::sync::broadcast::channel::<()>(1);
         let serialized_state = state_handle.get().await;
@@ -250,7 +250,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         span_context: opentelemetry::trace::SpanContext,
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
-        let mut span = self
+        let span = self
             .span(format!("process_cast_{}", target_port.0), span_context, Some(target_port.clone()))
             .await;
         let context = opentelemetry::Context::with_span(&opentelemetry::Context::new(), span);
@@ -269,7 +269,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.tracing_context.lock().await.parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
-                duration: duration.clone(),
+                duration,
                 error: exec_result.is_err(),
                 under_duration_soft_limit: duration < self.duration_soft_limit,
             },
@@ -308,7 +308,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.tracing_context.lock().await.parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
-                duration: duration.clone(),
+                duration,
                 error: res.is_err(),
                 under_duration_soft_limit: duration < self.duration_soft_limit,
             },
@@ -325,9 +325,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn stop(&mut self) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
-        let mut span = self
-            .span("process_stop".to_string(), opentelemetry::trace::SpanContext::empty_context(), None)
-            .await;
 
         self.function_instance
             .as_mut()

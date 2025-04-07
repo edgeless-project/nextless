@@ -33,7 +33,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
 
         match res {
             Ok(_) => Ok(crate::common::StartComponentResponse::InstanceId(
-                instance_specification.resource_id.clone(), // edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(&data).unwrap(),
+                instance_specification.resource_id, // edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(&data).unwrap(),
             )),
             Err(data) => Ok(crate::common::StartComponentResponse::ResponseError(crate::common::ResponseError {
                 summary: minicbor::decode::<&str>(&data).unwrap().to_string(),

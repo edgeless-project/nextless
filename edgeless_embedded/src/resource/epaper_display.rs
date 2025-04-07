@@ -72,7 +72,7 @@ impl crate::resource::Resource for EPaperDisplay {
         false
     }
 
-    async fn launch(&mut self, _spawner: embassy_executor::Spawner, agent: crate::agent::EmbeddedAgent) {}
+    async fn launch(&mut self, _spawner: embassy_executor::Spawner, _agent: crate::agent::EmbeddedAgent) {}
 }
 
 #[embassy_executor::task]
@@ -163,7 +163,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
 
     async fn patch(
         &mut self,
-        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+        _resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         Ok(())
     }

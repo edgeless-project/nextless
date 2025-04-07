@@ -41,7 +41,7 @@ pub fn std_outputs_to_core_ouputs(
                         }
                         edgeless_api_core::common::Output::Any(id_vec)
                     }
-                    crate::common::Output::Link(link_id) => todo!(),
+                    crate::common::Output::Link(_link_id) => todo!(),
                 },
             ))
             .map_err(|_| anyhow::anyhow!("Too many outputs"))?;

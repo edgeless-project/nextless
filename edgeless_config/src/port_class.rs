@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Method {
@@ -24,7 +26,7 @@ pub struct PortSpec {
 }
 
 impl std::fmt::Display for PortSpec {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -42,9 +44,9 @@ impl<'v> starlark::values::UnpackValue<'v> for PortSpec {
 
 #[starlark::starlark_module]
 pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
-    fn cast_output(id: String, data: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
+    fn cast_output<'v>(id: String, data: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(PortSpec {
-            id: id,
+            id,
             method: Method::Cast,
             direction: Direction::Output,
             data_type: data,
@@ -52,9 +54,9 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
         }))
     }
 
-    fn cast_input(id: String, data: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
+    fn cast_input<'v>(id: String, data: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(PortSpec {
-            id: id,
+            id,
             method: Method::Cast,
             direction: Direction::Input,
             data_type: data,
@@ -62,14 +64,14 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
         }))
     }
 
-    fn call_output(
+    fn call_output<'v>(
         id: String,
         data: String,
         return_data: Option<String>,
         heap: &'v starlark::values::Heap,
-    ) -> anyhow::Result<starlark::values::Value> {
+    ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(PortSpec {
-            id: id,
+            id,
             method: Method::Call,
             direction: Direction::Output,
             data_type: data,
@@ -77,14 +79,14 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
         }))
     }
 
-    fn call_input(
+    fn call_input<'v>(
         id: String,
         data: String,
         return_data: Option<String>,
         heap: &'v starlark::values::Heap,
-    ) -> anyhow::Result<starlark::values::Value> {
+    ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(PortSpec {
-            id: id,
+            id,
             method: Method::Call,
             direction: Direction::Input,
             data_type: data,

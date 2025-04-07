@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 pub struct WorkflowLink {
+    #[allow(unused)]
     pub(crate) id: edgeless_api::link::LinkInstanceId,
     pub(crate) class: edgeless_api::link::LinkType,
     pub(crate) materialized: bool,

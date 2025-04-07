@@ -91,11 +91,11 @@ impl EmbeddedAgent {
             } else {
                 static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>> =
                     static_cell::StaticCell::new();
-                let channel = CHANNEL_RAW.init_with(|| embassy_sync::channel::Channel::<
+                let channel = CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<
                     embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
                     AgentEvent,
                     2,
-                    >::new()
+                    >::new
                 );
                 static BUFFER_CHANNEL_RAW: static_cell::StaticCell<
                     embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
@@ -253,7 +253,7 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
             self.upstream_sender.send(AgentEvent::Invocation(event)).await;
             Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
         } else {
-            if let Ok(_) = self.internal_buffer_sender.try_send(event) {
+            if self.internal_buffer_sender.try_send(event).is_ok() {
                 return Ok(edgeless_api_core::invocation::LinkProcessingResult::PROCESSED);
             }
             Ok(edgeless_api_core::invocation::LinkProcessingResult::PASSED)
@@ -330,7 +330,7 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
             self.inner.lock().await.delayed_start = Some(instance_specification.to_owned_spec());
             self.upstream_sender
                 .send(AgentEvent::FetchImage {
-                    function_id: instance_specification.instance_id.clone(),
+                    function_id: instance_specification.instance_id,
                     image_spec: instance_specification.class.clone(),
                 })
                 .await;

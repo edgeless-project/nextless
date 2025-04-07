@@ -49,7 +49,7 @@ impl BlockValue {
 
 impl From<BlockValue> for Vec<u8> {
     fn from(block_value: BlockValue) -> Vec<u8> {
-        let scalar = block_value.num << 4 | u16::from(block_value.more) << 3 | u16::from(block_value.size_exponent & 0x7);
+        let scalar = (block_value.num << 4) | (u16::from(block_value.more) << 3) | u16::from(block_value.size_exponent & 0x7);
         Vec::from(OptionValueU16(scalar))
     }
 }
@@ -61,7 +61,7 @@ impl TryFrom<Vec<u8>> for BlockValue {
         let scalar = OptionValueU16::try_from(value)?.0;
 
         let num: u16 = scalar >> 4;
-        let more = scalar >> 3 & 0x1 == 0x1;
+        let more = (scalar >> 3) & 0x1 == 0x1;
         let size_exponent: u8 = (scalar & 0x7) as u8;
         Ok(Self { num, more, size_exponent })
     }

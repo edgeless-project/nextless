@@ -60,7 +60,7 @@ impl AliasMapping {
                         removed_inputs.insert(i_id.to_string(), val.get().clone());
                     }
                 }
-                std::collections::hash_map::Entry::Vacant(e) => {
+                std::collections::hash_map::Entry::Vacant(_) => {
                     return false;
                 }
             }

@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 pub type InnerStructure = Vec<Mapping>;
 
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, Clone, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize)]
@@ -18,7 +20,7 @@ pub enum MappingNode {
 starlark::starlark_simple_value!(Mapping);
 
 impl std::fmt::Display for Mapping {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -34,28 +36,28 @@ impl<'v> starlark::values::UnpackValue<'v> for Mapping {
 
 #[starlark::starlark_module]
 pub fn edgeless_inner_structure(builder: &mut starlark::environment::GlobalsBuilder) {
-    fn source(output_port_id: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
+    fn source<'v>(output_port_id: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(super::inner_structure::Mapping {
             source: MappingNode::SideEffect,
             dests: vec![MappingNode::Port(output_port_id)],
         }))
     }
 
-    fn sink(input_port_id: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value> {
+    fn sink<'v>(input_port_id: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(Mapping {
             source: MappingNode::Port(input_port_id),
             dests: vec![MappingNode::SideEffect],
         }))
     }
 
-    fn link(
+    fn link<'v>(
         input_port_id: String,
         output_port_ids: starlark::values::list::UnpackList<String>,
         heap: &'v starlark::values::Heap,
-    ) -> anyhow::Result<starlark::values::Value> {
+    ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(Mapping {
             source: MappingNode::Port(input_port_id),
-            dests: output_port_ids.into_iter().map(|port| MappingNode::Port(port)).collect(),
+            dests: output_port_ids.into_iter().map(MappingNode::Port).collect(),
         }))
     }
 }

@@ -9,12 +9,12 @@ use coap_lite::{MessageClass, MessageType, ResponseType};
 pub struct COAPEncoder {}
 
 impl COAPEncoder {
-    pub fn encode_invocation_event<'a, Endpoint>(
+    pub fn encode_invocation_event<Endpoint>(
         endpoint: Endpoint,
         event: crate::invocation::Event,
         token: u8,
-        out_buf: &'a mut [u8],
-    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        out_buf: &mut [u8],
+    ) -> ((&mut [u8], Endpoint), &mut [u8]) {
         let mut buffer = [0_u8; 1024];
         // let new_event: crate::invocation::Event<&minicbor::bytes::ByteSlice> = crate::invocation::Event::<&minicbor::bytes::ByteSlice> {
         //     target: event.target,
@@ -100,7 +100,6 @@ impl COAPEncoder {
         token: u8,
         out_buf: &mut [u8],
     ) -> ((&mut [u8], Endpoint), &mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
         let mut buffer = [0_u8; 512];
         minicbor::encode(instance_id, &mut buffer[..]).unwrap();
         let len = minicbor::len(instance_id);
@@ -201,13 +200,13 @@ impl COAPEncoder {
         ((data, endpoint), tail)
     }
 
-    pub fn encode_fetch_image_chunk<'a, Endpoint>(
+    pub fn encode_fetch_image_chunk<Endpoint>(
         endpoint: Endpoint,
         image_hash: [u8; 32],
         offset: usize,
         token: u8,
-        out_buf: &'a mut [u8],
-    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        out_buf: &mut [u8],
+    ) -> ((&mut [u8], Endpoint), &mut [u8]) {
         let mut req = coap_lite::CoapRequest::<Endpoint>::new();
         req.set_method(coap_lite::RequestType::Post);
         req.set_path("image");

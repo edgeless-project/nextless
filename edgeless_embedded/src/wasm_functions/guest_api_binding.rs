@@ -104,7 +104,7 @@ pub fn cast(
     let target = super::helpers::load_str_from_vm(&ctx, &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_from_vm(&ctx, &mem, payload_ptr, payload_len)?;
 
-    embassy_futures::block_on(caller.data().host.cast_alias(target, &payload)).map_err(|_| wasmi::Error::new("Cast Error"))
+    embassy_futures::block_on(caller.data().host.cast_alias(target, payload)).map_err(|_| wasmi::Error::new("Cast Error"))
 }
 
 pub fn call(

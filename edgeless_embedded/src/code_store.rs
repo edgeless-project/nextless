@@ -33,6 +33,12 @@ pub struct CodeStore {
     inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoreType>,
 }
 
+impl Default for CodeStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CodeStore {
     pub fn new() -> Self {
         Self {

@@ -112,7 +112,7 @@ pub async fn ingress_task(
     let (_, host, port) = edgeless_api::util::parse_http_host(&ingress_url).unwrap();
     let addr = std::net::SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
 
-    let mut dataplane = provider.get_handle_for(ingress_id, None).await;
+    let dataplane = provider.get_handle_for(ingress_id, None).await;
 
     let ingress_state = std::sync::Arc::new(tokio::sync::Mutex::new(IngressState {
         interests: Vec::<HTTPIngressInterest>::new(),
@@ -161,6 +161,7 @@ pub async fn ingress_task(
 
 #[derive(Clone)]
 struct IngressResource {
+    #[allow(unused)]
     own_node_id: uuid::Uuid,
     configuration_state: std::sync::Arc<tokio::sync::Mutex<IngressState>>,
 }

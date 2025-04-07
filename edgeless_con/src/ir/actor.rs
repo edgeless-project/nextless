@@ -68,11 +68,11 @@ impl super::PhysicalComponent for PhysicalActor {
     }
 
     fn id(&self) -> edgeless_api::function_instance::InstanceId {
-        self.id.clone()
+        self.id
     }
 
     fn creation_time(&self) -> std::time::Instant {
-        self.creation_tine.clone()
+        self.creation_tine
     }
 }
 
@@ -112,7 +112,9 @@ pub struct ActorClass {
 pub struct ActorImage {
     pub class: ActorClass,
     pub format: String,
+    #[allow(unused)]
     pub enabled_inputs: std::collections::HashSet<edgeless_api::function_instance::PortId>,
+    #[allow(unused)]
     pub enabled_outputs: std::collections::HashSet<edgeless_api::function_instance::PortId>,
     pub code: Vec<u8>,
 }

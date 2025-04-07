@@ -54,22 +54,22 @@ impl EmbeddedDataplaneHandle {
 
         match outputs {
             edgeless_api_core::common::Output::Single(id) => {
-                self.send(self.own_id, id.instance_id, id.port_id.clone(), &msg).await?;
+                self.send(self.own_id, id.instance_id, id.port_id.clone(), msg).await?;
             }
             edgeless_api_core::common::Output::Any(ids) => {
                 let id = ids.0.first();
                 if let Some(id) = id {
-                    self.send(self.own_id, id.instance_id, id.port_id.clone(), &msg).await?;
+                    self.send(self.own_id, id.instance_id, id.port_id.clone(), msg).await?;
                 } else {
                     return Err(DataplaneError::UnknownAlias);
                 }
             }
             edgeless_api_core::common::Output::All(ids) => {
-                if ids.0.len() == 0 {
+                if ids.0.is_empty() {
                     return Err(DataplaneError::UnknownAlias);
                 }
                 for id in ids.0 {
-                    self.send(self.own_id, id.instance_id, id.port_id.clone(), &msg).await?;
+                    self.send(self.own_id, id.instance_id, id.port_id.clone(), msg).await?;
                 }
             }
         }

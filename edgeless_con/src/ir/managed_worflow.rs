@@ -77,6 +77,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         self.materialize()
     }
 
+    #[allow(unused)]
     pub fn peer_cluster_removal(&self, _removed_cluster_ids: edgeless_api::function_instance::NodeId) -> Vec<super::RequiredChange> {
         Vec::new()
     }
@@ -137,7 +138,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                                                     port_statistics: self
                                                         .telemetry_provider
                                                         .as_ref()
-                                                        .and_then(|t| Some(t.input_port_statistics_for(&current.id, k))),
+                                                        .map(|t| t.input_port_statistics_for(&current.id, k)),
                                                 },
                                             )
                                         })
@@ -154,7 +155,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                                                     port_statistics: self
                                                         .telemetry_provider
                                                         .as_ref()
-                                                        .and_then(|t| Some(t.output_port_statistics_for(&current.id, k))),
+                                                        .map(|t| t.output_port_statistics_for(&current.id, k)),
                                                 },
                                             )
                                         })
@@ -188,7 +189,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                                                     port_statistics: self
                                                         .telemetry_provider
                                                         .as_ref()
-                                                        .and_then(|t| Some(t.input_port_statistics_for(&current.id, k))),
+                                                        .map(|t| t.input_port_statistics_for(&current.id, k)),
                                                 },
                                             )
                                         })
@@ -205,16 +206,13 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                                                     port_statistics: self
                                                         .telemetry_provider
                                                         .as_ref()
-                                                        .and_then(|t| Some(t.output_port_statistics_for(&current.id, k))),
+                                                        .map(|t| t.output_port_statistics_for(&current.id, k)),
                                                 },
                                             )
                                         })
                                         .collect(),
                                 },
-                                runtime_statistics: self
-                                    .telemetry_provider
-                                    .as_ref()
-                                    .and_then(|t| Some(t.component_statistics_for(&current.id))),
+                                runtime_statistics: self.telemetry_provider.as_ref().map(|t| t.component_statistics_for(&current.id)),
                             }))
                         }
                     }
@@ -264,7 +262,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                                                     port_statistics: self
                                                         .telemetry_provider
                                                         .as_ref()
-                                                        .and_then(|t| Some(t.input_port_statistics_for(&current.id, k))),
+                                                        .map(|t| t.input_port_statistics_for(&current.id, k)),
                                                 },
                                             )
                                         })
@@ -281,21 +279,18 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                                                     port_statistics: self
                                                         .telemetry_provider
                                                         .as_ref()
-                                                        .and_then(|t| Some(t.output_port_statistics_for(&current.id, k))),
+                                                        .map(|t| t.output_port_statistics_for(&current.id, k)),
                                                 },
                                             )
                                         })
                                         .collect(),
                                 },
-                                runtime_statistics: self
-                                    .telemetry_provider
-                                    .as_ref()
-                                    .and_then(|t| Some(t.component_statistics_for(&current.id))),
+                                runtime_statistics: self.telemetry_provider.as_ref().map(|t| t.component_statistics_for(&current.id)),
                             }))
                         }
                     }
                     super::PhysicalComponentState::StopPlanned(c) => {
-                        changes.push(super::RequiredChange::StopFunction { function_id: c.id.clone() });
+                        changes.push(super::RequiredChange::StopFunction { function_id: c.id });
                         current.mark_stopped();
                     }
                     super::PhysicalComponentState::Stopped(_) => {
@@ -308,7 +303,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
             }
         }
 
-        for (_s_name, subflow) in &mut self.wf.subflows {
+        for subflow in self.wf.subflows.values_mut() {
             let subflow = subflow.borrow_mut();
             for i in &subflow.instances {
                 let current = i.borrow_mut();
@@ -403,7 +398,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
 
     fn remove_nodes(&mut self, node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>) -> bool {
         let mut changed = false;
-        for (_, function) in &mut self.wf.functions {
+        for function in self.wf.functions.values_mut() {
             let mut function = function.borrow_mut();
             let before = function.instances.len();
             function.instances.retain(|instance| match &*instance.borrow() {
@@ -414,7 +409,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                 changed = true;
             }
         }
-        for (_, resource) in &mut self.wf.resources {
+        for resource in self.wf.resources.values_mut() {
             let mut resource = resource.borrow_mut();
             let before = resource.instances.len();
             resource.instances.retain(|instance| match &*instance.borrow() {

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+#![allow(unused)]
 
 pub mod actor;
 pub mod link;
@@ -28,7 +29,7 @@ pub enum PhysicalComponentState<C: PhysicalComponent> {
 }
 
 pub trait MaybePhyiscalInstance {
-    fn try_unpack<'a>(&'a mut self) -> Option<&'a mut dyn PhysicalComponent>;
+    fn try_unpack(&mut self) -> Option<&mut dyn PhysicalComponent>;
     fn id(&self) -> Option<edgeless_api::function_instance::InstanceId>;
 }
 
@@ -36,7 +37,7 @@ impl<C: PhysicalComponent> MaybePhyiscalInstance for PhysicalComponentState<C>
 where
     C: PhysicalComponent,
 {
-    fn try_unpack<'a>(&'a mut self) -> Option<&'a mut dyn PhysicalComponent> {
+    fn try_unpack(&mut self) -> Option<&mut dyn PhysicalComponent> {
         match self {
             PhysicalComponentState::Planned => None,
             PhysicalComponentState::Existing(inner) => Some(inner),
@@ -149,6 +150,7 @@ pub trait NativeRuntime {
     fn num_cores(&self) -> u32;
     fn cpu_freq_hz(&self) -> f32;
     fn mem_size_bytes(&self) -> u32;
+    #[allow(unused)]
     fn architecture(&self) -> NodeArchitecture;
     fn runtime_info(&self) -> Option<Box<dyn WasmRuntimeInfo>>;
 }
@@ -264,7 +266,7 @@ impl MaterializedPorts {
             }
         }
 
-        return true;
+        true
     }
 }
 

@@ -3,6 +3,7 @@
 
 struct ActiveMulticastLink {
     addr: std::net::Ipv4Addr,
+    #[allow(unused)]
     active_nodes: Vec<edgeless_api::function_instance::NodeId>,
 }
 

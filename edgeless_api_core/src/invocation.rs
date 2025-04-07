@@ -18,17 +18,17 @@ pub enum EventData {
 pub struct DataBuffer(pub heapless::Vec<u8, 1500>);
 
 impl<C> minicbor::Encode<C> for DataBuffer {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.bytes(&self.0.as_slice())?;
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+        e.bytes(self.0.as_slice())?;
         Ok(())
     }
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for DataBuffer {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        return Ok(DataBuffer(
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        Ok(DataBuffer(
             heapless::Vec::<u8, 1500>::from_slice(d.bytes()?).map_err(|_e| minicbor::decode::Error::message("String Error"))?,
-        ));
+        ))
     }
 }
 

@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
 pub struct EdgelessResourceGen<PortType> {
     pub id: String,
@@ -11,7 +13,7 @@ pub type EdgelessResource = EdgelessResourceGen<crate::port::Port>;
 pub type FrozenEdgelessResource = EdgelessResourceGen<crate::port::FrozenPort>;
 
 impl<PortType> std::fmt::Display for EdgelessResourceGen<PortType> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -27,19 +29,16 @@ impl<'v> starlark::values::StarlarkValue<'v> for EdgelessResource {
     type Canonical = EdgelessResource;
 
     fn get_attr(&self, attr_id: &str, heap: &'v starlark::values::Heap) -> std::option::Option<starlark::values::Value<'v>> {
-        self.outputs
-            .get(attr_id)
-            .or(self.inputs.get(attr_id))
-            .and_then(|x| Some(heap.alloc(x.clone())))
+        self.outputs.get(attr_id).or(self.inputs.get(attr_id)).map(|x| heap.alloc(x.clone()))
     }
 
-    fn has_attr(&self, attribute: &str, heap: &'v starlark::values::Heap) -> bool {
+    fn has_attr(&self, attribute: &str, _heap: &'v starlark::values::Heap) -> bool {
         self.outputs.contains_key(attribute) || self.inputs.contains_key(attribute)
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        let mut inputs: Vec<_> = self.inputs.iter().map(|(i_id, _)| i_id.clone()).collect();
-        let mut outputs: Vec<_> = self.outputs.iter().map(|(o_id, _)| o_id.clone()).collect();
+        let mut inputs: Vec<_> = self.inputs.keys().cloned().collect();
+        let mut outputs: Vec<_> = self.outputs.keys().cloned().collect();
         inputs.append(&mut outputs);
         inputs
     }
@@ -64,7 +63,7 @@ impl<'v> starlark::values::Freeze for EdgelessResource {
 }
 
 unsafe impl<'v> starlark::values::Trace<'v> for EdgelessResource {
-    fn trace(&mut self, tracer: &starlark::values::Tracer<'v>) {
+    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {
         todo!()
     }
 }

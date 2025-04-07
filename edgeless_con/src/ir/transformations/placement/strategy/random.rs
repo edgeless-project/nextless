@@ -12,17 +12,17 @@ pub struct Random {
 impl super::PlacementStrategy for Random {
     type GlobalState = ();
 
-    fn select_candidate<'a, 'b>(
-        &'a mut self,
+    fn select_candidate<'b>(
+        &mut self,
         candidates: Vec<crate::ir::transformations::placement::Candidate<'b>>,
         _global_state: &mut Self::GlobalState,
     ) -> Option<crate::ir::transformations::placement::Candidate<'b>> {
-        if candidates.len() == 0 {
+        if candidates.is_empty() {
             return None;
         }
-        let rv = rand::distributions::Uniform::new(0 as u64, candidates.len() as u64);
+        let rv = rand::distributions::Uniform::new(0_u64, candidates.len() as u64);
         let rnd = rv.sample(&mut self.rng);
-        candidates.get(rnd as usize).and_then(|v| Some(v.clone()))
+        candidates.get(rnd as usize).cloned()
     }
 
     fn new() -> Self {

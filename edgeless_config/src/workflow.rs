@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 use starlark::values::{list::UnpackList, ValueLike};
 
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
@@ -12,7 +14,7 @@ pub struct EdgelessWorkflow {
 starlark::starlark_simple_value!(EdgelessWorkflow);
 
 impl std::fmt::Display for EdgelessWorkflow {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -54,7 +56,7 @@ pub fn edgeless_workflow(builder: &mut starlark::environment::GlobalsBuilder) {
                                     crate::port::FrozenPort {
                                         component_id: o.component_id.clone(),
                                         port_id: o.port_id.clone(),
-                                        mapping: mapping,
+                                        mapping,
                                         klass: o.klass,
                                     },
                                 ))
@@ -103,7 +105,7 @@ pub fn edgeless_workflow(builder: &mut starlark::environment::GlobalsBuilder) {
                                     crate::port::FrozenPort {
                                         component_id: o.component_id.clone(),
                                         port_id: o.port_id.clone(),
-                                        mapping: mapping,
+                                        mapping,
                                         klass: o.klass,
                                     },
                                 ))
@@ -123,7 +125,7 @@ pub fn edgeless_workflow(builder: &mut starlark::environment::GlobalsBuilder) {
                                     crate::port::FrozenPort {
                                         component_id: i.component_id.clone(),
                                         port_id: i.port_id.clone(),
-                                        mapping: mapping,
+                                        mapping,
                                         klass: i.klass,
                                     },
                                 ))
@@ -138,9 +140,9 @@ pub fn edgeless_workflow(builder: &mut starlark::environment::GlobalsBuilder) {
         }
 
         Ok(heap.alloc(EdgelessWorkflow {
-            id: id,
-            actors: actors,
-            resources: resources,
+            id,
+            actors,
+            resources,
             annotations: annotations.collect_entries().into_iter().collect(),
         }))
     }

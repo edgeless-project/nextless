@@ -38,9 +38,9 @@ pub enum Message {
 impl Message {
     pub fn payload_len(&self) -> usize {
         match self {
-            Message::Cast(data) => data.as_bytes().len(),
-            Message::Call(data) => data.as_bytes().len(),
-            Message::CallRet(data) => data.as_bytes().len(),
+            Message::Cast(data) => data.len(),
+            Message::Call(data) => data.len(),
+            Message::CallRet(data) => data.len(),
             Message::CallNoRet => 0,
             Message::Err => 0,
         }

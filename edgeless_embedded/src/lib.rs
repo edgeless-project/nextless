@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: MIT
 #![no_std]
 #![cfg_attr(feature = "nightly", feature(impl_trait_in_assoc_type))]
+#![allow(async_fn_in_trait)]
 extern crate alloc;
-
-const NODE_ID: uuid::Uuid = uuid::uuid!("0827240a-3050-4604-bf3e-564c41c77106");
 
 const REGISTRATION_PEER: embassy_net::IpEndpoint = embassy_net::IpEndpoint {
     addr: embassy_net::IpAddress::v4(192, 168, 2, 61),

@@ -20,7 +20,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
             .map(|(id, spec)| (id.to_string(), spec.borrow_mut().instance_ids()))
             .collect::<std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>>();
 
-        for (component_id, _) in &components {
+        for component_id in components.keys() {
             let mut component = workflow.get_component(component_id).unwrap().borrow_mut();
             let (logical_ports, physical_instances) = component.split_view();
 
@@ -85,7 +85,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                 }
             }
 
-            for (input_id, _input) in &logical_ports.logical_input_mapping {
+            for input_id in logical_ports.logical_input_mapping.keys() {
                 for c_instance in &physical_instances {
                     if let Some(c_instance) = c_instance.borrow_mut().try_unpack() {
                         c_instance

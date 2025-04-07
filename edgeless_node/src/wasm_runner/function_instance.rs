@@ -276,12 +276,12 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         .await
         .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
 
-        let payload_len = msg.as_bytes().len();
+        let payload_len = msg.len();
         let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .await
             .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
 
-        let port_len = port.as_bytes().len();
+        let port_len = port.len();
         let port_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
             .await
             .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
@@ -349,12 +349,12 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         .await
         .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
 
-        let payload_len = msg.as_bytes().len();
+        let payload_len = msg.len();
         let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .await
             .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
 
-        let port_len = port.as_bytes().len();
+        let port_len = port.len();
         let port_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
             .await
             .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;

@@ -35,10 +35,7 @@ impl crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_i
             .await;
 
         match res {
-            Ok(data) => Ok(crate::common::StartComponentResponse::InstanceId(
-                // edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(&data).unwrap()
-                spawn_request.instance_id.clone(),
-            )),
+            Ok(_data) => Ok(crate::common::StartComponentResponse::InstanceId(spawn_request.instance_id)),
             Err(data) => Ok(crate::common::StartComponentResponse::ResponseError(crate::common::ResponseError {
                 summary: minicbor::decode::<&str>(&data).unwrap().to_string(),
                 detail: None,

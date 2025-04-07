@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use opentelemetry::trace::TraceContextExt;
 use opentelemetry::trace::Tracer;
 
@@ -13,6 +13,7 @@ use rand::seq::SliceRandom;
 #[derive(Clone)]
 struct IncommingLink {
     sender: tokio::sync::mpsc::UnboundedSender<DataplaneEvent>,
+    #[allow(unused)]
     target_id: edgeless_api::function_instance::InstanceId,
     target_port: edgeless_api::function_instance::PortId,
 }
@@ -49,6 +50,7 @@ pub struct DataplaneHandle {
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
+    #[allow(unused)]
     telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
 }
 
@@ -68,7 +70,7 @@ impl DataplaneHandle {
         let clone_overwrites = receiver_overwrites.clone();
         // This task intercepts the messages received and routes responses towards temporary receivers while routing other events towards the main receiver used in `receive_next`.
 
-        let mut cloned_sender = main_sender.clone();
+        let cloned_sender = main_sender.clone();
         let mut cloned_telemetry = telemetry_handle.clone();
 
         tokio::spawn(async move {
@@ -169,7 +171,7 @@ impl DataplaneHandle {
         new_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
     ) {
         log::info!("{:?}", new_output_mapping);
-        let ((removed_inputs, removed_output), (added_inputs, added_outputs)) =
+        let ((_removed_inputs, _removed_output), (added_inputs, added_outputs)) =
             self.alias_mapping.update(new_input_mapping, new_output_mapping).await;
 
         for (added_i_id, i) in added_inputs {
@@ -197,7 +199,7 @@ impl DataplaneHandle {
         self.incomming_links.lock().await.insert(link_id.clone(), incomming_link);
     }
 
-    async fn add_outgoing_link(&mut self, port: edgeless_api::function_instance::PortId, link_id: &edgeless_api::link::LinkInstanceId) {
+    async fn add_outgoing_link(&mut self, _port: edgeless_api::function_instance::PortId, link_id: &edgeless_api::link::LinkInstanceId) {
         let link = self.link_manager.get_writer(link_id).await;
         if let Some(link) = link {
             self.links.insert(link_id.clone(), std::sync::Arc::new(tokio::sync::Mutex::new(link)));
@@ -277,7 +279,7 @@ impl DataplaneHandle {
                     // return Err(GuestAPIError::UnknownAlias);
                     return CallRet::Err;
                 }
-                edgeless_api::common::Output::Link(link_id) => {
+                edgeless_api::common::Output::Link(_) => {
                     return CallRet::Err;
                 }
             }

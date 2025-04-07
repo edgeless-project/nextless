@@ -13,20 +13,6 @@ pub struct PrometheusEventTarget {
     message_sizes: prometheus_client::metrics::family::Family<MessageLabels, prometheus_client::metrics::histogram::Histogram>,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, prometheus_client::encoding::EncodeLabelSet)]
-struct RuntimeLabels {
-    node_id: String,
-    function_type: String,
-}
-
-// TODO: add additional labels like class_spec, function_name
-#[derive(Clone, Debug, Hash, PartialEq, Eq, prometheus_client::encoding::EncodeLabelSet)]
-struct FunctionLabels {
-    node_id: String,
-    function_id: String,
-    function_type: String,
-}
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq, prometheus_client::encoding::EncodeLabelValue)]
 enum InvocationType {
     Cast,
@@ -167,7 +153,6 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
                     self.execution_times.get_or_create(&labels).observe(duration.as_secs_f64());
                     if *under_duration_soft_limit {
                         self.under_soft_limit.get_or_create(&labels).inc();
-                    } else {
                     }
                     if *error {
                         self.errors.get_or_create(&labels).inc();

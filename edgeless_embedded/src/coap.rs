@@ -189,7 +189,7 @@ impl CoapMultiplexer {
             }
             // While we don't send back a response, we still need to block duplicate delivery.
             Some((entry, _message)) => {
-                if &*entry < &token || token == 0 {
+                if *entry < token || token == 0 {
                     self.agent.handle(invocation).await.unwrap();
                     *entry = token;
                 }
@@ -387,7 +387,7 @@ impl CoapMultiplexer {
                 Some(response)
             }
             Some((stored_token, stored_response)) => {
-                if &*stored_token < &token || token == 0 {
+                if *stored_token < token || token == 0 {
                     let id = operation.await;
                     *stored_token = token;
                     *stored_response = Some(id.clone());

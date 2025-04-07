@@ -14,7 +14,7 @@ impl super::ImageEntry for StaticImageEntry {
         true
     }
 
-    fn update(&self, offset: usize, data: &[u8], complete: bool) -> Result<(), super::CodeStoreError> {
+    fn update(&self, _offset: usize, _data: &[u8], _complete: bool) -> Result<(), super::CodeStoreError> {
         Err(super::CodeStoreError::ReadOnly)
     }
 }

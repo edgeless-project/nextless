@@ -7,11 +7,7 @@ pub mod weighted_random;
 
 pub trait PlacementStrategy: Send + Sync {
     type GlobalState: Default;
-    fn select_candidate<'a, 'b>(
-        &'a mut self,
-        candidates: Vec<super::Candidate<'b>>,
-        global_state: &mut Self::GlobalState,
-    ) -> Option<super::Candidate<'b>>;
+    fn select_candidate<'b>(&mut self, candidates: Vec<super::Candidate<'b>>, global_state: &mut Self::GlobalState) -> Option<super::Candidate<'b>>;
 
     fn new() -> Self;
 }

@@ -11,13 +11,13 @@ impl crate::link::LinkInstanceAPI for LinkInstanceAPIClient {
     async fn create(&mut self, req: crate::link::CreateLinkRequest) -> anyhow::Result<()> {
         match self.client.create(tonic::Request::new(req.into())).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Request Failed")),
+            Err(err) => Err(anyhow::anyhow!("Request Failed: {}", err)),
         }
     }
     async fn remove(&mut self, id: crate::link::LinkInstanceId) -> anyhow::Result<()> {
         match self.client.remove(tonic::Request::new(id.into())).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Request Failed")),
+            Err(err) => Err(anyhow::anyhow!("Request Failed: {}", err)),
         }
     }
 }

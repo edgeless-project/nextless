@@ -119,20 +119,22 @@ pub async fn mock_sensor_task(
         if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
             log::info!("Sensor send!");
 
-            let mut dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id.clone(), agent.clone(), heapless::Vec::new());
+            let mut dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id, agent.clone(), heapless::Vec::new());
 
             match data_out_id {
                 edgeless_api_core::common::Output::Single(id) => {
                     dataplane_handle
                         .send(instance_id, id.instance_id, id.port_id, "800.12345;50.12345;20.12345".as_bytes())
-                        .await;
+                        .await
+                        .unwrap();
                 }
                 edgeless_api_core::common::Output::Any(ids) => {
                     let id = ids.0.first();
                     if let Some(id) = id {
                         dataplane_handle
                             .send(instance_id, id.instance_id, id.port_id.clone(), "800.12345;50.12345;20.12345".as_bytes())
-                            .await;
+                            .await
+                            .unwrap();
                     } else {
                         // return Err(GuestAPIError::UnknownAlias)
                     }
@@ -141,7 +143,8 @@ pub async fn mock_sensor_task(
                     for id in ids.0 {
                         dataplane_handle
                             .send(instance_id, id.instance_id, id.port_id, "800.12345;50.12345;20.12345".as_bytes())
-                            .await;
+                            .await
+                            .unwrap();
                     }
                 }
             }

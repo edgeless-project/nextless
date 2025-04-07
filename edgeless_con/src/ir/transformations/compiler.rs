@@ -15,7 +15,7 @@ impl Compiler {
 
 impl super::StatelessTransformation for Compiler {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
-        for (_, function) in &workflow.functions {
+        for function in workflow.functions.values() {
             let function = function.borrow_mut();
             if function.image.format != "RUST" {
                 continue;

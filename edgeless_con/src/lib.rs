@@ -30,7 +30,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
         edgeless_api::grpc_impl::controller::WorkflowInstanceAPIServer::run(controller.get_api_client(), settings.controller_url.clone());
 
     let coap_server_task = if let Some(url) = Some("coap://0.0.0.0:7001") {
-        if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
+        if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(url) {
             if proto != edgeless_api::util::Proto::COAP {
                 log::warn!("Wrong protocol for the CoAP node register ({}): assuming coap://", url);
             }

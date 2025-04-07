@@ -57,8 +57,8 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
             }
         }
 
-        for (_, resource) in &mut workflow.resources {
-            let mut resource = resource.borrow_mut();
+        for resource in workflow.resources.values_mut() {
+            let resource = resource.borrow_mut();
 
             for r in &resource.instances {
                 let mut r = r.borrow_mut();
@@ -83,8 +83,8 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
             if resource.instances.is_empty() {}
         }
 
-        for (_, subflow) in &mut workflow.subflows {
-            let mut subflow = subflow.borrow_mut();
+        for subflow in workflow.subflows.values_mut() {
+            let subflow = subflow.borrow_mut();
 
             for s in &subflow.instances {
                 let mut s = s.borrow_mut();
@@ -110,7 +110,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
         }
 
         {
-            let mut proxy = workflow.proxy.borrow_mut();
+            let proxy = workflow.proxy.borrow_mut();
             for p in &proxy.instances {
                 let mut p = p.borrow_mut();
                 match &*p {
@@ -140,10 +140,10 @@ pub struct Candidate<'a> {
     runtime: crate::ir::Runtime<'a>,
 }
 
-fn find_candidates_for_actor<'a, 'b>(actor: &'a actor::LogicalActor, nodes: &'b crate::ir::Nodes) -> Vec<Candidate<'b>> {
+fn find_candidates_for_actor<'b>(actor: &actor::LogicalActor, nodes: &'b crate::ir::Nodes) -> Vec<Candidate<'b>> {
     let mut candiates = Vec::new();
 
-    for (_node_id, node) in nodes {
+    for node in nodes.values() {
         let mut node_cadidates = feasibility::feasible_node_runtime_candidates(actor, *node);
 
         node_cadidates.sort_by(|a, b| b.runtime.efficiency_score().total_cmp(&a.runtime.efficiency_score()));

@@ -90,7 +90,10 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        Ok(())
+        match self.sender.send(super::ControllerRequest::PATCH(update)).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
+        }
     }
 }
 
