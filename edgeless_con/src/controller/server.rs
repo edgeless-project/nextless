@@ -32,7 +32,7 @@ pub struct WorkerNode {
     pub supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
     // This should probably be based on link types and is a placeholder
     pub is_proxy: bool,
-    telemetry_provider: Box<dyn crate::ir::TelemetryProvider>,
+    telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
     id: edgeless_api::function_instance::NodeId,
     cluster_id: edgeless_api::function_instance::NodeId,
 }
@@ -66,6 +66,7 @@ impl crate::ir::Node for WorkerNode {
             .iter()
             .filter_map(|id| match id.as_str() {
                 "RUST_WASM" => Some(("RUST_WASM".to_string(), crate::ir::Runtime::WasmBase(self))),
+                "NATIVE_BASE" => Some(("NATIVE_BASE".to_string(), crate::ir::Runtime::Native(self))),
                 _ => None,
             })
             .collect()
@@ -112,8 +113,40 @@ impl crate::ir::WasmRuntime for WorkerNode {
         self.capabilities.mem_size
     }
 
-    fn runtime_info(&self) -> Box<dyn crate::ir::WasmRuntimeInfo> {
-        self.telemetry_provider.wasm_runtime_statistics_for(&self.id)
+    fn runtime_info(&self) -> Option<Box<dyn crate::ir::WasmRuntimeInfo>> {
+        // self.telemetry_provider.wasm_runtime_statistics_for(&self.id)
+        None
+    }
+}
+
+impl crate::ir::NativeRuntime for WorkerNode {
+    fn num_cores(&self) -> u32 {
+        self.capabilities.num_cores
+    }
+
+    fn cpu_freq_hz(&self) -> f32 {
+        self.capabilities.clock_freq_cpu
+    }
+
+    fn mem_size_bytes(&self) -> u32 {
+        self.capabilities.mem_size
+    }
+
+    fn architecture(&self) -> crate::ir::NodeArchitecture {
+        match self.capabilities.cpu_arch.as_str() {
+            "amd64" => crate::ir::NodeArchitecture::Amd64,
+            "arm64" => crate::ir::NodeArchitecture::Arm64,
+            "xtensa" => crate::ir::NodeArchitecture::Xtensa,
+            _ => {
+                log::error!("Bad Node Architecture; Defaulting to amd64.");
+                crate::ir::NodeArchitecture::Amd64
+            }
+        }
+    }
+
+    fn runtime_info(&self) -> Option<Box<dyn crate::ir::WasmRuntimeInfo>> {
+        // todo!()
+        None
     }
 }
 
@@ -395,7 +428,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                 is_proxy: true,
                 id: node_id,
                 cluster_id: self.cluster_id.clone(),
-                telemetry_provider: self.telemetry_provider.as_ref().unwrap().clone(),
+                telemetry_provider: self.telemetry_provider.clone(),
             },
         );
 

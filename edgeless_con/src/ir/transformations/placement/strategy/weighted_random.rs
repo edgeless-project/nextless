@@ -19,8 +19,12 @@ impl super::PlacementStrategy for WeightedRandom {
         _global_state: &mut Self::GlobalState,
     ) -> Option<crate::ir::transformations::placement::Candidate<'b>> {
         let highmark: f64 = candidates.iter().map(|c| c.runtime.capacity_score() as f64).sum();
-        let rv = rand::distributions::Uniform::new(0.0, highmark);
-        let rnd = rv.sample(&mut self.rng);
+        let rnd = if highmark > 0.0 {
+            let rv = rand::distributions::Uniform::new(0.0, highmark);
+            rv.sample(&mut self.rng)
+        } else {
+            0.0
+        };
 
         let mut sum = 0.0_f64;
         for c in candidates {

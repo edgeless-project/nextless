@@ -82,6 +82,16 @@ impl DataplaneHandle {
                     context,
                 }) = receiver.next().await
                 {
+                    if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
+                        match sender.send((source_id, message.clone())) {
+                            Ok(_) => {
+                                continue;
+                            }
+                            Err(_) => {
+                                log::error!("Tried to use expired overwrite send handle.");
+                            }
+                        }
+                    }
                     if let Some(telemetry_handle) = &mut cloned_telemetry {
                         telemetry_handle.observe(
                             edgeless_telemetry::telemetry_events::TelemetryEvent::MessageReceived(message.payload_len() as u64),
@@ -92,16 +102,6 @@ impl DataplaneHandle {
                                 ("DEST_PORT".to_string(), target_port.0.clone()),
                             ]),
                         );
-                    }
-                    if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
-                        match sender.send((source_id, message.clone())) {
-                            Ok(_) => {
-                                continue;
-                            }
-                            Err(_) => {
-                                log::error!("Tried to use expired overwrite send handle.");
-                            }
-                        }
                     }
                     match cloned_sender.send(DataplaneEvent {
                         source_id,

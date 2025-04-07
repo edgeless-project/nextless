@@ -57,7 +57,7 @@ message MappingNodeVariant {
 
 message Mapping {
     MappingNodeVariant source = 1;
-    repeated MappingNodeVariant dest = 2; 
+    repeated MappingNodeVariant dest = 2;
 }
 
 // Message defining the function class specification.
@@ -150,6 +150,8 @@ message NodeCapabilities {
     float clock_freq_cpu     = 12;
     // Number of physical cores.
     uint32 num_cores         = 13;
+    // CPU Architecture
+    string cpu_arch = 15;
     // Size of memory available to applications running on the edge node, in MiB.
     uint32 mem_size          = 14;
     // List of labels assigned to this node.
@@ -235,7 +237,7 @@ message InstanceOutput {
         Target single = 1;
         TargetVec any  = 2;
         TargetVec all = 3;
-        LinkInstanceId link = 4;    
+        LinkInstanceId link = 4;
     }
 }
 
@@ -453,7 +455,7 @@ message FunctionInstanceInit {
 message InputEventData {
     // The function instance that generated the event.
     InstanceId src = 1;
-    
+
     // The event payload. Can be empty.
     bytes msg     = 2;
 }
@@ -484,7 +486,7 @@ message OutputEventData {
 
     // The alias of the function instance recipient of this event.
     string alias          = 2;
-    
+
     // The event payload. Can be empty.
     bytes msg             = 3;
 }
@@ -496,7 +498,7 @@ message OutputEventDataRaw {
 
     // The function instance recipient of this event.
     InstanceId dst        = 2;
-    
+
     // The event payload. Can be empty.
     bytes msg             = 3;
 }
@@ -531,7 +533,7 @@ message DelayedEventData {
 
     // The alias of the function instance recipient of this event.
     string alias          = 2;
-    
+
     // The event payload. Can be empty.
     bytes msg             = 3;
 

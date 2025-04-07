@@ -142,19 +142,19 @@ pub trait WasmRuntime {
     fn num_cores(&self) -> u32;
     fn cpu_freq_hz(&self) -> f32;
     fn mem_size_bytes(&self) -> u32;
-    fn runtime_info(&self) -> Box<dyn WasmRuntimeInfo>;
+    fn runtime_info(&self) -> Option<Box<dyn WasmRuntimeInfo>>;
 }
 
 pub trait NativeRuntime {
     fn num_cores(&self) -> u32;
     fn cpu_freq_hz(&self) -> f32;
-    fn mem_size_bytes(&self) -> f32;
+    fn mem_size_bytes(&self) -> u32;
     fn architecture(&self) -> NodeArchitecture;
-    fn runtime_info(&self) -> Box<dyn WasmRuntimeInfo>;
+    fn runtime_info(&self) -> Option<Box<dyn WasmRuntimeInfo>>;
 }
 
 pub enum NodeArchitecture {
-    X86,
+    Amd64,
     Arm64,
     Xtensa,
 }

@@ -20,10 +20,12 @@ pub struct NodeCapabilities {
     pub num_cpus: u32,
     // Name of the CPU model.
     pub model_name_cpu: String,
-    // Clock frequency of the CPU, in BogoMIPS.
+    // Clock frequency of the CPU, in MHz.
     pub clock_freq_cpu: f32,
     // Number of cores for each CPU.
     pub num_cores: u32,
+    // CPU Architecture
+    pub cpu_arch: String,
     // Size of memory available to applications running on the edge node, in MiB.
     pub mem_size: u32,
     // List of labels assigned to this node.
@@ -44,6 +46,7 @@ impl NodeCapabilities {
             model_name_cpu: "".to_string(),
             clock_freq_cpu: 0.0,
             num_cores: 0,
+            cpu_arch: "".to_string(),
             mem_size: 0,
             labels: vec![],
             is_tee_running: false,
@@ -59,6 +62,7 @@ impl NodeCapabilities {
             model_name_cpu: "".to_string(),
             clock_freq_cpu: 0.0,
             num_cores: 1,
+            cpu_arch: "".to_string(),
             mem_size: 0,
             labels: vec![],
             is_tee_running: false,
@@ -77,7 +81,7 @@ impl std::fmt::Display for NodeCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MiB memory, labels [{}]{}{}, runtimes [{}]",
+            "{} {} CPU(s) at {} MHz, {} core(s), {} MiB memory, labels [{}]{}{}, runtimes [{}]",
             self.num_cpus,
             self.model_name_cpu,
             self.clock_freq_cpu,

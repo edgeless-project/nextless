@@ -88,7 +88,9 @@ impl TelemetryHandleAPI for TelemetryHandle {
         let mut merged_tags = self.handle_tags.clone();
         merged_tags.append(&mut event_tags);
 
-        self.sender.send(TelemetryProcessorInput::TelemetryEvent(event, merged_tags)).unwrap();
+        if self.sender.send(TelemetryProcessorInput::TelemetryEvent(event, merged_tags)).is_err() {
+            log::error!("Tried to observe telemetry while the receiver is stopped.")
+        }
     }
 
     fn fork(&mut self, child_tags: std::collections::BTreeMap<String, String>) -> Box<dyn TelemetryHandleAPI> {

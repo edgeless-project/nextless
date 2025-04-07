@@ -112,6 +112,7 @@ pub struct NodeCapabilitiesUser {
     pub model_name_cpu: Option<String>,
     pub clock_freq_cpu: Option<f32>,
     pub num_cores: Option<u32>,
+    pub cpu_arch: Option<String>,
     pub mem_size: Option<u32>,
     pub labels: Option<Vec<String>>,
     pub is_tee_running: Option<bool>,
@@ -125,6 +126,7 @@ impl NodeCapabilitiesUser {
             model_name_cpu: None,
             clock_freq_cpu: None,
             num_cores: None,
+            cpu_arch: None,
             mem_size: None,
             labels: None,
             is_tee_running: None,
@@ -161,8 +163,11 @@ impl EdgelessNodeSettings {
 }
 
 fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilitiesUser) -> edgeless_api::node_registration::NodeCapabilities {
-    let mut sys = sysinfo::System::new();
+    let mut sys = sysinfo::System::new_all();
     sys.refresh_all();
+    sys.refresh_cpu_all();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    sys.refresh_cpu_all();
     let mut model_name_set = std::collections::HashSet::new();
     let mut clock_freq_cpu_set = std::collections::HashSet::new();
     for processor in sys.cpus() {
@@ -188,8 +193,11 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         num_cpus: user_node_capabilities.num_cpus.unwrap_or(sys.cpus().len() as u32),
         model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
         clock_freq_cpu: user_node_capabilities.clock_freq_cpu.unwrap_or(clock_freq_cpu),
-        num_cores: user_node_capabilities.num_cores.unwrap_or(sys.physical_core_count().unwrap_or(1) as u32),
-        mem_size: user_node_capabilities.mem_size.unwrap_or(sys.total_memory() as u32 / (1024 * 1024)),
+        num_cores: user_node_capabilities
+            .num_cores
+            .unwrap_or(sysinfo::System::physical_core_count().unwrap_or(1) as u32),
+        cpu_arch: sysinfo::System::cpu_arch(),
+        mem_size: user_node_capabilities.mem_size.unwrap_or((sys.total_memory() / 1024 / 1024) as u32),
         labels: user_node_capabilities.labels.unwrap_or_default(),
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),

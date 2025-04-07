@@ -19,8 +19,6 @@ impl super::StatelessTransformation for Scaler {
                 _ => acc,
             });
 
-            assert!(number_of_existing_instances == f.instances.len());
-
             if f.instances.len() == 0 {
                 f.instances.push(std::cell::RefCell::new(super::super::PhysicalComponentState::new()));
             }
@@ -77,6 +75,18 @@ impl super::StatelessTransformation for Scaler {
             // if should_scale_down {
             //     f.instances.last().unwrap().borrow_mut().plan_stop();
             // }
+        }
+        for (_rid, r) in &mut workflow.resources {
+            let mut r = r.borrow_mut();
+
+            let number_of_existing_instances = r.instances.iter().fold(0, |acc, i| match &*i.borrow() {
+                super::super::PhysicalComponentState::Existing(_) => acc + 1,
+                _ => acc,
+            });
+
+            if r.instances.len() == 0 {
+                r.instances.push(std::cell::RefCell::new(super::super::PhysicalComponentState::new()));
+            }
         }
     }
 }

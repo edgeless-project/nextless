@@ -5,9 +5,6 @@ use edgeless_api::{node_management::UpdatePeersRequest, proxy_instance::ProxyIns
 use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
-#[cfg(test)]
-pub mod test;
-
 enum AgentRequest {
     Spawn(edgeless_api::function_instance::SpawnFunctionRequest),
     SpawnResource(
@@ -297,14 +294,14 @@ impl Agent {
                 }
                 AgentRequest::HealthStatus(responder) => {
                     // Refresh system/process information.
-                    sys.refresh_cpu();
+                    sys.refresh_cpu_all();
                     sys.refresh_memory();
-                    sys.refresh_process(my_pid);
+                    sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[my_pid]), true);
 
                     let to_kb = |x| (x / 1024) as i32;
                     let proc = sys.process(my_pid).unwrap();
                     let health_status = edgeless_api::node_management::HealthStatus {
-                        cpu_usage: sys.global_cpu_info().cpu_usage() as i32,
+                        cpu_usage: sys.global_cpu_usage() as i32,
                         cpu_load: sys.cpus().iter().map(|x| x.cpu_usage() / 100_f32).sum::<f32>() as i32,
                         mem_free: to_kb(sys.free_memory()),
                         mem_used: to_kb(sys.used_memory()),
