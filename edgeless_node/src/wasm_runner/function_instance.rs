@@ -69,10 +69,10 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         );
 
         linker
-            .func_wrap6_async(
+            .func_wrap_async(
                 "env",
                 "cast_raw_asm",
-                |store, instance_node_id_ptr, instance_component_id_ptr, port_ptr, port_len, payload_ptr, payload_len| {
+                |store, (instance_node_id_ptr, instance_component_id_ptr, port_ptr, port_len, payload_ptr, payload_len)| {
                     Box::new(super::guest_api_binding::cast_raw(
                         store,
                         instance_node_id_ptr,
@@ -86,15 +86,15 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             )
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
-            .func_wrap4_async("env", "cast_asm", |store, target_ptr, target_len, payload_ptr, payload_len| {
+            .func_wrap_async("env", "cast_asm", |store, (target_ptr, target_len, payload_ptr, payload_len)| {
                 Box::new(super::guest_api_binding::cast(store, target_ptr, target_len, payload_ptr, payload_len))
             })
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
-            .func_wrap8_async(
+            .func_wrap_async(
                 "env",
                 "call_raw_asm",
-                |store, instance_node_id_ptr, instance_component_id_ptr, port_ptr, port_len, payload_ptr, payload_len, out_ptr_ptr, out_len_ptr| {
+                |store, (instance_node_id_ptr, instance_component_id_ptr, port_ptr, port_len, payload_ptr, payload_len, out_ptr_ptr, out_len_ptr)| {
                     Box::new(super::guest_api_binding::call_raw(
                         store,
                         instance_node_id_ptr,
@@ -110,10 +110,10 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             )
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
-            .func_wrap6_async(
+            .func_wrap_async(
                 "env",
                 "call_asm",
-                |store, target_ptr, target_len, payload_ptr, payload_len, out_ptr_ptr, out_len_ptr| {
+                |store, (target_ptr, target_len, payload_ptr, payload_len, out_ptr_ptr, out_len_ptr)| {
                     Box::new(super::guest_api_binding::call(
                         store,
                         target_ptr,
@@ -127,22 +127,22 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             )
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
-            .func_wrap5_async("env", "telemetry_log_asm", |store, level, target_ptr, target_len, msg_ptr, msg_len| {
+            .func_wrap_async("env", "telemetry_log_asm", |store, (level, target_ptr, target_len, msg_ptr, msg_len)| {
                 Box::new(super::guest_api_binding::telemetry_log(
                     store, level, target_ptr, target_len, msg_ptr, msg_len,
                 ))
             })
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
-            .func_wrap2_async("env", "slf_asm", |store, out_node_id_ptr, out_component_id_ptr| {
+            .func_wrap_async("env", "slf_asm", |store, (out_node_id_ptr, out_component_id_ptr)| {
                 Box::new(super::guest_api_binding::slf(store, out_node_id_ptr, out_component_id_ptr))
             })
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
-            .func_wrap5_async(
+            .func_wrap_async(
                 "env",
                 "delayed_cast_asm",
-                |store, delay_ms, target_ptr, target_len, payload_ptr, payload_len| {
+                |store, (delay_ms, target_ptr, target_len, payload_ptr, payload_len)| {
                     Box::new(super::guest_api_binding::delayed_cast(
                         store,
                         delay_ms,
@@ -155,7 +155,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             )
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
-            .func_wrap2_async("env", "sync_asm", |store, state_ptr, state_len| {
+            .func_wrap_async("env", "sync_asm", |store, (state_ptr, state_len)| {
                 Box::new(super::guest_api_binding::sync(store, state_ptr, state_len))
             })
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
