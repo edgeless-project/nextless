@@ -13,6 +13,8 @@ extern crate alloc;
 pub mod epaper_display_impl;
 #[cfg(feature = "scd30")]
 pub mod scd30_sensor_impl;
+#[cfg(feature = "scd30")]
+use embedded_hal::delay::DelayNs;
 pub mod wifi;
 
 #[cfg(feature = "epaper_2_13")]
@@ -165,7 +167,7 @@ fn main() -> ! {
         .with_scl(peripherals.GPIO32);
 
         let mut i2c_delay = esp_hal::delay::Delay::new();
-        i2c_delay.delay_ms(5000u32);
+        i2c_delay.delay_ns(5_000_000u32);
 
         let scd = sensor_scd30::Scd30::new(i2c, i2c_delay).unwrap();
 
@@ -246,16 +248,18 @@ fn main() -> ! {
                 static IO_EXECUTOR_RAW: static_cell::StaticCell<esp_hal_embassy::Executor> = static_cell::StaticCell::new();
                 let io_executor = IO_EXECUTOR_RAW.init_with(esp_hal_embassy::Executor::new);
 
-                io_executor.run(|_| {
+                io_executor.run(|#[allow(unused_variables)] spawner| {
                     #[cfg(feature = "epaper_2_13")]
                     display_wrapper.set_text("Edgeless");
                     #[cfg(feature = "scd30")]
-                    spawner.spawn(io_task(spawner, sender, sensor_wrapper));
+                    spawner.spawn(io_task(spawner, sender, sensor_wrapper)).unwrap();
                     #[cfg(feature = "epaper_2_13")]
-                    spawner.spawn(edgeless_embedded::resource::epaper_display::display_writer(
-                        display_receiver,
-                        display_wrapper,
-                    ));
+                    spawner
+                        .spawn(edgeless_embedded::resource::epaper_display::display_writer(
+                            display_receiver,
+                            display_wrapper,
+                        ))
+                        .unwrap();
                 });
             },
         )

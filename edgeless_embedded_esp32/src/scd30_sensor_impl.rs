@@ -11,7 +11,7 @@ impl<Conn: sensor_scd30::base::Base<Err>, Delay: embedded_hal::delay::DelayNs, E
         self.sensor.set_measurement_interval(5).unwrap();
         self.sensor.start_continuous(0).unwrap();
     }
-    fn read(&mut self) -> Result<edgeless_embedded::resource::scd30_sensor::Measurement, ()> {
+    fn read(&mut self) -> Result<edgeless_embedded::resource::scd30_sensor::Measurement, edgeless_embedded::resource::scd30_sensor::SensorError> {
         match self.sensor.read_data() {
             Ok(val) => {
                 let wrapped_measurement = edgeless_embedded::resource::scd30_sensor::Measurement {
