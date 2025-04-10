@@ -95,7 +95,7 @@ impl crate::state_management::StateHandleAPI for MockStateHandle {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn basic_lifecycle() {
     let node_id = uuid::Uuid::new_v4();
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
@@ -252,7 +252,7 @@ async fn messaging_test_setup() -> (
 
 // test input (host-> function): cast
 // We assume this works after this test and trigger the different outputs using casts.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn messaging_cast_raw_input() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
     test_peer_handle
@@ -274,7 +274,7 @@ async fn messaging_cast_raw_input() {
 }
 
 // test output (i.e. the method available to the function): cast
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn messaging_cast_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
@@ -293,7 +293,9 @@ async fn messaging_cast_raw_output() {
     assert!(timeout_t_r.unwrap().unwrap().is_function_invocation_completed());
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let test_message = test_peer_handle.receive_next().await;
+    let test_message = tokio::time::timeout(tokio::time::Duration::from_secs(2), test_peer_handle.receive_next())
+        .await
+        .unwrap();
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
@@ -302,7 +304,7 @@ async fn messaging_cast_raw_output() {
 }
 
 // test output: call
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn messaging_call_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
@@ -337,7 +339,7 @@ async fn messaging_call_raw_output() {
 }
 
 // test output: delayed_cast
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn messaging_delayed_cast_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
@@ -371,7 +373,7 @@ async fn messaging_delayed_cast_output() {
 }
 
 // test output: cast
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn messaging_cast_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
@@ -398,7 +400,7 @@ async fn messaging_cast_output() {
 }
 
 // test output: call
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn messaging_call_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
@@ -429,7 +431,7 @@ async fn messaging_call_output() {
 }
 
 // test whether a function can be stopped while it is waiting for a call response
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn function_in_call_can_be_stopped() {
     let (mut client, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
@@ -459,18 +461,21 @@ async fn function_in_call_can_be_stopped() {
 }
 
 // test call-interaction: Noreply
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn messaging_call_raw_input_noreply() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle
-        .call(
+    let ret = tokio::time::timeout(
+        tokio::time::Duration::from_secs(2),
+        test_peer_handle.call(
             instance_id,
             edgeless_api::function_instance::PortId("test_input_noreply".to_string()),
             "some_cast".to_string(),
             opentelemetry::Context::new(),
-        )
-        .await;
+        ),
+    )
+    .await
+    .unwrap();
     assert_eq!(ret, CallRet::NoReply);
 
     let timeout_t_r = tokio::time::timeout(tokio::time::Duration::from_secs(2), telemetry_mock_receiver.recv()).await;
@@ -483,18 +488,21 @@ async fn messaging_call_raw_input_noreply() {
 }
 
 // test call-interaction: Reply
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn messaging_call_raw_input_reply() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle
-        .call(
+    let ret = tokio::time::timeout(
+        tokio::time::Duration::from_secs(2),
+        test_peer_handle.call(
             instance_id,
             edgeless_api::function_instance::PortId("test_input_reply".to_string()),
             "test_ret".to_string(),
             opentelemetry::Context::new(),
-        )
-        .await;
+        ),
+    )
+    .await
+    .unwrap();
     assert_eq!(ret, CallRet::Reply("test_reply".to_string()));
 
     let timeout_t_r = tokio::time::timeout(tokio::time::Duration::from_secs(2), telemetry_mock_receiver.recv()).await;
@@ -530,7 +538,7 @@ async fn messaging_call_raw_input_reply() {
 //     assert!(telemetry_mock_receiver.try_recv().is_err());
 // }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn state_management() {
     let node_id = uuid::Uuid::new_v4();
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
