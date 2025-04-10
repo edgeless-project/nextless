@@ -274,7 +274,7 @@ async fn messaging_cast_raw_input() {
 }
 
 // test output (i.e. the method available to the function): cast
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn messaging_cast_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
@@ -532,8 +532,6 @@ async fn messaging_call_raw_input_reply() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn state_management() {
-    env_logger::init();
-
     let node_id = uuid::Uuid::new_v4();
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
     let fid2 = edgeless_api::function_instance::InstanceId::new(node_id);

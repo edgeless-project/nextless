@@ -10,9 +10,9 @@ pub mod base_runtime;
 pub mod proxy;
 pub mod resources;
 pub mod state_management;
-#[cfg(feature = "wasmtime")]
+#[cfg(any(feature = "wasmtime", test))]
 pub mod wasm_runner;
-#[cfg(feature = "wasmi")]
+#[cfg(any(feature = "wasmi", test))]
 pub mod wasmi_runner;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
