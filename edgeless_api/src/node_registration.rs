@@ -101,6 +101,7 @@ impl std::fmt::Display for NodeCapabilities {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum UpdateNodeRequest {
     // 0: node_id (cannot be nil)

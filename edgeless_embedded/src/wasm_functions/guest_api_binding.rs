@@ -48,6 +48,7 @@ pub fn cast_raw(
     embassy_futures::block_on(caller.data().host.cast_raw(target_instance_id, target_port, payload)).map_err(|_| wasmi::Error::new("Cast Error"))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn call_raw(
     mut caller: wasmi::Caller<'_, GuestAPI>,
     instance_node_id_ptr: i32,

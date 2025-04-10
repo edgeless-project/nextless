@@ -10,8 +10,8 @@ pub struct MockDisplay {
 }
 
 impl MockDisplay {
-    async fn parse_configuration<'a>(
-        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    async fn parse_configuration(
+        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<MockDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
         if data.class_type == "epaper-display" {
             Ok(MockDisplayInstanceConfiguration {
@@ -25,7 +25,7 @@ impl MockDisplay {
         }
     }
 
-    pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
+    pub async fn new_resource() -> &'static mut dyn crate::resource::ResourceDyn {
         static SLF_RAW: static_cell::StaticCell<MockDisplay> = static_cell::StaticCell::new();
         SLF_RAW.init_with(|| MockDisplay {
             instance_id: None,
@@ -84,9 +84,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
         }
     }
 
-    async fn start<'a>(
+    async fn start(
         &mut self,
-        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Display Start");
         let instance_specification = Self::parse_configuration(instance_specification).await?;

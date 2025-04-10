@@ -24,7 +24,7 @@ pub trait ImageEntry {
 }
 
 #[derive(Clone)]
-pub struct ImageEntryContainer(alloc::sync::Arc<alloc::boxed::Box<dyn ImageEntry>>);
+pub struct ImageEntryContainer(alloc::rc::Rc<alloc::boxed::Box<dyn ImageEntry>>);
 
 type StoreType = alloc::collections::BTreeMap<edgeless_api_core::function_instance::EncodedFunctionClassSpecification, ImageEntryContainer>;
 
@@ -59,7 +59,7 @@ impl CodeStore {
     ) -> Result<ImageEntryContainer, CodeStoreError> {
         match self.inner.lock().await.entry(spec.clone()) {
             alloc::collections::btree_map::Entry::Vacant(vacant_entry) => {
-                let entry = ImageEntryContainer(alloc::sync::Arc::new(alloc::boxed::Box::new(alloc_image::AllocImageEntry::new(
+                let entry = ImageEntryContainer(alloc::rc::Rc::new(alloc::boxed::Box::new(alloc_image::AllocImageEntry::new(
                     spec.image_size,
                 ))));
                 vacant_entry.insert(entry.clone());
@@ -76,7 +76,7 @@ impl CodeStore {
     ) -> Result<ImageEntryContainer, CodeStoreError> {
         match self.inner.lock().await.entry(spec.clone()) {
             alloc::collections::btree_map::Entry::Vacant(vacant_entry) => {
-                let entry = ImageEntryContainer(alloc::sync::Arc::new(alloc::boxed::Box::new(static_image::StaticImageEntry { image })));
+                let entry = ImageEntryContainer(alloc::rc::Rc::new(alloc::boxed::Box::new(static_image::StaticImageEntry { image })));
                 vacant_entry.insert(entry.clone());
                 Ok(entry)
             }

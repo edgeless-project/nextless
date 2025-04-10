@@ -15,9 +15,13 @@ pub struct SCD30SensorInner {
     // pub delay: u8,
 }
 
+pub enum SensorError {
+    ReadError,
+}
+
 pub trait Sensor {
     fn init(&mut self, delay_s: u8);
-    fn read(&mut self) -> Result<Measurement, ()>;
+    fn read(&mut self) -> Result<Measurement, SensorError>;
 }
 
 pub struct SCD30SensorConfiguration {
@@ -30,8 +34,8 @@ pub struct SCD30Sensor {
 }
 
 impl SCD30Sensor {
-    async fn parse_configuration<'a>(
-        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    async fn parse_configuration(
+        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<SCD30SensorConfiguration, edgeless_api_core::common::ErrorResponse> {
         let mut out_id: Option<edgeless_api_core::common::Output> = None;
 
@@ -55,7 +59,7 @@ impl SCD30Sensor {
         })
     }
 
-    pub async fn new(
+    pub async fn new_resource(
         data_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
@@ -141,7 +145,7 @@ pub async fn scd30_sensor_task(
         let lck = state.lock().await;
 
         if let (Some(instance_id), Some(data_out_id)) = (lck.instance_id, lck.data_out_id.clone()) {
-            let mut dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id, agent.clone(), heapless::Vec::new());
+            let dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id, agent.clone(), heapless::Vec::new());
 
             let mut buffer = heapless::String::<150>::new();
             if core::fmt::write(
@@ -190,9 +194,9 @@ impl crate::invocation::InvocationAPI for SCD30Sensor {
 }
 
 impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
-    async fn start<'a>(
+    async fn start(
         &mut self,
-        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let instance_specification = SCD30Sensor::parse_configuration(instance_specification).await?;
         let mut lck = self.inner.lock().await;

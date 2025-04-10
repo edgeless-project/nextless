@@ -17,8 +17,7 @@ pub mod wifi;
 
 #[cfg(feature = "epaper_2_13")]
 use edgeless_embedded::resource::epaper_display::EPaper;
-use edgeless_embedded::{agent::EmbeddedAgent, function_instance::FunctionInstanceAPI};
-use embedded_hal::delay::DelayNs;
+#[cfg(feature = "epaper_2_13")]
 use epd_waveshare::prelude::*;
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -51,7 +50,7 @@ pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
 unsafe extern "Rust" fn __getrandom_v03_custom(dest: *mut u8, len: usize) -> Result<(), getrandom::Error> {
     match RNG.get() {
         Some(rng) => {
-            let mut rng = rng.clone();
+            let mut rng = *rng;
             for i in 0..len {
                 *(dest.add(i)) = rng.random() as u8;
             }
@@ -89,7 +88,7 @@ fn main() -> ! {
     let timer_group0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
 
     let rng = esp_hal::rng::Rng::new(peripherals.RNG);
-    assert!(RNG.set(rng.clone()).is_ok());
+    assert!(RNG.set(rng).is_ok());
 
     #[cfg(not(feature = "esp32"))]
     {
@@ -211,7 +210,9 @@ fn main() -> ! {
         }
     }
 
+    #[allow(unused_variables)]
     let sender = sensor_channel.sender();
+    #[allow(unused_variables)]
     let receiver = sensor_channel.receiver();
 
     cfg_if::cfg_if! {
@@ -230,41 +231,51 @@ fn main() -> ! {
         }
     }
 
+    #[allow(unused_variables)]
     let display_sender = display_channel.sender();
+    #[allow(unused_variables)]
     let display_receiver = display_channel.receiver();
 
     let _other_core = cpu_control
-        .start_app_core(unsafe { &mut APP_CORE_STACK }, move || {
-            static IO_EXECUTOR_RAW: static_cell::StaticCell<esp_hal_embassy::Executor> = static_cell::StaticCell::new();
-            let io_executor = IO_EXECUTOR_RAW.init_with(|| esp_hal_embassy::Executor::new());
+        .start_app_core(
+            unsafe {
+                #[allow(static_mut_refs)]
+                &mut APP_CORE_STACK
+            },
+            move || {
+                static IO_EXECUTOR_RAW: static_cell::StaticCell<esp_hal_embassy::Executor> = static_cell::StaticCell::new();
+                let io_executor = IO_EXECUTOR_RAW.init_with(esp_hal_embassy::Executor::new);
 
-            io_executor.run(|spawner| {
-                #[cfg(feature = "epaper_2_13")]
-                display_wrapper.set_text("Edgeless");
-                #[cfg(feature = "scd30")]
-                spawner.spawn(io_task(spawner, sender, sensor_wrapper));
-                #[cfg(feature = "epaper_2_13")]
-                spawner.spawn(edgeless_embedded::resource::epaper_display::display_writer(
-                    display_receiver,
-                    display_wrapper,
-                ));
-            });
-        })
+                io_executor.run(|_| {
+                    #[cfg(feature = "epaper_2_13")]
+                    display_wrapper.set_text("Edgeless");
+                    #[cfg(feature = "scd30")]
+                    spawner.spawn(io_task(spawner, sender, sensor_wrapper));
+                    #[cfg(feature = "epaper_2_13")]
+                    spawner.spawn(edgeless_embedded::resource::epaper_display::display_writer(
+                        display_receiver,
+                        display_wrapper,
+                    ));
+                });
+            },
+        )
         .unwrap();
 
     static EXECUTOR_RAW: static_cell::StaticCell<esp_hal_embassy::Executor> = static_cell::StaticCell::new();
-    let executor = EXECUTOR_RAW.init_with(|| esp_hal_embassy::Executor::new());
+    let executor = EXECUTOR_RAW.init_with(esp_hal_embassy::Executor::new);
 
     executor.run(|spawner| {
-        spawner.spawn(edgeless(
-            spawner,
-            timer_group0.timer0,
-            rng,
-            peripherals.RADIO_CLK,
-            peripherals.WIFI,
-            receiver,
-            display_sender,
-        ));
+        spawner
+            .spawn(edgeless(
+                spawner,
+                timer_group0.timer0,
+                rng,
+                peripherals.RADIO_CLK,
+                peripherals.WIFI,
+                receiver,
+                display_sender,
+            ))
+            .unwrap();
     });
 }
 
@@ -291,13 +302,18 @@ async fn edgeless(
     rng: esp_hal::rng::Rng,
     radio_clock_control: esp_hal::peripherals::RADIO_CLK,
     wifi: esp_hal::peripherals::WIFI,
-    sensor_scd_receiver: embassy_sync::channel::Receiver<
+    #[allow(unused_variables)] sensor_scd_receiver: embassy_sync::channel::Receiver<
         'static,
         embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
         edgeless_embedded::resource::scd30_sensor::Measurement,
         2,
     >,
-    display_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
+    #[allow(unused_variables)] display_sender: embassy_sync::channel::Sender<
+        'static,
+        embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+        heapless::String<1500>,
+        2,
+    >,
 ) {
     log::info!("Edgeless Embedded Async Main");
 
@@ -311,33 +327,33 @@ async fn edgeless(
             let app_rx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
         } else {
             static RX_BUF_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-            let rx_buf = RX_BUF_RAW.init_with(|| [0 as u8; 2500]);
+            let rx_buf = RX_BUF_RAW.init_with(|| [0_u8; 2500]);
             static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
             let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
             static TX_BUF_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-            let tx_buf = TX_BUF_RAW.init_with(|| [0 as u8; 2500]);
+            let tx_buf = TX_BUF_RAW.init_with(|| [0_u8; 2500]);
             static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
             let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
             static APP_TX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-            let app_tx = APP_TX_RAW.init_with(|| [0 as u8; 2500]);
+            let app_tx = APP_TX_RAW.init_with(|| [0_u8; 2500]);
             static APP_RX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-            let app_rx = APP_RX_RAW.init_with(|| [0 as u8; 2500]);
+            let app_rx = APP_RX_RAW.init_with(|| [0_u8; 2500]);
         }
     }
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "scd30")] {
-            let sensor_scd30_resource = edgeless_embedded::resource::scd30_sensor::SCD30Sensor::new(sensor_scd_receiver).await;
+            let sensor_scd30_resource = edgeless_embedded::resource::scd30_sensor::SCD30Sensor::new_resource(sensor_scd_receiver).await;
         } else {
-            let sensor_scd30_resource = edgeless_embedded::resource::mock_sensor::MockSensor::new().await;
+            let sensor_scd30_resource = edgeless_embedded::resource::mock_sensor::MockSensor::new_resource().await;
         }
     }
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "epaper_2_13")] {
-            let display_resource = edgeless_embedded::resource::epaper_display::EPaperDisplay::new(display_sender).await;
+            let display_resource = edgeless_embedded::resource::epaper_display::EPaperDisplay::new_resource(display_sender).await;
         } else {
-            let display_resource = edgeless_embedded::resource::mock_display::MockDisplay::new().await;
+            let display_resource = edgeless_embedded::resource::mock_display::MockDisplay::new_resource().await;
         }
     }
 
@@ -359,22 +375,24 @@ async fn edgeless(
         edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), Some(wasm_runtime), resources).await
     };
     #[cfg(not(feature = "wasm"))]
-    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), None, resources).await;
+    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID, None, resources).await;
 
     log::info!("Agent Created");
 
-    let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, wifi, agent.clone()).await;
+    let stack = wifi::init(spawner, timer, rng, radio_clock_control, wifi, agent.clone()).await;
     let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
 
     log::info!("WiFi Started");
 
-    spawner.spawn(edgeless_embedded::coap::coap_task(
-        sock,
-        agent.upstream_receiver().unwrap(),
-        agent.clone(),
-        app_rx,
-        app_tx,
-    ));
+    spawner
+        .spawn(edgeless_embedded::coap::coap_task(
+            sock,
+            agent.upstream_receiver().unwrap(),
+            agent.clone(),
+            app_rx,
+            app_tx,
+        ))
+        .unwrap();
 
     log::info!("CoAP Started");
 }

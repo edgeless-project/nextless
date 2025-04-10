@@ -338,7 +338,7 @@ async fn main() -> anyhow::Result<()> {
                     WorkflowCommands::List {} => match con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
                         Ok(instances) => {
                             for instance in instances.iter() {
-                                println!("workflow: {}", instance.workflow_id.to_string());
+                                println!("workflow: {}", instance.workflow_id);
                                 for function in instance.node_mapping.iter() {
                                     println!("\t{:?}", function);
                                 }

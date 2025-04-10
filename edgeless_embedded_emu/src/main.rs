@@ -15,9 +15,6 @@ fn main() -> ! {
     executor.run(|spawner| {
         spawner.spawn(edgeless(spawner)).unwrap();
     });
-
-    #[allow(unreachable_code)]
-    loop {}
 }
 
 #[embassy_executor::task]
@@ -65,9 +62,9 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
 
     let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
 
-    let sensor_scd30 = edgeless_embedded::resource::mock_sensor::MockSensor::new().await;
+    let sensor_scd30 = edgeless_embedded::resource::mock_sensor::MockSensor::new_resource().await;
 
-    let display = edgeless_embedded::resource::mock_display::MockDisplay::new().await;
+    let display = edgeless_embedded::resource::mock_display::MockDisplay::new_resource().await;
 
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [display, sensor_scd30]);

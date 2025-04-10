@@ -22,7 +22,7 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
 }
 
 pub enum RuntimeRequest {
-    Start(edgeless_api::function_instance::SpawnFunctionRequest),
+    Start(Box<edgeless_api::function_instance::SpawnFunctionRequest>),
     Stop(edgeless_api::function_instance::InstanceId),
     Patch(edgeless_api::common::PatchRequest),
     FunctionExit(edgeless_api::function_instance::InstanceId, Result<(), super::FunctionInstanceError>),
@@ -65,7 +65,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         while let Some(req) = self.receiver.next().await {
             match req {
                 RuntimeRequest::Start(spawn_request) => {
-                    self.start_function(spawn_request).await;
+                    self.start_function(*spawn_request).await;
                 }
                 RuntimeRequest::Stop(instance_id) => {
                     self.stop_function(instance_id).await;
@@ -134,7 +134,7 @@ impl RuntimeClient {
 #[async_trait::async_trait]
 impl super::RuntimeAPI for RuntimeClient {
     async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<()> {
-        match self.sender.send(RuntimeRequest::Start(request)).await {
+        match self.sender.send(RuntimeRequest::Start(Box::new(request))).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }

@@ -187,7 +187,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                 req = self.request_receiver.next() => {
                     if let Some(req) = req {
                         match req {
-                            super::ControllerRequest::START(spawn_workflow_request, reply_sender) => {
+                            super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
                                 // log::info!("{:?}", spawn_workflow_request);
                                 let reply = self.start_workflow(spawn_workflow_request).await;
                                 match reply_sender.send(reply) {
@@ -197,10 +197,10 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                                     }
                                 }
                             }
-                            super::ControllerRequest::STOP(wf_id) => {
+                            super::ControllerRequest::Stop(wf_id) => {
                                 self.stop_workflow(&wf_id).await;
                             }
-                            super::ControllerRequest::LIST(workflow_id, reply_sender) => {
+                            super::ControllerRequest::List(workflow_id, reply_sender) => {
                                 let reply = self.list_workflows(&workflow_id).await;
                                 match reply_sender.send(reply) {
                                     Ok(_) => {}
@@ -209,7 +209,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                                     }
                                 }
                             }
-                            super::ControllerRequest::UPDATENODE(update, reply_sender) => {
+                            super::ControllerRequest::UpdateNode(update, reply_sender) => {
                                 let reply = match update {
                                     edgeless_api::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers, capabilities, link_providers) => self.process_node_registration(node_id, agent_url, invocation_url, resource_providers, capabilities, link_providers).await,
                                     edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => self.process_node_del(node_id).await,
@@ -221,7 +221,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                                     }
                                 }
                             },
-                            super::ControllerRequest::PATCH(update) => {
+                            super::ControllerRequest::Patch(update) => {
                                 let _res = self.patch_workflow(&update).await;
                             }
                         }
@@ -581,6 +581,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_workflow_function_on_node(
         &mut self,
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
@@ -653,6 +654,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_workflow_resource_on_node(
         &mut self,
         wf_id: &edgeless_api::workflow_instance::WorkflowId,

@@ -303,6 +303,7 @@ impl MaterializedOutput {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum RequiredChange {
     StartFunction {

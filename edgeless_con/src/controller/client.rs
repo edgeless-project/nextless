@@ -12,7 +12,7 @@ pub struct ControllerClient {
 }
 
 impl ControllerClient {
-    pub fn new(
+    pub fn new_client(
         sender: futures::channel::mpsc::UnboundedSender<super::ControllerRequest>,
         repo: super::image_repository::ImageRepository,
     ) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
@@ -56,7 +56,7 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
     ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
         let (reply_sender, reply_receiver) =
             tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>();
-        match self.sender.send(super::ControllerRequest::START(request.clone(), reply_sender)).await {
+        match self.sender.send(super::ControllerRequest::Start(request.clone(), reply_sender)).await {
             Ok(_) => {}
             Err(_) => return Err(anyhow::anyhow!("Controller Channel Error")),
         }
@@ -67,7 +67,7 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
         }
     }
     async fn stop(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<()> {
-        match self.sender.send(super::ControllerRequest::STOP(id)).await {
+        match self.sender.send(super::ControllerRequest::Stop(id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
         }
@@ -78,7 +78,7 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
     ) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>> {
         let (reply_sender, reply_receiver) =
             tokio::sync::oneshot::channel::<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>();
-        match self.sender.send(super::ControllerRequest::LIST(id.clone(), reply_sender)).await {
+        match self.sender.send(super::ControllerRequest::List(id.clone(), reply_sender)).await {
             Ok(_) => {}
             Err(_) => return Err(anyhow::anyhow!("Controller Channel Error")),
         }
@@ -90,7 +90,7 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        match self.sender.send(super::ControllerRequest::PATCH(update)).await {
+        match self.sender.send(super::ControllerRequest::Patch(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
         }
@@ -105,7 +105,7 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for ControllerNodeRegi
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
         log::debug!("NodeRegistrationAPI::update_node() {:?}", request);
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>();
-        if let Err(err) = self.sender.send(super::ControllerRequest::UPDATENODE(request, reply_sender)).await {
+        if let Err(err) = self.sender.send(super::ControllerRequest::UpdateNode(request, reply_sender)).await {
             return Err(anyhow::anyhow!("Controller channel error when updating a node: {}", err.to_string()));
         }
         match reply_receiver.await {

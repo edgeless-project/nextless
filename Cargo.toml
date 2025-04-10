@@ -8,7 +8,6 @@ members = [
     "edgeless_api_core",
     #"edgeless_benchmark",
     "edgeless_cli",
-    "edgeless_container_function",
     "edgeless_function",
     "edgeless_con",
     "edgeless_inabox",

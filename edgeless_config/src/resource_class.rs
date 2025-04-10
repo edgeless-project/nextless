@@ -1,4 +1,5 @@
 #![allow(clippy::needless_lifetimes)]
+#![allow(clippy::type_complexity)]
 
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
 pub struct EdgelessResourceClass {

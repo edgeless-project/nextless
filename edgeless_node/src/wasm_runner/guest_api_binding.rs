@@ -57,6 +57,7 @@ pub async fn cast_raw(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn call_raw(
     mut caller: wasmtime::Caller<'_, GuestAPI>,
     instance_node_id_ptr: i32,

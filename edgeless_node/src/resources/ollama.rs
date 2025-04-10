@@ -145,11 +145,10 @@ impl OllamaResourceProvider {
     ///
     /// - `dataplane_provider`: handle to the EDGELESS data plane
     /// - `resource_provider_id`: identifier of this resource provider,
-    ///    also containing the identifier of the node hosting it
+    ///   also containing the identifier of the node hosting it
     /// - `ollama_host`: address of the ollama server
     /// - `ollama_port`: port number of the ollama server
-    /// - `ollama_messages_number_limit`: maximum number of messages per
-    ///    chat conversation
+    /// - `ollama_messages_number_limit`: maximum number of messages per chat conversation
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
@@ -271,7 +270,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         // Check that the resource to be patched is active.
         let mut lck = self.inner.lock().await;
-        if lck.instances.get(&update.function_id).is_none() {
+        if !lck.instances.contains_key(&update.function_id) {
             anyhow::bail!("Patching a non-existing resource: {}", update.function_id);
         }
 

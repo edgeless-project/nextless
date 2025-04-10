@@ -6,7 +6,7 @@ use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
 enum AgentRequest {
-    Spawn(edgeless_api::function_instance::SpawnFunctionRequest),
+    Spawn(Box<edgeless_api::function_instance::SpawnFunctionRequest>),
     SpawnResource(
         edgeless_api::resource_configuration::ResourceInstanceSpecification,
         futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>>>,
@@ -106,7 +106,7 @@ impl Agent {
                     match runners.get_mut(&spawn_req.code.function_class_type) {
                         Some(r) => {
                             // Forward the start request to the correct runner
-                            match r.start(spawn_req).await {
+                            match r.start(*spawn_req).await {
                                 Ok(_) => {}
                                 Err(err) => {
                                     log::error!("Unhandled Start Error: {}", err);
@@ -398,7 +398,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         let f_id = request.instance_id;
-        match self.sender.send(AgentRequest::Spawn(request)).await {
+        match self.sender.send(AgentRequest::Spawn(Box::new(request))).await {
             Ok(_) => Ok(edgeless_api::common::StartComponentResponse::InstanceId(f_id)),
             Err(err) => Err(anyhow::anyhow!(
                 "Agent channel error when creating a function instance: {}",

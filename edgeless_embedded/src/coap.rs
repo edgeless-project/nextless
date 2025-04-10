@@ -197,11 +197,11 @@ impl CoapMultiplexer {
         }
     }
 
-    async fn incoming_resource_start<'a>(
+    async fn incoming_resource_start(
         &mut self,
         sender: embassy_net::IpEndpoint,
         token: u8,
-        start_spec: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+        start_spec: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) {
         let mut cloned_agent = self.agent.clone();
         self.at_most_once(sender, token, async move { cloned_agent.start(start_spec).await })
@@ -219,21 +219,21 @@ impl CoapMultiplexer {
             .await
     }
 
-    async fn incoming_resource_patch<'a>(
+    async fn incoming_resource_patch(
         &mut self,
         sender: embassy_net::IpEndpoint,
         token: u8,
-        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
+        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) {
         let mut cloned_agent = self.agent.clone();
         self.at_most_once(sender, token, async move { cloned_agent.patch(patch_req).await }).await
     }
 
-    async fn incoming_function_start<'a>(
-        &'a mut self,
+    async fn incoming_function_start(
+        &mut self,
         sender: embassy_net::IpEndpoint,
         token: u8,
-        start_spec: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
+        start_spec: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'_>,
     ) {
         let mut cloned_agent = self.agent.clone();
         self.at_most_once(sender, token, async move { cloned_agent.start_function(start_spec).await })
@@ -251,11 +251,11 @@ impl CoapMultiplexer {
             .await
     }
 
-    async fn incoming_fucntion_patch<'a>(
+    async fn incoming_fucntion_patch(
         &mut self,
         sender: embassy_net::IpEndpoint,
         token: u8,
-        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
+        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) {
         let mut cloned_agent = self.agent.clone();
         self.at_most_once(sender, token, async move { cloned_agent.patch_function(patch_req).await })
@@ -370,8 +370,8 @@ impl CoapMultiplexer {
         }
     }
 
-    async fn at_most_once<'a>(
-        &'a mut self,
+    async fn at_most_once(
+        &mut self,
         sender: embassy_net::IpEndpoint,
         token: u8,
         operation: impl core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>>,

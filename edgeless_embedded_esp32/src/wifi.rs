@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 // Based on https://github.com/esp-rs/esp-wifi/blob/main/examples-esp32/examples/embassy_dhcp.rs
-use embedded_svc::wifi::Wifi;
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -37,16 +36,16 @@ pub async fn init(
 
     static STACK_RESOURCES_RAW: static_cell::StaticCell<embassy_net::StackResources<3>> = static_cell::StaticCell::new();
 
-    let (stack, mut runner) = embassy_net::new(
+    let (stack, runner) = embassy_net::new(
         wifi_interface,
         net_config,
-        STACK_RESOURCES_RAW.init_with(|| embassy_net::StackResources::<3>::new()),
+        STACK_RESOURCES_RAW.init_with(embassy_net::StackResources::<3>::new),
         1234,
     );
 
     spawner.spawn(connection(controller)).unwrap();
     spawner.spawn(net_task(runner)).unwrap();
-    spawner.spawn(network_watchdog(stack.clone(), agent)).unwrap();
+    spawner.spawn(network_watchdog(stack, agent)).unwrap();
 
     stack
 }
@@ -82,13 +81,10 @@ async fn network_watchdog(stack: embassy_net::Stack<'static>, mut agent: edgeles
 #[embassy_executor::task]
 async fn connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
     loop {
-        match esp_wifi::wifi::wifi_state() {
-            esp_wifi::wifi::WifiState::StaConnected => {
-                controller.wait_for_event(esp_wifi::wifi::WifiEvent::StaDisconnected).await;
-                log::info!("Sta Disconnect");
-                embassy_time::Timer::after(embassy_time::Duration::from_millis(5000)).await
-            }
-            _ => {}
+        if esp_wifi::wifi::wifi_state() == esp_wifi::wifi::WifiState::StaConnected {
+            controller.wait_for_event(esp_wifi::wifi::WifiEvent::StaDisconnected).await;
+            log::info!("Sta Disconnect");
+            embassy_time::Timer::after(embassy_time::Duration::from_millis(5000)).await
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = esp_wifi::wifi::Configuration::Client(esp_wifi::wifi::ClientConfiguration {
@@ -116,5 +112,4 @@ async fn connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
 #[embassy_executor::task]
 async fn net_task(mut runner: embassy_net::Runner<'static, esp_wifi::wifi::WifiDevice<'static>>) {
     runner.run().await;
-    log::info!("Network runner died.");
 }

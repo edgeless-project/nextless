@@ -1,4 +1,5 @@
 #![allow(clippy::needless_lifetimes)]
+#![allow(clippy::type_complexity)]
 
 use starlark::values::list::UnpackList;
 
@@ -33,6 +34,7 @@ impl<'v> starlark::values::UnpackValue<'v> for EdgelessActorClass {
 
 #[starlark::starlark_module]
 pub fn edgeless_actor_class(builder: &mut starlark::environment::GlobalsBuilder) {
+    #[allow(clippy::too_many_arguments)]
     fn edgeless_actor_class<'v>(
         id: String,
         version: String,

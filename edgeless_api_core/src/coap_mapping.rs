@@ -295,6 +295,7 @@ impl COAPEncoder {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum CoapMessage<'a> {
     Invocation(crate::invocation::Event),
     ResourceStart(crate::resource_configuration::EncodedResourceInstanceSpecification<'a>),
@@ -428,10 +429,7 @@ impl CoapDecoder {
         let body_ref = &data[(data.len() - body_len)..];
 
         let return_status_ok = match response.message.header.code {
-            MessageClass::Response(response_type) => match response_type {
-                ResponseType::Content => true,
-                _ => false,
-            },
+            MessageClass::Response(response_type) => matches!(response_type, ResponseType::Content),
             _ => true,
         };
 

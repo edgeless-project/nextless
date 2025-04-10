@@ -46,6 +46,7 @@ pub async fn run_agent(slf: AgentTask) {
 
 type StoredMessage = edgeless_api_core::invocation::Event;
 
+#[allow(clippy::large_enum_variant)] // no_alloc
 pub enum AgentEvent {
     Invocation(StoredMessage),
     Registration(
@@ -275,9 +276,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         })
     }
 
-    async fn start<'a>(
+    async fn start(
         &mut self,
-        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("R Start 1");
         let mut lck = self.inner.lock().await;
@@ -296,9 +297,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         })
     }
 
-    async fn patch<'a>(
+    async fn patch(
         &mut self,
-        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
+        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let mut lck = self.inner.lock().await;
         let mut my_patch = patch_req;
@@ -320,9 +321,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
 }
 
 impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
-    async fn start_function<'a>(
+    async fn start_function(
         &mut self,
-        instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
+        instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         if !self.code_store().has_image(&instance_specification.class).await {
             log::info!("Code Fetch Required");
@@ -366,9 +367,9 @@ impl crate::function_instance::FunctionInstanceAPI for EmbeddedAgent {
         }
     }
 
-    async fn patch_function<'a>(
+    async fn patch_function(
         &mut self,
-        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
+        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let mut lck = self.inner.lock().await;
 

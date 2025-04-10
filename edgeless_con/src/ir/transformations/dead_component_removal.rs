@@ -78,12 +78,10 @@ impl DeadComponentRemoval {
             if let Some(source) = slf.functions.get_mut(target_component_id) {
                 let mut source = source.borrow_mut();
                 let mut remove = false;
-                if let Some(source_port) = source.logical_ports().logical_input_mapping.get_mut(target_port_id) {
-                    if let LogicalInput::Direct(sources) = source_port {
-                        sources.retain(|(s_id, s_p_id)| s_id != source_component_id && s_p_id != source_port_id);
-                        if sources.is_empty() {
-                            remove = true;
-                        }
+                if let Some(LogicalInput::Direct(sources)) = source.logical_ports().logical_input_mapping.get_mut(target_port_id) {
+                    sources.retain(|(s_id, s_p_id)| s_id != source_component_id && s_p_id != source_port_id);
+                    if sources.is_empty() {
+                        remove = true;
                     }
                 }
                 if remove {

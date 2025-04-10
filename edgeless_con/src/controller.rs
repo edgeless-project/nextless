@@ -17,19 +17,19 @@ pub struct Controller {
 }
 
 pub(crate) enum ControllerRequest {
-    START(
+    Start(
         edgeless_api::workflow_instance::SpawnWorkflowRequest,
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
     ),
-    STOP(edgeless_api::workflow_instance::WorkflowId),
-    LIST(
+    Stop(edgeless_api::workflow_instance::WorkflowId),
+    List(
         edgeless_api::workflow_instance::WorkflowId,
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,
     ),
-    PATCH(edgeless_api::common::PatchRequest),
-    UPDATENODE(
+    Patch(edgeless_api::common::PatchRequest),
+    UpdateNode(
         edgeless_api::node_registration::UpdateNodeRequest,
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>,
@@ -101,6 +101,6 @@ impl Controller {
     }
 
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
-        client::ControllerClient::new(self.sender.clone(), self.image_repository.clone())
+        client::ControllerClient::new_client(self.sender.clone(), self.image_repository.clone())
     }
 }

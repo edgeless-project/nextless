@@ -68,18 +68,14 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedFunctionInstanceSpecification<'b>
 
         let mut input_mapping = heapless::Vec::<(&'b str, crate::common::Input), 4>::new();
 
-        for item in d.array_iter::<(&str, crate::common::Input)>().unwrap() {
-            if let Ok(item) = item {
-                input_mapping.push(item).unwrap();
-            }
+        for item in d.array_iter::<(&str, crate::common::Input)>()?.flatten() {
+            input_mapping.push(item).unwrap();
         }
 
         let mut output_mapping = heapless::Vec::<(&'b str, crate::common::Output), 4>::new();
 
-        for item in d.array_iter::<(&str, crate::common::Output)>().unwrap() {
-            if let Ok(item) = item {
-                output_mapping.push(item).unwrap();
-            }
+        for item in d.array_iter::<(&str, crate::common::Output)>()?.flatten() {
+            output_mapping.push(item).unwrap();
         }
 
         Ok(Self {

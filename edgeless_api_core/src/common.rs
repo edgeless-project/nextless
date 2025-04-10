@@ -49,11 +49,9 @@ impl<C, const N: usize> minicbor::CborLen<C> for TargetVec<N> {
 impl<C, const N: usize> minicbor::Decode<'_, C> for TargetVec<N> {
     fn decode(d: &mut minicbor::decode::Decoder<'_>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let mut s = Self(heapless::Vec::<Target, N>::new());
-        for item in d.array_iter::<Target>().unwrap() {
-            if let Ok(item) = item {
-                if s.0.push(item).is_err() {
-                    log::error!("Too many Targets!");
-                }
+        for item in d.array_iter::<Target>()?.flatten() {
+            if s.0.push(item).is_err() {
+                log::error!("Too many Targets!");
             }
         }
         Ok(s)

@@ -1,4 +1,5 @@
 #![allow(clippy::needless_lifetimes)]
+#![allow(clippy::type_complexity)]
 
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EdgelessActorGen<PortType> {
@@ -50,7 +51,7 @@ impl<'v> starlark::values::StarlarkValue<'v> for FrozenEdgelessActor {
     type Canonical = FrozenEdgelessActor;
 }
 
-impl<'v> starlark::values::Freeze for EdgelessActor {
+impl starlark::values::Freeze for EdgelessActor {
     type Frozen = FrozenEdgelessActor;
     fn freeze(self, freezer: &starlark::values::Freezer) -> anyhow::Result<Self::Frozen> {
         Ok(EdgelessActorGen::<crate::port::FrozenPort> {

@@ -8,6 +8,7 @@ pub struct WASMFunctionInstance {
     edgeless_mem_alloc: wasmtime::TypedFunc<i32, i32>,
     edgeless_mem_free: wasmtime::TypedFunc<(i32, i32), ()>,
     edgeless_mem_clear: wasmtime::TypedFunc<(), ()>,
+    #[allow(clippy::type_complexity)]
     edgefunctione_handle_call: wasmtime::TypedFunc<
         (
             i32, // node_id_ptr

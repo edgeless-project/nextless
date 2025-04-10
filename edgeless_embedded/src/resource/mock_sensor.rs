@@ -18,8 +18,8 @@ pub struct MockSensor {
 }
 
 impl MockSensor {
-    async fn parse_configuration<'a>(
-        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    async fn parse_configuration(
+        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<MockSensorConfiguration, edgeless_api_core::common::ErrorResponse> {
         let mut out_id: Option<edgeless_api_core::common::Output> = None;
 
@@ -64,7 +64,7 @@ impl MockSensor {
         })
     }
 
-    pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
+    pub async fn new_resource() -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
             embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>,
         > = static_cell::StaticCell::new();
@@ -109,8 +109,6 @@ pub async fn mock_sensor_task(
     state: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>,
     agent: crate::agent::EmbeddedAgent,
 ) {
-    let agent = agent;
-
     loop {
         let (instance_id, data_out_id, delay) = {
             let lck = state.lock().await;
@@ -119,7 +117,7 @@ pub async fn mock_sensor_task(
         if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
             log::info!("Sensor send!");
 
-            let mut dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id, agent.clone(), heapless::Vec::new());
+            let dataplane_handle = crate::dataplane::EmbeddedDataplaneHandle::new(instance_id, agent.clone(), heapless::Vec::new());
 
             match data_out_id {
                 edgeless_api_core::common::Output::Single(id) => {
@@ -161,9 +159,9 @@ impl crate::invocation::InvocationAPI for MockSensor {
 }
 
 impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
-    async fn start<'a>(
+    async fn start(
         &mut self,
-        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Mock Sensor Start");
         let instance_specification = Self::parse_configuration(instance_specification).await?;

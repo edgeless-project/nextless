@@ -8,7 +8,7 @@
 /// Those need to be made available to the guest using a virtualization-specific interface/binding.
 pub struct GuestAPIHost {
     pub instance_id: edgeless_api_core::instance_id::InstanceId,
-    pub data_plane: core::cell::RefCell<crate::dataplane::EmbeddedDataplaneHandle>,
+    pub data_plane: crate::dataplane::EmbeddedDataplaneHandle,
 }
 
 /// Errors to be reported by the host side of the guest binding.
@@ -33,7 +33,7 @@ impl From<crate::dataplane::DataplaneError> for GuestAPIError {
 
 impl GuestAPIHost {
     pub async fn cast_alias(&self, alias: &str, msg: &[u8]) -> Result<(), GuestAPIError> {
-        self.data_plane.borrow_mut().send_alias(alias, msg).await.map_err(GuestAPIError::from)?;
+        self.data_plane.send_alias(alias, msg).await.map_err(GuestAPIError::from)?;
         Ok(())
     }
 
@@ -44,7 +44,6 @@ impl GuestAPIHost {
         msg: &[u8],
     ) -> Result<(), GuestAPIError> {
         self.data_plane
-            .borrow_mut()
             .send(self.instance_id, target, target_port, msg)
             .await
             .map_err(GuestAPIError::from)?;

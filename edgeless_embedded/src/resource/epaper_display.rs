@@ -19,8 +19,8 @@ pub struct EPaperDisplay {
 }
 
 impl EPaperDisplay {
-    async fn parse_configuration<'a>(
-        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    async fn parse_configuration(
+        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<EPaperDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
         if data.class_type == "epaper-display" {
             let mut config: Option<[u8; 128]> = None;
@@ -88,7 +88,7 @@ pub async fn display_writer(
 }
 
 impl EPaperDisplay {
-    pub async fn new(
+    pub async fn new_resource(
         sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
         static SLF_RAW: static_cell::StaticCell<EPaperDisplay> = static_cell::StaticCell::new();
@@ -129,9 +129,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
         }
     }
 
-    async fn start<'a>(
+    async fn start(
         &mut self,
-        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Epaper Display Start");
 

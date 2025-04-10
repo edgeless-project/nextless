@@ -65,18 +65,12 @@ impl WorkflowInstanceConverters {
                 .workflow_functions
                 .iter()
                 .map(WorkflowInstanceConverters::parse_workflow_function)
-                .filter_map(|f| match f {
-                    Ok(val) => Some(val),
-                    Err(_) => None,
-                })
+                .filter_map(|f| f.ok())
                 .collect(),
             workflow_resources: api_request
                 .workflow_resources
                 .iter()
-                .filter_map(|f| match WorkflowInstanceConverters::parse_workflow_resource(f) {
-                    Ok(val) => Some(val),
-                    Err(_) => None,
-                })
+                .filter_map(|f| WorkflowInstanceConverters::parse_workflow_resource(f).ok())
                 .collect(),
             annotations: api_request.annotations.clone(),
             workflow_egress_proxies: Vec::new(),
@@ -131,10 +125,7 @@ impl WorkflowInstanceConverters {
                 .node_mapping
                 .iter()
                 .map(WorkflowInstanceConverters::parse_workflow_function_mapping)
-                .filter_map(|x| match x {
-                    Ok(val) => Some(val),
-                    Err(_) => None,
-                })
+                .filter_map(|x| x.ok())
                 .collect(),
         })
     }

@@ -1,5 +1,5 @@
 #![allow(clippy::needless_lifetimes)]
-
+#![allow(clippy::type_complexity)]
 use starlark::values::{list::UnpackList, ValueLike};
 
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
@@ -30,10 +30,6 @@ pub fn edgeless_workflow(builder: &mut starlark::environment::GlobalsBuilder) {
         annotations: starlark::values::dict::DictOf<String, String>,
         heap: &'v starlark::values::Heap,
     ) -> anyhow::Result<starlark::values::Value<'v>> {
-        // for i in items {
-        //     println!("{}", i.get_type())
-        // }
-
         let mut actors = Vec::<crate::actor::FrozenEdgelessActor>::new();
         let mut resources = Vec::<crate::resource::FrozenEdgelessResource>::new();
 

@@ -198,19 +198,17 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                     allow: allow.clone(),
                 },
             );
-            if let Some(output) = instance_specification
+            if let Some(edgeless_api::common::Output::Single(target, port_id)) = instance_specification
                 .output_mapping
                 .get(&edgeless_api::function_instance::PortId("new_request".to_string()))
             {
-                if let edgeless_api::common::Output::Single(target, port_id) = output {
-                    lck.interests.push(HTTPIngressInterest {
-                        resource_id: instance_specification.resource_id,
-                        host: host.to_string(),
-                        allow,
-                        target: *target,
-                        target_port: port_id.clone(),
-                    });
-                }
+                lck.interests.push(HTTPIngressInterest {
+                    resource_id: instance_specification.resource_id,
+                    host: host.to_string(),
+                    allow,
+                    target: *target,
+                    target_port: port_id.clone(),
+                });
             }
 
             Ok(edgeless_api::common::StartComponentResponse::InstanceId(

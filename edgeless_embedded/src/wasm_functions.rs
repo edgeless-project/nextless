@@ -73,9 +73,9 @@ impl crate::invocation::InvocationAPI for WasmiRuntime {
 }
 
 impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
-    async fn start_function<'a>(
+    async fn start_function(
         &mut self,
-        instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'a>,
+        instance_specification: edgeless_api_core::function_instance::EncodedFunctionInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let image = self
             .agent
@@ -103,11 +103,11 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
         let mut inner_fun = WasmiFunctionInstance::instantiate(
             guest_api::GuestAPIHost {
                 instance_id: instance_specification.instance_id,
-                data_plane: core::cell::RefCell::new(crate::dataplane::EmbeddedDataplaneHandle::new(
+                data_plane: crate::dataplane::EmbeddedDataplaneHandle::new(
                     instance_specification.instance_id,
                     self.agent.clone().unwrap(),
                     output_mapping,
-                )),
+                ),
             },
             image2.read(),
         )
@@ -137,9 +137,9 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
         Ok(())
     }
 
-    async fn patch_function<'a>(
+    async fn patch_function(
         &mut self,
-        patch_reg: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
+        patch_reg: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         if let Some(fun) = self.functions.iter_mut().find(|fun| fun.instance_id == patch_reg.instance_id) {
             // TODO(raphaelhetzel) This should probably be changed to Port<32> in the request type.
@@ -149,7 +149,7 @@ impl crate::function_instance::FunctionInstanceAPI for WasmiRuntime {
                 .map(|(k, v)| (edgeless_api_core::port::Port(heapless::String::<32>::from_str(k).unwrap()), v))
                 .collect();
 
-            fun.inner.store.data_mut().host.data_plane.borrow_mut().patch(output_mapping);
+            fun.inner.store.data_mut().host.data_plane.patch(output_mapping).await;
         }
         Ok(())
     }
@@ -163,7 +163,6 @@ impl crate::invocation::InvocationAPI for WasmiFunctionInstanceWrapper {
                 let own_host = &mut self.inner.store.data_mut().host;
                 own_host
                     .data_plane
-                    .borrow_mut()
                     .reply(own_host.instance_id, event.source, event.stream_id, ret)
                     .await
                     .map_err(|_| ())?;
@@ -184,6 +183,7 @@ struct WasmiFunctionInstance {
     edgeless_mem_alloc: wasmi::TypedFunc<i32, i32>,
     edgeless_mem_free: wasmi::TypedFunc<(i32, i32), ()>,
     edgeless_mem_clear: wasmi::TypedFunc<(), ()>,
+    #[allow(clippy::type_complexity)]
     edgefunctione_handle_call: wasmi::TypedFunc<
         (
             i32, // node_id_ptr

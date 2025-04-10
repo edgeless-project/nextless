@@ -22,10 +22,12 @@ pub struct CoapClient {
     network_task_abort_handle: Option<std::sync::Arc<tokio::task::AbortHandle>>,
 }
 
+type ActiveRequest = tokio::sync::oneshot::Sender<Result<Vec<u8>, Vec<u8>>>;
+
 struct CoapClientInner {
     endpoint: std::net::SocketAddrV4,
     next_token: u8,
-    active_requests: std::collections::HashMap<u8, tokio::sync::oneshot::Sender<Result<Vec<u8>, Vec<u8>>>>,
+    active_requests: std::collections::HashMap<u8, ActiveRequest>,
 }
 
 impl CoapClient {
@@ -103,7 +105,7 @@ impl CoapClient {
         }
     }
 
-    async fn call_with_reply<'a>(
+    async fn call_with_reply(
         &mut self,
         encode_request: impl Fn(u8, std::net::SocketAddrV4, &mut [u8]) -> ((&mut [u8], std::net::SocketAddrV4), &mut [u8]),
     ) -> Result<Vec<u8>, Vec<u8>> {

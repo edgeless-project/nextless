@@ -6,6 +6,9 @@ static mut data_arena: [u8; 32 * 1024] = [0; 32 * 1024];
 #[cfg(not(feature = "std"))]
 static mut arena_start: usize = 0;
 
+/// # Safety
+///
+/// This can only be called on valid pointers. Only used in WASM.
 #[cfg(not(feature = "std"))]
 #[no_mangle]
 pub unsafe extern "C" fn edgeless_mem_alloc(payload_len: usize) -> *mut u8 {
@@ -18,6 +21,9 @@ pub unsafe extern "C" fn edgeless_mem_alloc(payload_len: usize) -> *mut u8 {
     out
 }
 
+/// # Safety
+///
+/// This can only be called on valid pointers. Only used in WASM.
 #[cfg(feature = "std")]
 #[no_mangle]
 // https://radu-matei.com/blog/practical-guide-to-wasm-memory/
@@ -27,24 +33,36 @@ pub unsafe extern "C" fn edgeless_mem_alloc(payload_len: usize) -> *mut u8 {
     std::alloc::alloc(layout)
 }
 
+/// # Safety
+///
+/// This can only be called on valid pointers. Only used in WASM.
 #[cfg(not(feature = "std"))]
 #[no_mangle]
 pub unsafe extern "C" fn edgeless_mem_clear() {
     arena_start = 0;
 }
 
+/// # Safety
+///
+/// This can only be called on valid pointers. Only used in WASM.
 #[cfg(feature = "std")]
 #[no_mangle]
 pub unsafe extern "C" fn edgeless_mem_clear() {
     // We always free and clear, so this does not leak memory.
 }
 
+/// # Safety
+///
+/// This can only be called on valid pointers. Only used in WASM.
 #[cfg(not(feature = "std"))]
 #[no_mangle]
 pub unsafe extern "C" fn edgeless_mem_free(ptr: *mut u8, size: usize) {
     // We always free and clear, so this does not leak memory.
 }
 
+/// # Safety
+///
+/// This can only be called on valid pointers. Only used in WASM.
 #[cfg(feature = "std")]
 #[no_mangle]
 pub unsafe extern "C" fn edgeless_mem_free(ptr: *mut u8, size: usize) {

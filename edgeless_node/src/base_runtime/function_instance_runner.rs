@@ -116,6 +116,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 }
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstanceType> {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,

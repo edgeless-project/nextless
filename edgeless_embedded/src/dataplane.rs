@@ -9,6 +9,7 @@ pub enum DataplaneError {
     UnknownAlias,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CallRet {
     NoReply,
@@ -18,6 +19,10 @@ pub enum CallRet {
 
 pub struct EmbeddedDataplaneHandle {
     own_id: edgeless_api_core::instance_id::InstanceId,
+    inner: embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedDataplaneHandleInner>,
+}
+
+struct EmbeddedDataplaneHandleInner {
     pub agent: crate::agent::EmbeddedAgent,
     alias_mapping: AliasMapping,
 }
@@ -34,17 +39,22 @@ impl EmbeddedDataplaneHandle {
     ) -> Self {
         Self {
             own_id,
-            agent,
-            alias_mapping: AliasMapping { outputs: output_mapping },
+            inner: embassy_sync::mutex::Mutex::new(EmbeddedDataplaneHandleInner {
+                agent,
+                alias_mapping: AliasMapping { outputs: output_mapping },
+            }),
         }
     }
 
-    pub fn patch(&mut self, output_mapping: heapless::Vec<(edgeless_api_core::port::Port<32>, edgeless_api_core::common::Output), 16>) {
-        self.alias_mapping.outputs = output_mapping;
+    pub async fn patch(&mut self, output_mapping: heapless::Vec<(edgeless_api_core::port::Port<32>, edgeless_api_core::common::Output), 16>) {
+        self.inner.lock().await.alias_mapping.outputs = output_mapping;
     }
 
-    pub async fn send_alias(&mut self, alias: &str, msg: &[u8]) -> Result<(), DataplaneError> {
+    pub async fn send_alias(&self, alias: &str, msg: &[u8]) -> Result<(), DataplaneError> {
         let outputs = self
+            .inner
+            .lock()
+            .await
             .alias_mapping
             .outputs
             .iter()
@@ -77,7 +87,7 @@ impl EmbeddedDataplaneHandle {
     }
 
     pub async fn send(
-        &mut self,
+        &self,
         slf: edgeless_api_core::instance_id::InstanceId,
         target: edgeless_api_core::instance_id::InstanceId,
         target_port: edgeless_api_core::port::Port<32>,
@@ -97,12 +107,12 @@ impl EmbeddedDataplaneHandle {
                 trace_flags: 0,
             },
         };
-        self.agent.handle(event).await.map_err(|_| DataplaneError::Internal)?;
+        self.inner.lock().await.agent.handle(event).await.map_err(|_| DataplaneError::Internal)?;
         Ok(())
     }
 
     pub async fn reply(
-        &mut self,
+        &self,
         slf: edgeless_api_core::instance_id::InstanceId,
         target: edgeless_api_core::instance_id::InstanceId,
         target_channel: u64,
@@ -124,7 +134,7 @@ impl EmbeddedDataplaneHandle {
                 trace_flags: 0,
             },
         };
-        self.agent.handle(event).await.map_err(|_| DataplaneError::Internal)?;
+        self.inner.lock().await.agent.handle(event).await.map_err(|_| DataplaneError::Internal)?;
         Ok(())
     }
 }

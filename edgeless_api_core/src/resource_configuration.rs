@@ -45,19 +45,15 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
         let mut outputs = heapless::Vec::<(&'b str, crate::common::Output), 4>::new();
         let mut configuration = heapless::Vec::<(&'b str, &'b str), 16>::new();
 
-        for item in d.array_iter::<(&str, crate::common::Output)>().unwrap() {
-            if let Ok(item) = item {
-                if outputs.push(item).is_err() {
-                    log::info!("Too many Outputs");
-                }
+        for item in d.array_iter::<(&str, crate::common::Output)>()?.flatten() {
+            if outputs.push(item).is_err() {
+                log::info!("Too many Outputs");
             }
         }
 
-        for item in d.array_iter::<(&str, &str)>().unwrap() {
-            if let Ok(item) = item {
-                if configuration.push(item).is_err() {
-                    log::info!("Too many Configuration Options");
-                }
+        for item in d.array_iter::<(&str, &str)>()?.flatten() {
+            if configuration.push(item).is_err() {
+                log::info!("Too many Configuration Options");
             }
         }
 
@@ -102,11 +98,9 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedPatchRequest<'b> {
 
         let mut outputs = heapless::Vec::new();
 
-        for item in d.array_iter::<(&str, crate::common::Output)>().unwrap() {
-            if let Ok(item) = item {
-                if outputs.push(item).is_err() {
-                    log::error!("Too many Outputs");
-                }
+        for item in d.array_iter::<(&str, crate::common::Output)>()?.flatten() {
+            if outputs.push(item).is_err() {
+                log::error!("Too many Outputs");
             }
         }
 

@@ -86,7 +86,7 @@ impl crate::ir::ComponentRuntimeStatistics for PrometheusComponentRuntimeStatist
             "sum(rate(execution_time_seconds_count{{node_id = \"{}\", function_id = \"{}\"}}[{}]))",
             self.component_id.node_id,
             self.component_id.function_id,
-            format!("{}s", period.as_secs())
+            format_args!("{}s", period.as_secs())
         );
 
         single_value_helper(&self.client, query)
@@ -97,7 +97,7 @@ impl crate::ir::ComponentRuntimeStatistics for PrometheusComponentRuntimeStatist
             "rate(execution_time_seconds_count{{node_id = \"{}\", function_id = \"{}\"}}[{}])",
             self.component_id.node_id,
             self.component_id.function_id,
-            format!("{}s", period.as_secs())
+            format_args!("{}s", period.as_secs())
         );
         let res_f = self.client.query(query).post();
         let res = tokio::runtime::Handle::current().block_on(res_f);
@@ -122,7 +122,7 @@ impl crate::ir::ComponentRuntimeStatistics for PrometheusComponentRuntimeStatist
             "{{node_id = \"{}\", function_id = \"{}\"}}[{}]",
             self.component_id.node_id,
             self.component_id.function_id,
-            format!("{}s", period.as_secs())
+            format_args!("{}s", period.as_secs())
         );
 
         let query = format!(
@@ -138,7 +138,7 @@ impl crate::ir::ComponentRuntimeStatistics for PrometheusComponentRuntimeStatist
             "{{node_id = \"{}\", function_id = \"{}\"}}[{}]",
             self.component_id.node_id,
             self.component_id.function_id,
-            format!("{}s", period.as_secs())
+            format_args!("{}s", period.as_secs())
         );
 
         let query = format!(
@@ -154,7 +154,7 @@ impl crate::ir::ComponentRuntimeStatistics for PrometheusComponentRuntimeStatist
             "{{node_id = \"{}\", function_id = \"{}\"}}[{}]",
             self.component_id.node_id,
             self.component_id.function_id,
-            format!("{}s", period.as_secs())
+            format_args!("{}s", period.as_secs())
         );
 
         let query = format!(
@@ -194,7 +194,7 @@ impl PrometheusPortStatistics {
             self.component_id.node_id,
             self.component_id.function_id,
             self.port_id.0,
-            format!("{}s", period.as_secs())
+            format_args!("{}s", period.as_secs())
         )
     }
 
@@ -204,7 +204,7 @@ impl PrometheusPortStatistics {
             self.component_id.node_id,
             self.component_id.function_id,
             self.port_id.0,
-            format!("{}s", period.as_secs())
+            format_args!("{}s", period.as_secs())
         )
     }
 }

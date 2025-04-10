@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 use std::str::FromStr;
 
 pub mod actor;
@@ -55,7 +57,7 @@ fn load_module(file: &std::path::PathBuf) -> starlark::Result<starlark::environm
 
     let load_refs = loads.iter().map(|(k, v)| (k.as_str(), v)).collect();
 
-    let mut loader = starlark::eval::ReturnFileLoader { modules: &load_refs };
+    let loader = starlark::eval::ReturnFileLoader { modules: &load_refs };
 
     let globals = starlark::environment::GlobalsBuilder::extended_by(&[starlark::environment::LibraryExtension::Print])
         .with(crate::inner_structure::edgeless_inner_structure)
@@ -74,7 +76,7 @@ fn load_module(file: &std::path::PathBuf) -> starlark::Result<starlark::environm
 
     {
         let mut eval = starlark::eval::Evaluator::new(&module);
-        eval.set_loader(&mut loader);
+        eval.set_loader(&loader);
         eval.extra = Some(&context);
         eval.eval_module(ast, &globals).unwrap();
     }

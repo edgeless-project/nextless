@@ -21,7 +21,7 @@ impl<Conn: sensor_scd30::base::Base<Err>, Delay: embedded_hal::delay::DelayNs, E
                 };
                 Ok(wrapped_measurement)
             }
-            Err(_) => Err(()),
+            Err(_) => Err(edgeless_embedded::resource::scd30_sensor::SensorError::ReadError),
         }
     }
 }

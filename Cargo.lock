@@ -1756,24 +1756,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "edgeless_container_function"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "clap",
- "edgeless_api",
- "env_logger",
- "futures",
- "log",
- "serde",
- "serde_json",
- "tokio",
- "toml 0.7.8",
- "uuid",
-]
-
-[[package]]
 name = "edgeless_dataplane"
 version = "0.1.0"
 dependencies = [

@@ -12,8 +12,7 @@ struct AllocImageRef<'a> {
 
 impl AllocImageEntry {
     pub(crate) fn new(size: u64) -> Self {
-        let mut buffer = alloc::vec::Vec::new();
-        buffer.resize(size as usize, 0);
+        let buffer = alloc::vec![0; size as usize];
 
         Self {
             inner: core::cell::RefCell::new(buffer),

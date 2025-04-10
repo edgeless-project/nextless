@@ -40,13 +40,12 @@ impl ScoreableRuntime for crate::ir::Runtime<'_> {
 
     fn capacity_score(&self) -> f64 {
         match self {
-            super::Runtime::WasmBase(wasm_runtime) => ((wasm_runtime.cpu_freq_hz() as f64 * wasm_runtime.num_cores() as f64) / (5_000f64 * 128f64))
-                .min(1f64)
-                .max(0.01f64),
-            super::Runtime::Native(native_runtime) => ((native_runtime.cpu_freq_hz() as f64 * native_runtime.num_cores() as f64)
-                / (5_000f64 * 128f64))
-                .min(1f64)
-                .max(0.01f64),
+            super::Runtime::WasmBase(wasm_runtime) => {
+                ((wasm_runtime.cpu_freq_hz() as f64 * wasm_runtime.num_cores() as f64) / (5_000f64 * 128f64)).clamp(0.01f64, 1f64)
+            }
+            super::Runtime::Native(native_runtime) => {
+                ((native_runtime.cpu_freq_hz() as f64 * native_runtime.num_cores() as f64) / (5_000f64 * 128f64)).clamp(0.01f64, 1f64)
+            }
         }
     }
 }

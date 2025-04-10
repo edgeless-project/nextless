@@ -76,23 +76,19 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
 
         let mut resources: heapless::Vec<ResourceProviderSpecification, 16> = heapless::Vec::new();
 
-        for item in d.array_iter::<ResourceProviderSpecification<'b>>().unwrap() {
-            if let Ok(item) = item {
-                if resources.push(item).is_err() {
-                    log::error!("Too many Resources");
-                }
+        for item in d.array_iter::<ResourceProviderSpecification<'b>>()?.flatten() {
+            if resources.push(item).is_err() {
+                log::error!("Too many Resources");
             }
         }
 
         let mut runtimes = heapless::Vec::<heapless::String<32>, 4>::new();
-        for item in d.array_iter::<&'b str>().unwrap() {
-            if let Ok(item) = item {
-                if runtimes
-                    .push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?)
-                    .is_err()
-                {
-                    log::error!("Too many Runtimes");
-                }
+        for item in d.array_iter::<&'b str>()?.flatten() {
+            if runtimes
+                .push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?)
+                .is_err()
+            {
+                log::error!("Too many Runtimes");
             }
         }
 
@@ -141,10 +137,8 @@ impl<'b, C> minicbor::Decode<'b, C> for ResourceProviderSpecification<'b> {
         let class_type: &str = d.decode()?;
 
         let mut outputs = heapless::Vec::new();
-        for item in d.array_iter::<&str>().unwrap() {
-            if let Ok(item) = item {
-                outputs.push(item).unwrap();
-            }
+        for item in d.array_iter::<&str>()?.flatten() {
+            outputs.push(item).unwrap();
         }
 
         Ok(ResourceProviderSpecification {
