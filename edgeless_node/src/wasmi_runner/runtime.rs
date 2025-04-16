@@ -5,6 +5,12 @@ pub struct WasmiRuntime {
     _configuration: std::collections::HashMap<String, String>,
 }
 
+impl Default for WasmiRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WasmiRuntime {
     pub fn new() -> Self {
         Self {

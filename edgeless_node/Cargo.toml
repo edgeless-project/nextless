@@ -55,5 +55,7 @@ ollama-rs = { version = "0.2.0", features = ["chat-history"] }
 
 opentelemetry = "0.27"
 
+wgpu = { version = "25", features = ["serde"] }
+
 [build-dependencies]
 tonic-build = "0.10"

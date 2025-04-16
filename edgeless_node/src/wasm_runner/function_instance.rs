@@ -65,6 +65,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             &engine,
             super::guest_api_binding::GuestAPI {
                 host: guest_api_host.take().expect("the impossible happened: no GuestAPIHost"),
+                wgpu_wrapper: super::gpu_binding::GPUWrapper::new(),
             },
         );
 
@@ -159,7 +160,180 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 Box::new(super::guest_api_binding::sync(store, state_ptr, state_len))
             })
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
-
+        linker
+            .func_wrap_async("env", "webgpu_instance_new", |store, ()| {
+                Box::new(super::guest_api_binding::wgpu_instance_new(store))
+            })
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap_async("env", "webgpu_instance_poll_all", |store, (instance_id, forced_wait)| {
+                Box::new(super::guest_api_binding::wgpu_instance_poll_all(store, instance_id, forced_wait))
+            })
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap_async("env", "webgpu_instance_adapter_create", |store, (instance_id,)| {
+                Box::new(super::guest_api_binding::webgpu_instance_adapter_create(store, instance_id))
+            })
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap_async("env", "webgpu_instance_wgsl_language_features", |store, (instance_id,)| {
+                Box::new(super::guest_api_binding::webgpu_instance_wgsl_language_features(store, instance_id))
+            })
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap_async(
+                "env",
+                "webgpu_adapter_device_create",
+                |store, (instance_id, out_device_id, out_queue_id)| {
+                    log::info!("D1");
+                    Box::new(super::guest_api_binding::webgpu_adapter_device_create(
+                        store,
+                        instance_id,
+                        out_device_id,
+                        out_queue_id,
+                    ))
+                },
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_device_create_shader_module",
+                super::guest_api_binding::webgpu_device_create_shader_module,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_device_create_bind_group_layout",
+                super::guest_api_binding::webgpu_device_create_bind_group_layout,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_device_create_bind_group",
+                super::guest_api_binding::webgpu_device_create_bind_group,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_device_create_dipatch_pipeline_layout",
+                super::guest_api_binding::webgpu_device_create_dipatch_pipeline_layout,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_device_create_compute_pipeline",
+                super::guest_api_binding::webgpu_device_create_compute_pipeline,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_device_create_buffer",
+                super::guest_api_binding::webgpu_device_create_buffer,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_device_create_command_encoder",
+                super::guest_api_binding::webgpu_device_create_command_encoder,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_device_poll", super::guest_api_binding::webgpu_device_poll)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_queue_write_buffer", super::guest_api_binding::webgpu_queue_write_buffer)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_queue_submit", super::guest_api_binding::webgpu_queue_submit)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_queue_get_timestamp_period",
+                super::guest_api_binding::webgpu_queue_get_timestamp_period,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_buffer_map_async", super::guest_api_binding::webgpu_buffer_map_async)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_ce_copy_buffer_to_buffer",
+                super::guest_api_binding::webgpu_ce_copy_buffer_to_buffer,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_ce_begin_compute_pass",
+                super::guest_api_binding::webgpu_ce_begin_compute_pass,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_ce_finish", super::guest_api_binding::webgpu_ce_finish)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_cp_set_pipeline", super::guest_api_binding::webgpu_cp_set_pipeline)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_cp_set_bind_group", super::guest_api_binding::webgpu_cp_set_bind_group)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_cp_dispatch_workgroups",
+                super::guest_api_binding::webgpu_cp_dispatch_workgroups,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_cp_dispatch_workgroups_indirect",
+                super::guest_api_binding::webgpu_cp_dispatch_workgroups_indirect,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_cp_set_push_constants",
+                super::guest_api_binding::webgpu_cp_set_push_constants,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        // linker
+        //     .func_wrap(
+        //         "env",
+        //         "webgpu_buffer_get_mapped_range",
+        //         super::guest_api_binding::webgpu_buffer_get_mapped_range,
+        //     )
+        //     .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_buffer_mapped_range_read",
+                super::guest_api_binding::webgpu_buffer_mapped_range_read,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_buffer_mapped_range_write",
+                super::guest_api_binding::webgpu_buffer_mapped_range_write,
+            )
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_cp_drop", super::guest_api_binding::webgpu_cp_drop)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_buffer_unmap", super::guest_api_binding::webgpu_buffer_unmap)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         let instance = linker.instantiate_async(&mut store, &module).await.unwrap();
 
         Ok(Box::new(Self {
@@ -226,7 +400,10 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     (init_payload_ptr, init_payload_len, serialized_state_ptr, serialized_state_len),
                 )
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                .map_err(|e| {
+                    log::info!("{}", e);
+                    crate::base_runtime::FunctionInstanceError::InternalError
+                })?;
             Ok(())
         };
 

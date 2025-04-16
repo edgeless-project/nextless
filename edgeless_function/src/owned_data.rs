@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+#[derive(Debug)]
 pub struct OwnedByteBuff {
     pub(crate) data: *mut u8,
     pub(crate) size: usize,
@@ -29,7 +30,10 @@ impl Drop for OwnedByteBuff {
 }
 
 impl OwnedByteBuff {
-    pub(crate) unsafe fn new(ptr: *mut u8, len: usize) -> Self {
+    /// # Safety
+    ///
+    /// This can only be called on a valid allocated range. Only used in WASM.
+    pub unsafe fn new(ptr: *mut u8, len: usize) -> Self {
         Self { data: ptr, size: len }
     }
 

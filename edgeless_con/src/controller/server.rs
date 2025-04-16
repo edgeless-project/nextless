@@ -301,7 +301,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
     async fn stop_workflow(&mut self, wf_id: &edgeless_api::workflow_instance::WorkflowId) {
         let mut workflow = match self.active_workflows.remove(wf_id) {
             None => {
-                log::error!("trying to tear-down a workflow that does not exist: {}", wf_id.to_string());
+                log::error!("trying to tear-down a workflow that does not exist: {}", wf_id);
                 return;
             }
             Some(val) => val,
@@ -633,7 +633,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         match response {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    log::warn!("function instance {}:{} creation rejected: {}", wf_id.to_string(), f_name, error);
+                    log::warn!("function instance {}:{} creation rejected: {}", wf_id, f_name, error);
                     Err(format!("function instance creation rejected: {} ", error))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(_id) => Ok(()),
@@ -685,7 +685,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                     Err(format!("resource start rejected: {} ", error))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    log::info!("workflow {} resource {} started with fid {}", wf_id.to_string(), &r_name, &id);
+                    log::info!("workflow {} resource {} started with fid {}", wf_id, &r_name, &id);
                     Ok(())
                 }
             },

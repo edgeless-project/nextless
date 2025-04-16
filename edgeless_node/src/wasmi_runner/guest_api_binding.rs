@@ -34,8 +34,8 @@ pub fn cast_raw(
     payload_len: i32,
 ) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
-    let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16 as usize].to_vec();
-    let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16 as usize].to_vec();
+    let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16_usize].to_vec();
+    let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16_usize].to_vec();
     let instance_id = edgeless_api::function_instance::InstanceId {
         node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
@@ -56,6 +56,7 @@ pub fn cast_raw(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn call_raw(
     mut caller: wasmi::Caller<'_, GuestAPI>,
     instance_node_id_ptr: i32,
@@ -69,8 +70,8 @@ pub fn call_raw(
 ) -> Result<i32, wasmi::Error> {
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
-    let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16 as usize].to_vec();
-    let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16 as usize].to_vec();
+    let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16_usize].to_vec();
+    let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16_usize].to_vec();
     let instance_id = edgeless_api::function_instance::InstanceId {
         node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::Error::new("uuid error"))?),
@@ -90,7 +91,7 @@ pub fn call_raw(
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),
         edgeless_dataplane::core::CallRet::Reply(data) => {
-            let len = data.as_bytes().len();
+            let len = data.len();
 
             let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes())?;
             copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
@@ -146,7 +147,7 @@ pub fn call(
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),
         edgeless_dataplane::core::CallRet::Reply(data) => {
-            let len = data.as_bytes().len();
+            let len = data.len();
 
             let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes())?;
             copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
