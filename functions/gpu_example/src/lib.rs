@@ -6,14 +6,12 @@
 // GPU Code with comments (largest part of this file) taken
 // from https://github.com/gfx-rs/wgpu/blob/trunk/examples/standalone/01_hello_compute/src/main.rs (MIT/APACHE Licensed).
 use edgeless_function::*;
-
+use edgeless_function_gpu::wgpu;
 use wgpu::{custom::InstanceInterface, util::DeviceExt};
 
 struct GPUTest;
 
 edgeless_function::generate!(GPUTest);
-
-mod wgpu_custom;
 
 impl GpuExampleAPI<'_> for GPUTest {
     type STRING = String;
@@ -31,7 +29,7 @@ impl GpuExampleAPI<'_> for GPUTest {
 
         let arguments: Vec<f32> = vec![1.0, 2.0, 3.0, 4.0];
 
-        let custom_gpu_instance = wgpu_custom::CustomInstance::new(&wgpu::InstanceDescriptor::default());
+        let custom_gpu_instance = edgeless_function_gpu::EdgeGpuInstance::new(&wgpu::InstanceDescriptor::default());
 
         // We first initialize an wgpu `Instance`, which contains any "global" state wgpu needs.
         //

@@ -21,4 +21,5 @@ members = [
     "edgeless_function_macro",
     "edgeless_config",
     "edgeless_link_multicast",
+    "edgeless_function_gpu",
 ]

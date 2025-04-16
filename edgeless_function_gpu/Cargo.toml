@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
+[package]
+name = "edgeless_function_gpu"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+
+[lib]
+name = "edgeless_function_gpu"
+path = "src/lib.rs"
+
+[dependencies]
+log = "0.4"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+wgpu = { git = "https://github.com/raphaelhetzel/wgpu.git", branch = "custom_fix", package = "wgpu", default-features = false, features = [
+    "wgsl",
+    "custom",
+    "serde",
+] }

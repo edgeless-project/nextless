@@ -117,6 +117,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "edgeless_function_gpu"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "wgpu",
+]
+
+[[package]]
 name = "edgeless_function_macro"
 version = "0.1.0"
 dependencies = [
@@ -146,11 +156,11 @@ dependencies = [
  "bytemuck",
  "edgeless_function",
  "edgeless_function_core",
+ "edgeless_function_gpu",
  "log",
  "pollster",
  "serde",
  "serde_json",
- "wgpu",
 ]
 
 [[package]]

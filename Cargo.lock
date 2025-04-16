@@ -1928,6 +1928,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "edgeless_function_gpu"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "wgpu 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
+]
+
+[[package]]
 name = "edgeless_function_macro"
 version = "0.1.0"
 dependencies = [
@@ -2023,7 +2033,7 @@ dependencies = [
  "uuid",
  "wasmi",
  "wasmtime 31.0.0",
- "wgpu",
+ "wgpu 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -5053,6 +5063,29 @@ dependencies = [
  "num-traits",
  "rustc-hash 1.1.0",
  "spirv",
+ "strum",
+ "thiserror 2.0.12",
+ "unicode-ident",
+]
+
+[[package]]
+name = "naga"
+version = "25.0.0"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix#a8f718f7149eee348360493c4302cedde0ab0067"
+dependencies = [
+ "arrayvec",
+ "bit-set 0.8.0",
+ "bitflags 2.9.0",
+ "cfg_aliases",
+ "codespan-reporting",
+ "half",
+ "hashbrown 0.15.2",
+ "hexf-parse",
+ "indexmap 2.9.0",
+ "log",
+ "num-traits",
+ "once_cell",
+ "rustc-hash 1.1.0",
  "strum",
  "thiserror 2.0.12",
  "unicode-ident",
@@ -8816,7 +8849,7 @@ dependencies = [
  "hashbrown 0.15.2",
  "js-sys",
  "log",
- "naga",
+ "naga 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot",
  "portable-atomic",
  "profiling",
@@ -8826,9 +8859,31 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "wgpu-core",
- "wgpu-hal",
- "wgpu-types",
+ "wgpu-core 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wgpu-hal 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wgpu-types 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "wgpu"
+version = "25.0.0"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix#a8f718f7149eee348360493c4302cedde0ab0067"
+dependencies = [
+ "arrayvec",
+ "bitflags 2.9.0",
+ "cfg_aliases",
+ "document-features",
+ "hashbrown 0.15.2",
+ "log",
+ "parking_lot",
+ "portable-atomic",
+ "profiling",
+ "raw-window-handle",
+ "smallvec",
+ "static_assertions",
+ "wgpu-core 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
+ "wgpu-hal 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
+ "wgpu-types 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
 ]
 
 [[package]]
@@ -8846,7 +8901,7 @@ dependencies = [
  "hashbrown 0.15.2",
  "indexmap 2.9.0",
  "log",
- "naga",
+ "naga 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "once_cell",
  "parking_lot",
  "portable-atomic",
@@ -8858,9 +8913,38 @@ dependencies = [
  "thiserror 2.0.12",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-emscripten",
- "wgpu-core-deps-windows-linux-android",
- "wgpu-hal",
- "wgpu-types",
+ "wgpu-core-deps-windows-linux-android 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wgpu-hal 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wgpu-types 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "wgpu-core"
+version = "25.0.0"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix#a8f718f7149eee348360493c4302cedde0ab0067"
+dependencies = [
+ "arrayvec",
+ "bit-set 0.8.0",
+ "bit-vec 0.8.0",
+ "bitflags 2.9.0",
+ "cfg_aliases",
+ "document-features",
+ "hashbrown 0.15.2",
+ "indexmap 2.9.0",
+ "log",
+ "naga 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
+ "once_cell",
+ "parking_lot",
+ "portable-atomic",
+ "profiling",
+ "raw-window-handle",
+ "rustc-hash 1.1.0",
+ "serde",
+ "smallvec",
+ "thiserror 2.0.12",
+ "wgpu-core-deps-windows-linux-android 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
+ "wgpu-hal 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
+ "wgpu-types 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
 ]
 
 [[package]]
@@ -8869,7 +8953,7 @@ version = "25.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfd488b3239b6b7b185c3b045c39ca6bf8af34467a4c5de4e0b1a564135d093d"
 dependencies = [
- "wgpu-hal",
+ "wgpu-hal 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -8878,7 +8962,7 @@ version = "25.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f09ad7aceb3818e52539acc679f049d3475775586f3f4e311c30165cf2c00445"
 dependencies = [
- "wgpu-hal",
+ "wgpu-hal 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -8887,7 +8971,15 @@ version = "25.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cba5fb5f7f9c98baa7c889d444f63ace25574833df56f5b817985f641af58e46"
 dependencies = [
- "wgpu-hal",
+ "wgpu-hal 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "wgpu-core-deps-windows-linux-android"
+version = "25.0.0"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix#a8f718f7149eee348360493c4302cedde0ab0067"
+dependencies = [
+ "wgpu-hal 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
 ]
 
 [[package]]
@@ -8918,7 +9010,7 @@ dependencies = [
  "libloading",
  "log",
  "metal",
- "naga",
+ "naga 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ndk-sys",
  "objc",
  "ordered-float 4.6.0",
@@ -8932,9 +9024,27 @@ dependencies = [
  "thiserror 2.0.12",
  "wasm-bindgen",
  "web-sys",
- "wgpu-types",
+ "wgpu-types 25.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "windows 0.58.0",
  "windows-core 0.58.0",
+]
+
+[[package]]
+name = "wgpu-hal"
+version = "25.0.0"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix#a8f718f7149eee348360493c4302cedde0ab0067"
+dependencies = [
+ "bitflags 2.9.0",
+ "cfg_aliases",
+ "libloading",
+ "log",
+ "naga 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
+ "parking_lot",
+ "portable-atomic",
+ "raw-window-handle",
+ "renderdoc-sys",
+ "thiserror 2.0.12",
+ "wgpu-types 25.0.0 (git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix)",
 ]
 
 [[package]]
@@ -8950,6 +9060,18 @@ dependencies = [
  "serde",
  "thiserror 2.0.12",
  "web-sys",
+]
+
+[[package]]
+name = "wgpu-types"
+version = "25.0.0"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix#a8f718f7149eee348360493c4302cedde0ab0067"
+dependencies = [
+ "bitflags 2.9.0",
+ "bytemuck",
+ "log",
+ "serde",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
