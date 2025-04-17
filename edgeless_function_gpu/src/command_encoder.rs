@@ -35,9 +35,9 @@ impl wgpu::custom::CommandEncoderInterface for EdgeGpuCommandEncoder {
         unsafe {
             webgpu_ce_copy_buffer_to_buffer(
                 self.ident,
-                source.as_custom_opt().unwrap().downcast::<crate::EdgeGpuBuffer>().unwrap().ident,
+                source.as_custom::<crate::EdgeGpuBuffer>().unwrap().ident,
                 source_offset,
-                destination.as_custom_opt().unwrap().downcast::<crate::EdgeGpuBuffer>().unwrap().ident,
+                destination.as_custom::<crate::EdgeGpuBuffer>().unwrap().ident,
                 destination_offset,
                 copy_size,
             )

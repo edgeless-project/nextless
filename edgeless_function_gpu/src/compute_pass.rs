@@ -27,22 +27,12 @@ impl Drop for EdgeGpuComputePass {
 
 impl wgpu::custom::ComputePassInterface for EdgeGpuComputePass {
     fn set_pipeline(&mut self, pipeline: &wgpu::custom::DispatchComputePipeline) {
-        unsafe {
-            webgpu_cp_set_pipeline(
-                self.ident,
-                pipeline
-                    .as_custom_opt()
-                    .unwrap()
-                    .downcast::<crate::EdgeGpuComputePipeline>()
-                    .unwrap()
-                    .ident,
-            )
-        }
+        unsafe { webgpu_cp_set_pipeline(self.ident, pipeline.as_custom::<crate::EdgeGpuComputePipeline>().unwrap().ident) }
     }
 
     fn set_bind_group(&mut self, index: u32, bind_group: Option<&wgpu::custom::DispatchBindGroup>, offsets: &[wgpu::DynamicOffset]) {
         let bind_group = match bind_group {
-            Some(g) => g.as_custom_opt().unwrap().downcast::<crate::EdgeGpuBindGroup>().unwrap().ident,
+            Some(g) => g.as_custom::<crate::EdgeGpuBindGroup>().unwrap().ident,
             None => 0,
         };
 
@@ -89,7 +79,7 @@ impl wgpu::custom::ComputePassInterface for EdgeGpuComputePass {
         unsafe {
             webgpu_cp_dispatch_workgroups_indirect(
                 self.ident,
-                indirect_buffer.as_custom_opt().unwrap().downcast::<crate::EdgeGpuBuffer>().unwrap().ident,
+                indirect_buffer.as_custom::<crate::EdgeGpuBuffer>().unwrap().ident,
                 indirect_offset,
             )
         }

@@ -265,7 +265,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "naga"
 version = "25.0.0"
-source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix2#4a62e1c8e0b7258fa1e826494049e4a67535ae29"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix3#9fdeccc6a7506b43b2afe83f079f3e3db0694a0c"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -526,7 +526,7 @@ checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 [[package]]
 name = "wgpu"
 version = "25.0.0"
-source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix2#4a62e1c8e0b7258fa1e826494049e4a67535ae29"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix3#9fdeccc6a7506b43b2afe83f079f3e3db0694a0c"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -548,7 +548,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "25.0.0"
-source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix2#4a62e1c8e0b7258fa1e826494049e4a67535ae29"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix3#9fdeccc6a7506b43b2afe83f079f3e3db0694a0c"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -577,7 +577,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-windows-linux-android"
 version = "25.0.0"
-source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix2#4a62e1c8e0b7258fa1e826494049e4a67535ae29"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix3#9fdeccc6a7506b43b2afe83f079f3e3db0694a0c"
 dependencies = [
  "wgpu-hal",
 ]
@@ -585,7 +585,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "25.0.0"
-source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix2#4a62e1c8e0b7258fa1e826494049e4a67535ae29"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix3#9fdeccc6a7506b43b2afe83f079f3e3db0694a0c"
 dependencies = [
  "bitflags",
  "cfg_aliases",
@@ -603,7 +603,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "25.0.0"
-source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix2#4a62e1c8e0b7258fa1e826494049e4a67535ae29"
+source = "git+https://github.com/raphaelhetzel/wgpu.git?branch=custom_fix3#9fdeccc6a7506b43b2afe83f079f3e3db0694a0c"
 dependencies = [
  "bitflags",
  "bytemuck",

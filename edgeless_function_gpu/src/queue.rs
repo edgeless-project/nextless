@@ -25,7 +25,7 @@ impl Drop for EdgeGpuQueue {
 
 impl wgpu::custom::QueueInterface for EdgeGpuQueue {
     fn write_buffer(&self, buffer: &wgpu::custom::DispatchBuffer, offset: wgpu::BufferAddress, data: &[u8]) {
-        let buffer_id = buffer.as_custom_opt().unwrap().downcast::<crate::EdgeGpuBuffer>().unwrap().ident;
+        let buffer_id = buffer.as_custom::<crate::EdgeGpuBuffer>().unwrap().ident;
         unsafe { webgpu_queue_write_buffer(self.ident, buffer_id, offset, data.as_ptr(), data.len() as u64) };
     }
 
@@ -65,7 +65,7 @@ impl wgpu::custom::QueueInterface for EdgeGpuQueue {
 
         let command_buffers: Vec<_> = command_buffers
             .iter()
-            .map(|c| c.as_custom_opt().unwrap().downcast::<crate::EdgeGpuCommandBuffer>().unwrap().ident)
+            .map(|c| c.as_custom::<crate::EdgeGpuCommandBuffer>().unwrap().ident)
             .collect();
         let command_buffers = serde_json::to_vec(&command_buffers).unwrap();
 
