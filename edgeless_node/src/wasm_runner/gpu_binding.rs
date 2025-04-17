@@ -1,19 +1,123 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+enum GpuResource {
+    Instance(WGPUInstance),
+    Adapter(WGPUAdapter),
+    Device(WGPUDevice),
+    Queue(WGPUQueue),
+    ShaderModule(WGPUShaderModule),
+    BindGroupLayout(WGPUBindGroupLayout),
+    BindGroup(WGPUBindGroup),
+    PipelineLayout(WGPUPipelineLayout),
+    ComputePipeline(WGPUComputePipeline),
+    Buffer(WGPUBuffer),
+    CommandEncoder(std::cell::RefCell<WGPUCommandEncoder>),
+    CommandBuffer(WGPUCommandBuffer),
+}
+
+impl GpuResource {
+    fn get_instance(&self) -> Result<&WGPUInstance, WGPUError> {
+        match self {
+            Self::Instance(i) => Ok(i),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_instance_mut(&mut self) -> Result<&mut WGPUInstance, WGPUError> {
+        match self {
+            Self::Instance(i) => Ok(i),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_adapter(&self) -> Result<&WGPUAdapter, WGPUError> {
+        match self {
+            Self::Adapter(a) => Ok(a),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_device(&self) -> Result<&WGPUDevice, WGPUError> {
+        match self {
+            Self::Device(d) => Ok(d),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_queue(&self) -> Result<&WGPUQueue, WGPUError> {
+        match self {
+            Self::Queue(q) => Ok(q),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_shader_module(&self) -> Result<&WGPUShaderModule, WGPUError> {
+        match self {
+            Self::ShaderModule(s) => Ok(s),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_bind_group_layout(&self) -> Result<&WGPUBindGroupLayout, WGPUError> {
+        match self {
+            Self::BindGroupLayout(bgl) => Ok(bgl),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_bind_group(&self) -> Result<&WGPUBindGroup, WGPUError> {
+        match self {
+            Self::BindGroup(bg) => Ok(bg),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_pipeline_layout(&self) -> Result<&WGPUPipelineLayout, WGPUError> {
+        match self {
+            Self::PipelineLayout(pl) => Ok(pl),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_compute_pipeline(&self) -> Result<&WGPUComputePipeline, WGPUError> {
+        match self {
+            Self::ComputePipeline(cp) => Ok(cp),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_buffer(&self) -> Result<&WGPUBuffer, WGPUError> {
+        match self {
+            Self::Buffer(b) => Ok(b),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn get_command_encoder(&self) -> Result<&std::cell::RefCell<WGPUCommandEncoder>, WGPUError> {
+        match self {
+            Self::CommandEncoder(ce) => Ok(ce),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn take_command_encoder(self) -> Result<std::cell::RefCell<WGPUCommandEncoder>, WGPUError> {
+        match self {
+            Self::CommandEncoder(ce) => Ok(ce),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+
+    fn take_command_buffer(self) -> Result<WGPUCommandBuffer, WGPUError> {
+        match self {
+            Self::CommandBuffer(cb) => Ok(cb),
+            _ => Err(WGPUError::WrongResource),
+        }
+    }
+}
+
 pub struct GPUWrapper {
-    instances: std::collections::HashMap<u64, WGPUInstance>,
-    adapters: std::collections::HashMap<u64, WGPUAdapter>,
-    devices: std::collections::HashMap<u64, WGPUDevice>,
-    queues: std::collections::HashMap<u64, WGPUQueue>,
-    shaders: std::collections::HashMap<u64, WGPUShaderModule>,
-    bind_group_layouts: std::collections::HashMap<u64, WGPUBindGroupLayout>,
-    bind_groups: std::collections::HashMap<u64, WGPUBindGroup>,
-    pipeline_layouts: std::collections::HashMap<u64, WGPUPipelineLayout>,
-    compute_pipelines: std::collections::HashMap<u64, WGPUComputePipeline>,
-    buffers: std::collections::HashMap<u64, WGPUBuffer>,
-    command_encoders: std::collections::HashMap<u64, WGPUCommandEncoder>,
-    command_buffers: std::collections::HashMap<u64, WGPUCommandBuffer>,
+    resources: std::collections::HashMap<u64, GpuResource>,
     compute_passes: std::collections::HashMap<u64, u64>,
     next_id: u64,
 }
@@ -21,6 +125,7 @@ pub struct GPUWrapper {
 #[derive(Debug)]
 pub enum WGPUError {
     NotFound,
+    WrongResource,
     AdapterCreation,
     DeviceCreation,
     BindGroupLayoutCreation,
@@ -52,19 +157,8 @@ enum BindGroupEntryResourceContainer<'a> {
 impl GPUWrapper {
     pub(crate) fn new() -> Self {
         Self {
-            instances: std::collections::HashMap::new(),
-            adapters: std::collections::HashMap::new(),
+            resources: std::collections::HashMap::new(),
             next_id: 1,
-            devices: std::collections::HashMap::new(),
-            queues: std::collections::HashMap::new(),
-            shaders: std::collections::HashMap::new(),
-            bind_group_layouts: std::collections::HashMap::new(),
-            bind_groups: std::collections::HashMap::new(),
-            pipeline_layouts: std::collections::HashMap::new(),
-            compute_pipelines: std::collections::HashMap::new(),
-            buffers: std::collections::HashMap::new(),
-            command_encoders: std::collections::HashMap::new(),
-            command_buffers: std::collections::HashMap::new(),
             compute_passes: std::collections::HashMap::new(),
         }
     }
@@ -72,12 +166,12 @@ impl GPUWrapper {
     pub(crate) fn new_instance(&mut self) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
-        self.instances.insert(
+        self.resources.insert(
             id,
-            WGPUInstance {
+            GpuResource::Instance(WGPUInstance {
                 instance: wgpu::Instance::new(&wgpu::InstanceDescriptor::default()),
                 id,
-            },
+            }),
         );
         id
     }
@@ -87,9 +181,10 @@ impl GPUWrapper {
         self.next_id += 1;
 
         let adapter = self
-            .instances
-            .get_mut(&instance_id)
-            .ok_or(WGPUError::AdapterCreation)?
+            .resources
+            .get(&instance_id)
+            .ok_or(WGPUError::NotFound)?
+            .get_instance()?
             .instance
             .request_adapter(&wgpu::RequestAdapterOptions::default())
             .await
@@ -97,7 +192,7 @@ impl GPUWrapper {
 
         log::info!("{:?}", adapter.get_info());
 
-        self.adapters.insert(id, WGPUAdapter { id, adapter });
+        self.resources.insert(id, GpuResource::Adapter(WGPUAdapter { id, adapter }));
         Ok(id)
     }
 
@@ -108,76 +203,86 @@ impl GPUWrapper {
         self.next_id += 1;
 
         let (device, queue) = self
-            .adapters
+            .resources
             .get(&adapter_id)
-            .unwrap()
+            .ok_or(WGPUError::NotFound)?
+            .get_adapter()?
             .adapter
             .request_device(&wgpu::DeviceDescriptor::default())
             .await
             .unwrap();
 
-        self.devices.insert(device_id, WGPUDevice { device, id: device_id });
-        self.queues.insert(queue_id, WGPUQueue { queue, id: queue_id });
+        self.resources
+            .insert(device_id, GpuResource::Device(WGPUDevice { device, id: device_id }));
+        self.resources.insert(queue_id, GpuResource::Queue(WGPUQueue { queue, id: queue_id }));
         Ok((device_id, queue_id))
     }
 
     pub(crate) fn new_shader_module(&mut self, device_id: u64, code: &[u8]) -> Result<u64, WGPUError> {
         let id = self.next_id;
         self.next_id += 1;
-        self.shaders.insert(
-            id,
-            WGPUShaderModule {
-                id,
-                shader_module: self
-                    .devices
-                    .get(&device_id)
-                    .ok_or(WGPUError::BindGroupLayoutCreation)?
-                    .device
-                    .create_shader_module(wgpu::ShaderModuleDescriptor {
-                        label: None,
-                        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Owned(String::from_utf8(code.to_vec()).unwrap())),
-                    }),
-            },
-        );
+
+        let shader_module = self
+            .resources
+            .get(&device_id)
+            .ok_or(WGPUError::NotFound)?
+            .get_device()?
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Owned(String::from_utf8(code.to_vec()).unwrap())),
+            });
+        self.resources
+            .insert(id, GpuResource::ShaderModule(WGPUShaderModule { id, shader_module }));
         Ok(id)
     }
 
     pub(crate) fn new_bind_group_layout(&mut self, device_id: u64, layout_entries: &[wgpu::BindGroupLayoutEntry]) -> Result<u64, WGPUError> {
         let id = self.next_id;
         self.next_id += 1;
-        self.bind_group_layouts.insert(
-            id,
-            WGPUBindGroupLayout {
-                id,
-                bind_group_layout: self
-                    .devices
-                    .get(&device_id)
-                    .ok_or(WGPUError::BindGroupLayoutCreation)?
-                    .device
-                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                        label: None,
-                        entries: layout_entries,
-                    }),
-            },
-        );
+
+        let bind_group_layout = self
+            .resources
+            .get(&device_id)
+            .ok_or(WGPUError::BindGroupLayoutCreation)?
+            .get_device()?
+            .device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: layout_entries,
+            });
+
+        self.resources
+            .insert(id, GpuResource::BindGroupLayout(WGPUBindGroupLayout { id, bind_group_layout }));
         Ok(id)
     }
 
     pub(crate) fn new_bind_group(&mut self, device_id: u64, layout_id: u64, entries: &[BindGroupEntrySerializer]) -> Result<u64, WGPUError> {
-        let layout = self.bind_group_layouts.get(&layout_id).ok_or(WGPUError::BindGroupCreation)?;
+        let layout = &self
+            .resources
+            .get(&layout_id)
+            .ok_or(WGPUError::BindGroupCreation)?
+            .get_bind_group_layout()?
+            .bind_group_layout;
 
         let entries: Vec<_> = entries
             .iter()
             .map(|e| BindGroupEntryContainer {
                 binding: e.binding,
                 resource: match &e.resource {
-                    BindGroupEntrySerializerResource::Buffer(buffer_id) => {
-                        BindGroupEntryResourceContainer::Buffer(self.buffers.get(buffer_id).unwrap().buffer.as_entire_buffer_binding())
-                    }
+                    BindGroupEntrySerializerResource::Buffer(buffer_id) => BindGroupEntryResourceContainer::Buffer(
+                        self.resources
+                            .get(buffer_id)
+                            .unwrap()
+                            .get_buffer()
+                            .unwrap()
+                            .buffer
+                            .as_entire_buffer_binding(),
+                    ),
                     BindGroupEntrySerializerResource::Buffers(items) => BindGroupEntryResourceContainer::Buffers(
                         items
                             .iter()
-                            .map(|i| self.buffers.get(i).unwrap().buffer.as_entire_buffer_binding())
+                            .map(|i| self.resources.get(i).unwrap().get_buffer().unwrap().buffer.as_entire_buffer_binding())
                             .collect::<Vec<_>>(),
                     ),
                 },
@@ -197,22 +302,20 @@ impl GPUWrapper {
 
         let id = self.next_id;
         self.next_id += 1;
-        self.bind_groups.insert(
-            id,
-            WGPUBindGroup {
-                id,
-                bind_group: self
-                    .devices
-                    .get(&device_id)
-                    .ok_or(WGPUError::BindGroupLayoutCreation)?
-                    .device
-                    .create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: None,
-                        entries: entries.as_slice(),
-                        layout: &layout.bind_group_layout,
-                    }),
-            },
-        );
+
+        let bind_group = self
+            .resources
+            .get(&device_id)
+            .ok_or(WGPUError::BindGroupLayoutCreation)?
+            .get_device()?
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                entries: entries.as_slice(),
+                layout: &layout,
+            });
+
+        self.resources.insert(id, GpuResource::BindGroup(WGPUBindGroup { id, bind_group }));
         Ok(id)
     }
 
@@ -224,27 +327,26 @@ impl GPUWrapper {
     ) -> Result<u64, WGPUError> {
         let bind_group_layouts: Vec<_> = bind_group_layouts
             .iter()
-            .map(|id| &self.bind_group_layouts.get(id).unwrap().bind_group_layout)
+            .map(|id| &self.resources.get(id).unwrap().get_bind_group_layout().unwrap().bind_group_layout)
             .collect();
 
         let id = self.next_id;
         self.next_id += 1;
-        self.pipeline_layouts.insert(
-            id,
-            WGPUPipelineLayout {
-                id,
-                pippeline_layout: self
-                    .devices
-                    .get(&device_id)
-                    .ok_or(WGPUError::BindGroupLayoutCreation)?
-                    .device
-                    .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                        label: None,
-                        bind_group_layouts: &bind_group_layouts[..],
-                        push_constant_ranges,
-                    }),
-            },
-        );
+
+        let pipeline_layout = self
+            .resources
+            .get(&device_id)
+            .ok_or(WGPUError::BindGroupLayoutCreation)?
+            .get_device()?
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &bind_group_layouts[..],
+                push_constant_ranges,
+            });
+
+        self.resources
+            .insert(id, GpuResource::PipelineLayout(WGPUPipelineLayout { id, pipeline_layout }));
         Ok(id)
     }
 
@@ -255,9 +357,9 @@ impl GPUWrapper {
         shader_module: u64,
         entry_point: Option<&str>,
     ) -> Result<u64, WGPUError> {
-        let layout = layout.map(|layout_id| &self.pipeline_layouts.get(&layout_id).unwrap().pippeline_layout);
+        let layout = layout.map(|layout_id| &self.resources.get(&layout_id).unwrap().get_pipeline_layout().unwrap().pipeline_layout);
 
-        let shader_module = self.shaders.get(&shader_module).ok_or(WGPUError::NotFound)?;
+        let shader_module = self.resources.get(&shader_module).ok_or(WGPUError::NotFound)?.get_shader_module()?;
 
         let descriptor = wgpu::ComputePipelineDescriptor {
             label: None,
@@ -270,74 +372,76 @@ impl GPUWrapper {
 
         let id = self.next_id;
         self.next_id += 1;
-        self.compute_pipelines.insert(
+        self.resources.insert(
             id,
-            WGPUComputePipeline {
+            GpuResource::ComputePipeline(WGPUComputePipeline {
                 id,
                 pipeline: self
-                    .devices
+                    .resources
                     .get(&device_id)
                     .ok_or(WGPUError::BindGroupLayoutCreation)?
+                    .get_device()?
                     .device
                     .create_compute_pipeline(&descriptor),
-            },
+            }),
         );
         Ok(id)
     }
 
     pub(crate) fn new_buffer(&mut self, device_id: u64, desc: &wgpu::BufferDescriptor) -> Result<u64, WGPUError> {
-        let device = self.devices.get(&device_id).ok_or(WGPUError::NotFound)?;
+        let device = self.resources.get(&device_id).ok_or(WGPUError::NotFound)?.get_device()?;
         let id = self.next_id;
         self.next_id += 1;
 
         let buffer = device.device.create_buffer(desc);
-        self.buffers.insert(id, WGPUBuffer { buffer, id });
+        self.resources.insert(id, GpuResource::Buffer(WGPUBuffer { buffer, id }));
         Ok(id)
     }
 
     pub(crate) fn new_command_encoder(&mut self, device_id: u64) -> Result<u64, WGPUError> {
-        let device = self.devices.get(&device_id).ok_or(WGPUError::NotFound)?;
+        let device = self.resources.get(&device_id).ok_or(WGPUError::NotFound)?.get_device()?;
         let id = self.next_id;
         self.next_id += 1;
 
         let command_encoder = device.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        self.command_encoders.insert(
+        self.resources.insert(
             id,
-            WGPUCommandEncoder {
+            GpuResource::CommandEncoder(std::cell::RefCell::new(WGPUCommandEncoder {
                 command_encoder,
                 id,
                 compute_passes: std::collections::HashMap::new(),
-            },
+            })),
         );
         Ok(id)
     }
 
     pub(crate) fn device_poll(&mut self, device_id: u64, maintain: wgpu::PollType) -> Result<wgpu::PollStatus, wgpu::PollError> {
-        let device = self.devices.get(&device_id).unwrap();
+        let device = self.resources.get(&device_id).unwrap().get_device().unwrap();
 
         device.device.poll(maintain)
     }
 
     pub(crate) fn queue_write_buffer(&mut self, queue_id: u64, buffer_id: u64, offset: u64, data: &[u8]) -> Result<(), WGPUError> {
-        let queue = self.queues.get(&queue_id).unwrap();
-        let buffer = self.buffers.get(&buffer_id).unwrap();
+        let queue = self.resources.get(&queue_id).ok_or(WGPUError::NotFound)?.get_queue()?;
+        let buffer = self.resources.get(&buffer_id).ok_or(WGPUError::NotFound)?.get_buffer()?;
 
         queue.queue.write_buffer(&buffer.buffer, offset, data);
         Ok(())
     }
 
     pub(crate) fn queue_submit(&mut self, queue_id: u64, command_buffer_ids: &[u64]) -> Result<u64, WGPUError> {
-        let queue = self.queues.get(&queue_id).unwrap();
-        let command_buffers = command_buffer_ids
+        let command_buffers: Vec<_> = command_buffer_ids
             .iter()
-            .map(|cb_id| self.command_buffers.remove(cb_id).unwrap().command_buffer);
+            .map(|cb_id| self.resources.remove(cb_id).unwrap().take_command_buffer().unwrap().command_buffer)
+            .collect();
 
+        let queue = self.resources.get(&queue_id).ok_or(WGPUError::NotFound)?.get_queue()?;
         queue.queue.submit(command_buffers);
         Ok(0)
     }
 
     pub(crate) fn buffer_map_async(&mut self, buffer_id: u64, mode: wgpu::MapMode, start: u64, end: u64) -> Result<(), WGPUError> {
-        let buffer = self.buffers.get(&buffer_id).unwrap();
+        let buffer = self.resources.get(&buffer_id).ok_or(WGPUError::NotFound)?.get_buffer()?;
 
         buffer.buffer.map_async(mode, std::ops::Range { start, end }, |_| {
             log::info!("Unimplemented Callback Called");
@@ -346,7 +450,7 @@ impl GPUWrapper {
     }
 
     pub(crate) fn mapped_range_read(&mut self, buffer_id: u64, sub_range_start: u64, sub_range_end: u64) -> Result<Vec<u8>, WGPUError> {
-        let buffer = self.buffers.get(&buffer_id).unwrap();
+        let buffer = self.resources.get(&buffer_id).ok_or(WGPUError::NotFound)?.get_buffer()?;
 
         Ok(buffer
             .buffer
@@ -358,7 +462,7 @@ impl GPUWrapper {
     }
 
     pub(crate) fn mapped_range_write(&mut self, buffer_id: u64, sub_range_start: u64, sub_range_end: u64, data: &[u8]) -> Result<(), WGPUError> {
-        let buffer = self.buffers.get_mut(&buffer_id).unwrap();
+        let buffer = self.resources.get(&buffer_id).ok_or(WGPUError::NotFound)?.get_buffer()?;
 
         buffer
             .buffer
@@ -380,9 +484,9 @@ impl GPUWrapper {
         dest_offset: u64,
         copy_size: u64,
     ) -> Result<(), WGPUError> {
-        let command_encoder = self.command_encoders.get_mut(&ce_id).unwrap();
-        let source_buffer = self.buffers.get(&source_buffer_id).unwrap();
-        let dest_buffer = self.buffers.get(&dest_buffer_id).unwrap();
+        let mut command_encoder = self.resources.get(&ce_id).unwrap().get_command_encoder().unwrap().borrow_mut();
+        let source_buffer = self.resources.get(&source_buffer_id).unwrap().get_buffer().unwrap();
+        let dest_buffer = self.resources.get(&dest_buffer_id).unwrap().get_buffer().unwrap();
 
         command_encoder
             .command_encoder
@@ -394,32 +498,36 @@ impl GPUWrapper {
         let id = self.next_id;
         self.next_id += 1;
 
-        self.command_encoders.get_mut(&ce_id).unwrap().begin_compute_pass(id);
+        self.resources
+            .get_mut(&ce_id)
+            .unwrap()
+            .get_command_encoder()
+            .unwrap()
+            .borrow_mut()
+            .begin_compute_pass(id);
         self.compute_passes.insert(id, ce_id);
 
         Ok(id)
     }
 
     pub(crate) fn ce_finish(&mut self, ce_id: u64) -> Result<u64, WGPUError> {
-        let command_encoder = self.command_encoders.remove(&ce_id).unwrap();
+        let command_encoder = self.resources.remove(&ce_id).unwrap();
+        let command_encoder = command_encoder.take_command_encoder().unwrap().into_inner();
 
         let id = self.next_id;
         self.next_id += 1;
         let command_buffer = command_encoder.command_encoder.finish();
-        self.command_buffers.insert(id, WGPUCommandBuffer { command_buffer, id });
+        self.resources
+            .insert(id, GpuResource::CommandBuffer(WGPUCommandBuffer { command_buffer, id }));
         Ok(id)
     }
 
     pub(crate) fn cp_set_pipeline(&mut self, compute_pass_id: u64, pipeline_id: u64) -> Result<(), WGPUError> {
         let relevant_ce_id = self.compute_passes.get(&compute_pass_id).unwrap();
-        let compute_pass = self
-            .command_encoders
-            .get_mut(relevant_ce_id)
-            .unwrap()
-            .compute_passes
-            .get_mut(&compute_pass_id)
-            .unwrap();
-        let pipeline = self.compute_pipelines.get(&pipeline_id).unwrap();
+        let compute_pass = self.resources.get(relevant_ce_id).unwrap().get_command_encoder().unwrap();
+        let mut compute_pass = compute_pass.borrow_mut();
+        let compute_pass = compute_pass.compute_passes.get_mut(&compute_pass_id).unwrap();
+        let pipeline = self.resources.get(&pipeline_id).unwrap().get_compute_pipeline().unwrap();
 
         compute_pass.compute_pass.set_pipeline(&pipeline.pipeline);
         Ok(())
@@ -433,14 +541,10 @@ impl GPUWrapper {
         offsets: &[wgpu::DynamicOffset],
     ) -> Result<(), WGPUError> {
         let relevant_ce_id = self.compute_passes.get(&compute_pass_id).unwrap();
-        let compute_pass = self
-            .command_encoders
-            .get_mut(relevant_ce_id)
-            .unwrap()
-            .compute_passes
-            .get_mut(&compute_pass_id)
-            .unwrap();
-        let bind_group = bind_group_id.map(|id| &self.bind_groups.get(&id).unwrap().bind_group);
+        let compute_pass = self.resources.get(relevant_ce_id).unwrap().get_command_encoder().unwrap();
+        let mut compute_pass = compute_pass.borrow_mut();
+        let compute_pass = compute_pass.compute_passes.get_mut(&compute_pass_id).unwrap();
+        let bind_group = bind_group_id.map(|id| &self.resources.get(&id).unwrap().get_bind_group().unwrap().bind_group);
 
         compute_pass.compute_pass.set_bind_group(index, bind_group, offsets);
         Ok(())
@@ -448,13 +552,9 @@ impl GPUWrapper {
 
     pub(crate) fn cp_dispatch_workgroups(&mut self, compute_pass_id: u64, x: u32, y: u32, z: u32) -> Result<(), WGPUError> {
         let relevant_ce_id = self.compute_passes.get(&compute_pass_id).unwrap();
-        let compute_pass = self
-            .command_encoders
-            .get_mut(relevant_ce_id)
-            .unwrap()
-            .compute_passes
-            .get_mut(&compute_pass_id)
-            .unwrap();
+        let compute_pass = self.resources.get(relevant_ce_id).unwrap().get_command_encoder().unwrap();
+        let mut compute_pass = compute_pass.borrow_mut();
+        let compute_pass = compute_pass.compute_passes.get_mut(&compute_pass_id).unwrap();
 
         compute_pass.compute_pass.dispatch_workgroups(x, y, z);
         Ok(())
@@ -467,14 +567,10 @@ impl GPUWrapper {
         indirect_buffer_offset: u64,
     ) -> Result<(), WGPUError> {
         let relevant_ce_id = self.compute_passes.get(&compute_pass_id).unwrap();
-        let compute_pass = self
-            .command_encoders
-            .get_mut(relevant_ce_id)
-            .unwrap()
-            .compute_passes
-            .get_mut(&compute_pass_id)
-            .unwrap();
-        let buffer = self.buffers.get(&indirect_buffer_id).unwrap();
+        let compute_pass = self.resources.get(relevant_ce_id).unwrap().get_command_encoder().unwrap();
+        let mut compute_pass = compute_pass.borrow_mut();
+        let compute_pass = compute_pass.compute_passes.get_mut(&compute_pass_id).unwrap();
+        let buffer = self.resources.get(&indirect_buffer_id).unwrap().get_buffer().unwrap();
 
         compute_pass
             .compute_pass
@@ -484,13 +580,9 @@ impl GPUWrapper {
 
     pub(crate) fn cp_set_push_constants(&mut self, compute_pass_id: u64, offset: u32, data: &[u8]) -> Result<(), WGPUError> {
         let relevant_ce_id = self.compute_passes.get(&compute_pass_id).unwrap();
-        let compute_pass = self
-            .command_encoders
-            .get_mut(relevant_ce_id)
-            .unwrap()
-            .compute_passes
-            .get_mut(&compute_pass_id)
-            .unwrap();
+        let compute_pass = self.resources.get(relevant_ce_id).unwrap().get_command_encoder().unwrap();
+        let mut compute_pass = compute_pass.borrow_mut();
+        let compute_pass = compute_pass.compute_passes.get_mut(&compute_pass_id).unwrap();
 
         compute_pass.compute_pass.set_push_constants(offset, data);
         Ok(())
@@ -498,25 +590,29 @@ impl GPUWrapper {
 
     pub(crate) fn cp_drop(&mut self, compute_pass_id: u64) -> Result<(), WGPUError> {
         let relevant_ce_id = self.compute_passes.get(&compute_pass_id).unwrap();
-        self.command_encoders
-            .get_mut(relevant_ce_id)
-            .unwrap()
-            .compute_passes
-            .remove(&compute_pass_id)
-            .unwrap();
+        let compute_pass = self.resources.get(relevant_ce_id).unwrap().get_command_encoder().unwrap();
+        let mut compute_pass = compute_pass.borrow_mut();
+        compute_pass.compute_passes.remove(&compute_pass_id);
         self.compute_passes.remove(&compute_pass_id);
 
         Ok(())
     }
 
     pub(crate) fn buffer_unmap(&mut self, buffer_id: u64) -> Result<(), WGPUError> {
-        let buffer = self.buffers.get(&buffer_id).unwrap();
+        let buffer = self.resources.get(&buffer_id).unwrap().get_buffer().unwrap();
         buffer.buffer.unmap();
         Ok(())
     }
 
+    pub fn drop_resource(&mut self, resource_id: u64) -> Result<(), WGPUError> {
+        if self.resources.remove(&resource_id).is_none() {
+            log::info!("Dropped something that does not exist");
+        }
+        Ok(())
+    }
+
     pub(crate) fn get_mut(&mut self, id: u64) -> Result<&mut WGPUInstance, WGPUError> {
-        self.instances.get_mut(&id).ok_or(WGPUError::NotFound)
+        self.resources.get_mut(&id).ok_or(WGPUError::NotFound)?.get_instance_mut()
     }
 }
 
@@ -577,7 +673,7 @@ pub struct WGPUBindGroup {
 }
 
 pub struct WGPUPipelineLayout {
-    pippeline_layout: wgpu::PipelineLayout,
+    pipeline_layout: wgpu::PipelineLayout,
     #[allow(unused)]
     id: u64,
 }

@@ -9,4 +9,12 @@ pub struct EdgeGpuBindGroupLayout {
     pub(crate) ident: u64,
 }
 
+impl Drop for EdgeGpuBindGroupLayout {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::BindGroupLayoutInterface for EdgeGpuBindGroupLayout {}

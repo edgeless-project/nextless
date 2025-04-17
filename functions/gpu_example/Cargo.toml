@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-License-Identifier: MIT
 [workspace]
-target = "wasm32-unknown-unknown"
 
 [profile.dev]
 panic = "abort"

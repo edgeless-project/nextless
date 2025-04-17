@@ -16,11 +16,11 @@ edgeless_function::generate!(GPUTest);
 impl GpuExampleAPI<'_> for GPUTest {
     type STRING = String;
 
-    fn handle_cast_trigger(_src: InstanceId, data: String) {
+    fn handle_cast_trigger(_src: InstanceId, _data: String) {
         log::info!("GPUTest: 'Cast' Got Response");
     }
 
-    fn handle_internal(data: &[u8]) {
+    fn handle_internal(_data: &[u8]) {
         log::info!("GPUTest: 'Cast' Wakeup");
     }
 
@@ -231,6 +231,8 @@ impl GpuExampleAPI<'_> for GPUTest {
 
         // We finish the encoder, giving us a fully recorded command buffer.
         let command_buffer = encoder.finish();
+
+        log::info!("Pre Submit");
 
         // At this point nothing has actually been executed on the gpu. We have recorded a series of
         // commands that we want to execute, but they haven't been sent to the gpu yet.

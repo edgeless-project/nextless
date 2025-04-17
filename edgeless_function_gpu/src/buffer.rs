@@ -16,6 +16,14 @@ pub struct EdgeGpuBuffer {
     pub(crate) ident: u64,
 }
 
+impl Drop for EdgeGpuBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::BufferInterface for EdgeGpuBuffer {
     fn map_async(&self, mode: wgpu::MapMode, range: std::ops::Range<wgpu::BufferAddress>, _callback: wgpu::custom::BufferMapCallback) {
         let mode: u64 = match mode {

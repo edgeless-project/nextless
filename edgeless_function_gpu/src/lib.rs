@@ -11,6 +11,7 @@ pub use wgpu;
 
 extern "C" {
     fn webgpu_cp_drop(compute_pass_id: u64);
+    fn webgpu_drop(instance_id: u64);
 }
 
 mod instance;

@@ -44,6 +44,14 @@ enum BindGroupEntrySerializerResource {
     Buffers(Vec<u64>),
 }
 
+impl Drop for EdgeGpuDevice {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::DeviceInterface for EdgeGpuDevice {
     fn features(&self) -> wgpu::Features {
         wgpu::Features::all_webgpu_mask()
@@ -89,7 +97,7 @@ impl wgpu::custom::DeviceInterface for EdgeGpuDevice {
         let bind_group_ident = unsafe {
             webgpu_device_create_bind_group(
                 self.ident,
-                desc.layout.inner.as_custom().downcast::<crate::EdgeGpuBindGroupLayout>().ident,
+                desc.layout.as_custom::<crate::EdgeGpuBindGroupLayout>().unwrap().ident,
                 entries.as_ptr(),
                 entries.len() as u64,
             )
@@ -103,7 +111,7 @@ impl wgpu::custom::DeviceInterface for EdgeGpuDevice {
             &desc
                 .bind_group_layouts
                 .iter()
-                .map(|l| l.inner.as_custom().downcast::<crate::EdgeGpuBindGroupLayout>().ident)
+                .map(|l| l.as_custom::<crate::EdgeGpuBindGroupLayout>().unwrap().ident)
                 .collect::<Vec<u64>>(),
         )
         .unwrap();
@@ -129,22 +137,16 @@ impl wgpu::custom::DeviceInterface for EdgeGpuDevice {
 
     fn create_compute_pipeline(&self, desc: &wgpu::ComputePipelineDescriptor<'_>) -> wgpu::custom::DispatchComputePipeline {
         let pipeline_layout_id = match desc.layout {
-            Some(l) => l.inner.as_custom().downcast::<crate::EdgeGpuPipelineLayout>().ident,
+            Some(l) => l.as_custom::<crate::EdgeGpuPipelineLayout>().unwrap().ident,
             None => 0,
         };
 
-        let module_id = desc.module.inner.as_custom().downcast::<crate::EdgeGpuShaderModule>().ident;
+        let module_id = desc.module.as_custom::<crate::EdgeGpuShaderModule>().unwrap().ident;
 
         let entry_point = desc.entry_point.unwrap_or_default();
 
         let ident = unsafe {
-            webgpu_device_create_compute_pipeline(
-                self.ident,
-                pipeline_layout_id,
-                module_id,
-                entry_point.as_ptr(),
-                entry_point.len() as u64,
-            )
+            webgpu_device_create_compute_pipeline(self.ident, pipeline_layout_id, module_id, entry_point.as_ptr(), entry_point.len() as u64)
         };
 
         wgpu::custom::DispatchComputePipeline::custom(crate::EdgeGpuComputePipeline { ident })
@@ -268,12 +270,12 @@ impl From<&wgpu::BindGroupEntry<'_>> for BindGroupEntrySerializer {
             binding: value.binding,
             resource: match &value.resource {
                 wgpu::BindingResource::Buffer(buffer_binding) => {
-                    BindGroupEntrySerializerResource::Buffer(buffer_binding.buffer.inner.as_custom().downcast::<crate::EdgeGpuBuffer>().ident)
+                    BindGroupEntrySerializerResource::Buffer(buffer_binding.buffer.as_custom::<crate::EdgeGpuBuffer>().unwrap().ident)
                 }
                 wgpu::BindingResource::BufferArray(buffer_bindings) => BindGroupEntrySerializerResource::Buffers(
                     buffer_bindings
                         .iter()
-                        .map(|b| b.buffer.inner.as_custom().downcast::<crate::EdgeGpuBuffer>().ident)
+                        .map(|b| b.buffer.as_custom::<crate::EdgeGpuBuffer>().unwrap().ident)
                         .collect(),
                 ),
                 _ => {

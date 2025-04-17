@@ -9,4 +9,12 @@ pub struct EdgeGpuCommandBuffer {
     pub(crate) ident: u64,
 }
 
+impl Drop for EdgeGpuCommandBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::CommandBufferInterface for EdgeGpuCommandBuffer {}

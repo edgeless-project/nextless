@@ -15,6 +15,14 @@ pub struct EdgeGpuCommandEncoder {
     pub(crate) ident: u64,
 }
 
+impl Drop for EdgeGpuCommandEncoder {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::CommandEncoderInterface for EdgeGpuCommandEncoder {
     fn copy_buffer_to_buffer(
         &self,
@@ -27,9 +35,9 @@ impl wgpu::custom::CommandEncoderInterface for EdgeGpuCommandEncoder {
         unsafe {
             webgpu_ce_copy_buffer_to_buffer(
                 self.ident,
-                source.as_custom().downcast::<crate::EdgeGpuBuffer>().ident,
+                source.as_custom_opt().unwrap().downcast::<crate::EdgeGpuBuffer>().unwrap().ident,
                 source_offset,
-                destination.as_custom().downcast::<crate::EdgeGpuBuffer>().ident,
+                destination.as_custom_opt().unwrap().downcast::<crate::EdgeGpuBuffer>().unwrap().ident,
                 destination_offset,
                 copy_size,
             )

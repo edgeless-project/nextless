@@ -15,9 +15,17 @@ pub struct EdgeGpuQueue {
     pub(crate) ident: u64,
 }
 
+impl Drop for EdgeGpuQueue {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::QueueInterface for EdgeGpuQueue {
     fn write_buffer(&self, buffer: &wgpu::custom::DispatchBuffer, offset: wgpu::BufferAddress, data: &[u8]) {
-        let buffer_id = buffer.as_custom().downcast::<crate::EdgeGpuBuffer>().ident;
+        let buffer_id = buffer.as_custom_opt().unwrap().downcast::<crate::EdgeGpuBuffer>().unwrap().ident;
         unsafe { webgpu_queue_write_buffer(self.ident, buffer_id, offset, data.as_ptr(), data.len() as u64) };
     }
 
@@ -53,8 +61,11 @@ impl wgpu::custom::QueueInterface for EdgeGpuQueue {
     }
 
     fn submit(&self, command_buffers: &mut dyn Iterator<Item = wgpu::custom::DispatchCommandBuffer>) -> u64 {
+        let command_buffers: Vec<_> = command_buffers.collect();
+
         let command_buffers: Vec<_> = command_buffers
-            .map(|c| c.as_custom().downcast::<crate::EdgeGpuCommandBuffer>().ident)
+            .iter()
+            .map(|c| c.as_custom_opt().unwrap().downcast::<crate::EdgeGpuCommandBuffer>().unwrap().ident)
             .collect();
         let command_buffers = serde_json::to_vec(&command_buffers).unwrap();
 

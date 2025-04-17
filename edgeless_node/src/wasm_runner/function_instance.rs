@@ -334,6 +334,9 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         linker
             .func_wrap("env", "webgpu_buffer_unmap", super::guest_api_binding::webgpu_buffer_unmap)
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        linker
+            .func_wrap("env", "webgpu_drop", super::guest_api_binding::webgpu_drop)
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         let instance = linker.instantiate_async(&mut store, &module).await.unwrap();
 
         Ok(Box::new(Self {

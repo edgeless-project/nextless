@@ -15,6 +15,14 @@ pub struct EdgeGpuAdapter {
 
 pub(crate) type EdgeGpuAdapterId = u64;
 
+impl Drop for EdgeGpuAdapter {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::AdapterInterface for EdgeGpuAdapter {
     fn request_device(&self, _desc: &wgpu::DeviceDescriptor<'_>) -> std::pin::Pin<Box<dyn wgpu::custom::RequestDeviceFuture>> {
         let mut device = 0u64;

@@ -9,4 +9,12 @@ pub struct EdgeGpuPipelineLayout {
     pub(crate) ident: u64,
 }
 
+impl Drop for EdgeGpuPipelineLayout {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::PipelineLayoutInterface for EdgeGpuPipelineLayout {}

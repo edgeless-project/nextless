@@ -648,6 +648,15 @@ pub fn webgpu_buffer_unmap(mut caller: wasmtime::Caller<'_, GuestAPI>, buffer_id
     Ok(())
 }
 
+pub fn webgpu_drop(mut caller: wasmtime::Caller<'_, GuestAPI>, resource_id: u64) -> wasmtime::Result<()> {
+    caller
+        .data_mut()
+        .wgpu_wrapper
+        .drop_resource(resource_id)
+        .map_err(|_| wasmtime::Error::msg("Resource Drop Error"))?;
+    Ok(())
+}
+
 pub(crate) fn get_memory(caller: &mut wasmtime::Caller<'_, super::guest_api_binding::GuestAPI>) -> wasmtime::Result<wasmtime::Memory> {
     caller
         .get_export("memory")

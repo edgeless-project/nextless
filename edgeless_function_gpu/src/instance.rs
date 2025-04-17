@@ -18,6 +18,14 @@ pub struct EdgeGpuInstance {
 
 pub(crate) type EdgeGpuInstanceId = u64;
 
+impl Drop for EdgeGpuInstance {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::InstanceInterface for EdgeGpuInstance {
     fn new(_desc: &wgpu::InstanceDescriptor) -> Self
     where

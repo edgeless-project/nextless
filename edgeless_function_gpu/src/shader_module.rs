@@ -9,6 +9,14 @@ pub struct EdgeGpuShaderModule {
     pub(crate) ident: u64,
 }
 
+impl Drop for EdgeGpuShaderModule {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::ShaderModuleInterface for EdgeGpuShaderModule {
     fn get_compilation_info(&self) -> std::pin::Pin<Box<dyn wgpu::custom::ShaderCompilationInfoFuture>> {
         Box::pin(std::future::ready(wgpu::CompilationInfo { messages: Vec::new() }))

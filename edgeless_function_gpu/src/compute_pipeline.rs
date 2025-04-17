@@ -9,6 +9,14 @@ pub struct EdgeGpuComputePipeline {
     pub(crate) ident: u64,
 }
 
+impl Drop for EdgeGpuComputePipeline {
+    fn drop(&mut self) {
+        unsafe {
+            crate::webgpu_drop(self.ident);
+        }
+    }
+}
+
 impl wgpu::custom::ComputePipelineInterface for EdgeGpuComputePipeline {
     fn get_bind_group_layout(&self, _index: u32) -> wgpu::custom::DispatchBindGroupLayout {
         log::error!("Tried to get Layout");
