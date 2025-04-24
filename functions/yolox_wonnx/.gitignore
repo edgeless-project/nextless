@@ -1,0 +1,5 @@
+# https://github.com/kadu-v/wonnx/blob/dev/slice/data/models/coco-classes.txt
+/data/coco-classes.txt
+# https://github.com/kadu-v/wonnx/blob/dev/slice/data/models/yolox_nano.onnx
+/data/yolox_nano.onnx
+function.json

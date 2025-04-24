@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
+[workspace]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
+
+[package]
+name = "image_detection_tester"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+
+[lib]
+name = "image_detection_tester"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../edgeless_function" }
+edgeless_function_core = { path = "../../edgeless_function_core" }
+edgeless_function_types = { path = "../../edgeless_function_types" }
+log = "0.4"
+image = { version = "0.25", default-features = false, features = [
+    "jpeg",
+    "bmp",
+] }
+
+[features]
+
+default = ["input_detection", "output_test_image"]
+input_detection = []
+output_test_image = []

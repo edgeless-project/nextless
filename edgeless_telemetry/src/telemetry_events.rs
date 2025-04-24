@@ -141,7 +141,6 @@ struct EventLogger {
     colors: std::collections::HashMap<String, &'static str>,
 }
 
-
 impl EventProcessor for EventLogger {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
         let f_id = event_tags.get("FUNCTION_ID").unwrap();
