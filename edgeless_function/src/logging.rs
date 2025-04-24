@@ -32,7 +32,7 @@ impl log::Log for Logger {
 static LOGGER: Logger = Logger;
 
 pub fn init_logger() {
-    log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug)).unwrap();
+    log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info)).unwrap();
 }
 
 pub fn rust_to_api(lvl: log::Level) -> u32 {

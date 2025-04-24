@@ -4,9 +4,9 @@
 
 #[derive(Clone)]
 pub enum EventData {
-    Call(String),
-    Cast(String),
-    CallRet(String),
+    Call(Vec<u8>),
+    Cast(Vec<u8>),
+    CallRet(Vec<u8>),
     CallNoRet,
     Err,
 }

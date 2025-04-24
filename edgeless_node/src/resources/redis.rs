@@ -48,9 +48,9 @@ impl RedisResource {
                 let message_data = match message {
                     Message::Call(data) => {
                         need_reply = true;
-                        data
+                        String::from_utf8(data).unwrap()
                     }
-                    Message::Cast(data) => data,
+                    Message::Cast(data) => String::from_utf8(data).unwrap(),
                     _ => {
                         continue;
                     }
@@ -62,7 +62,7 @@ impl RedisResource {
 
                 if need_reply {
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(Vec::new()))
                         .await;
                 }
             }

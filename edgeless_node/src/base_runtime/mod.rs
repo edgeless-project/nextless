@@ -25,18 +25,20 @@ pub trait FunctionInstance: Send + 'static {
         code: &[u8],
     ) -> Result<Box<Self>, FunctionInstanceError>;
     async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&str>) -> Result<(), FunctionInstanceError>;
-    async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, port: &str, msg: &str) -> Result<(), FunctionInstanceError>;
+    async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, port: &str, msg: &[u8]) -> Result<(), FunctionInstanceError>;
     async fn call(
         &mut self,
         src: &edgeless_api::function_instance::InstanceId,
         port: &str,
-        msg: &str,
+        msg: &[u8],
     ) -> Result<edgeless_dataplane::core::CallRet, FunctionInstanceError>;
     async fn stop(&mut self) -> Result<(), FunctionInstanceError>;
 }
 
-#[derive(Clone, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum FunctionInstanceError {
-    BadCode,
-    InternalError,
+    #[error("Bad Code: {0}")]
+    BadCode(#[source] anyhow::Error),
+    #[error("Internal Error: {0}")]
+    Internal(#[source] anyhow::Error),
 }

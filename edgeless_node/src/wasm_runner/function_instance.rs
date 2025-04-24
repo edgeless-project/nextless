@@ -57,8 +57,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
     ) -> Result<Box<Self>, crate::base_runtime::FunctionInstanceError> {
         let mut config = wasmtime::Config::new();
         config.async_support(true);
-        let engine = wasmtime::Engine::new(&config).map_err(|_err| crate::base_runtime::FunctionInstanceError::InternalError)?;
-        let module = wasmtime::Module::from_binary(&engine, code).map_err(|_err| crate::base_runtime::FunctionInstanceError::BadCode)?;
+        let engine = wasmtime::Engine::new(&config).map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
+        let module = wasmtime::Module::from_binary(&engine, code).map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         let mut linker = wasmtime::Linker::new(&engine);
 
         let mut store: wasmtime::Store<super::guest_api_binding::GuestAPI> = wasmtime::Store::new(
@@ -85,12 +85,12 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     ))
                 },
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async("env", "cast_asm", |store, (target_ptr, target_len, payload_ptr, payload_len)| {
                 Box::new(super::guest_api_binding::cast(store, target_ptr, target_len, payload_ptr, payload_len))
             })
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async(
                 "env",
@@ -109,7 +109,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     ))
                 },
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async(
                 "env",
@@ -126,19 +126,19 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     ))
                 },
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async("env", "telemetry_log_asm", |store, (level, target_ptr, target_len, msg_ptr, msg_len)| {
                 Box::new(super::guest_api_binding::telemetry_log(
                     store, level, target_ptr, target_len, msg_ptr, msg_len,
                 ))
             })
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async("env", "slf_asm", |store, (out_node_id_ptr, out_component_id_ptr)| {
                 Box::new(super::guest_api_binding::slf(store, out_node_id_ptr, out_component_id_ptr))
             })
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async(
                 "env",
@@ -154,32 +154,32 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     ))
                 },
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async("env", "sync_asm", |store, (state_ptr, state_len)| {
                 Box::new(super::guest_api_binding::sync(store, state_ptr, state_len))
             })
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async("env", "webgpu_instance_new", |store, ()| {
                 Box::new(super::guest_api_binding::wgpu_instance_new(store))
             })
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async("env", "webgpu_instance_poll_all", |store, (instance_id, forced_wait)| {
                 Box::new(super::guest_api_binding::wgpu_instance_poll_all(store, instance_id, forced_wait))
             })
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async("env", "webgpu_instance_adapter_create", |store, (instance_id,)| {
                 Box::new(super::guest_api_binding::webgpu_instance_adapter_create(store, instance_id))
             })
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async("env", "webgpu_instance_wgsl_language_features", |store, (instance_id,)| {
                 Box::new(super::guest_api_binding::webgpu_instance_wgsl_language_features(store, instance_id))
             })
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap_async(
                 "env",
@@ -194,176 +194,184 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     ))
                 },
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_device_create_shader_module",
                 super::guest_api_binding::webgpu_device_create_shader_module,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_device_create_bind_group_layout",
                 super::guest_api_binding::webgpu_device_create_bind_group_layout,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_device_create_bind_group",
                 super::guest_api_binding::webgpu_device_create_bind_group,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_device_create_dipatch_pipeline_layout",
                 super::guest_api_binding::webgpu_device_create_dipatch_pipeline_layout,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_device_create_compute_pipeline",
                 super::guest_api_binding::webgpu_device_create_compute_pipeline,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_device_create_buffer",
                 super::guest_api_binding::webgpu_device_create_buffer,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_device_create_command_encoder",
                 super::guest_api_binding::webgpu_device_create_command_encoder,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_device_poll", super::guest_api_binding::webgpu_device_poll)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_queue_write_buffer", super::guest_api_binding::webgpu_queue_write_buffer)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_queue_submit", super::guest_api_binding::webgpu_queue_submit)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_queue_get_timestamp_period",
                 super::guest_api_binding::webgpu_queue_get_timestamp_period,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_buffer_map_async", super::guest_api_binding::webgpu_buffer_map_async)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_ce_copy_buffer_to_buffer",
                 super::guest_api_binding::webgpu_ce_copy_buffer_to_buffer,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_ce_begin_compute_pass",
                 super::guest_api_binding::webgpu_ce_begin_compute_pass,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_ce_finish", super::guest_api_binding::webgpu_ce_finish)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_cp_set_pipeline", super::guest_api_binding::webgpu_cp_set_pipeline)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_cp_set_bind_group", super::guest_api_binding::webgpu_cp_set_bind_group)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_cp_dispatch_workgroups",
                 super::guest_api_binding::webgpu_cp_dispatch_workgroups,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_cp_dispatch_workgroups_indirect",
                 super::guest_api_binding::webgpu_cp_dispatch_workgroups_indirect,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_cp_set_push_constants",
                 super::guest_api_binding::webgpu_cp_set_push_constants,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         // linker
         //     .func_wrap(
         //         "env",
         //         "webgpu_buffer_get_mapped_range",
         //         super::guest_api_binding::webgpu_buffer_get_mapped_range,
         //     )
-        //     .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        //     .map_err(|e| crate::base_runtime::FunctionInstanceError::InternalError(e.to_string()))?;;
         linker
             .func_wrap(
                 "env",
                 "webgpu_buffer_mapped_range_read",
                 super::guest_api_binding::webgpu_buffer_mapped_range_read,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap(
                 "env",
                 "webgpu_buffer_mapped_range_write",
                 super::guest_api_binding::webgpu_buffer_mapped_range_write,
             )
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_cp_drop", super::guest_api_binding::webgpu_cp_drop)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_buffer_unmap", super::guest_api_binding::webgpu_buffer_unmap)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
+        linker
+            .func_wrap(
+                "env",
+                "webgpu_compute_pipeline_get_bind_group_layout",
+                super::guest_api_binding::webgpu_compute_pipeline_get_bind_group_layout,
+            )
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         linker
             .func_wrap("env", "webgpu_drop", super::guest_api_binding::webgpu_drop)
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         let instance = linker.instantiate_async(&mut store, &module).await.unwrap();
 
         Ok(Box::new(Self {
             edgeless_mem_alloc: instance
                 .get_typed_func::<i32, i32>(&mut store, "edgeless_mem_alloc")
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgeless_mem_free: instance
                 .get_typed_func::<(i32, i32), ()>(&mut store, "edgeless_mem_free")
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgeless_mem_clear: instance
                 .get_typed_func::<(), ()>(&mut store, "edgeless_mem_clear")
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgefunctione_handle_call: instance
                 .get_typed_func::<(i32, i32, i32, i32, i32, i32, i32, i32), i32>(&mut store, "handle_call_asm")
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgefunctione_handle_cast: instance
                 .get_typed_func::<(i32, i32, i32, i32, i32, i32), ()>(&mut store, "handle_cast_asm")
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgefunctione_handle_init: instance
                 .get_typed_func::<(i32, i32, i32, i32), ()>(&mut store, "handle_init_asm")
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgefunctione_handle_stop: instance
                 .get_typed_func::<(), ()>(&mut store, "handle_stop_asm")
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?,
             memory: instance
                 .get_memory(&mut store, "memory")
-                .ok_or(crate::base_runtime::FunctionInstanceError::BadCode)?,
+                .ok_or(anyhow::anyhow!("could not get memory"))
+                .map_err(crate::base_runtime::FunctionInstanceError::Internal)?,
             store,
         }))
     }
@@ -379,7 +387,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     payload.as_bytes(),
                 )
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+                .map_err(|e| e.context("Could not copy payload to vm"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
                 (ptr, len as i32)
             }
             None => (0i32, 0i32),
@@ -390,7 +399,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 let len = state.len();
                 let ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, state.as_bytes())
                     .await
-                    .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+                    .map_err(|e| e.context("Could not copy serialized_state to vm"))
+                    .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
                 (ptr, len as i32)
             }
             None => (0i32, 0i32),
@@ -403,10 +413,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     (init_payload_ptr, init_payload_len, serialized_state_ptr, serialized_state_len),
                 )
                 .await
-                .map_err(|e| {
-                    log::info!("{}", e);
-                    crate::base_runtime::FunctionInstanceError::InternalError
-                })?;
+                .map_err(|e| e.context("Init call failed"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
             Ok(())
         };
 
@@ -414,14 +422,16 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             self.edgeless_mem_free
                 .call_async(&mut self.store, (init_payload_ptr, init_payload_len))
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                .map_err(|e| e.context("Could not free payload memory"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         }
 
         if serialized_state_len > 0 {
             self.edgeless_mem_free
                 .call_async(&mut self.store, (serialized_state_ptr, serialized_state_len))
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                .map_err(|e| e.context("Could not free serialized_state memory"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         }
 
         ret
@@ -431,14 +441,15 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         &mut self,
         src: &edgeless_api::function_instance::InstanceId,
         port: &str,
-        msg: &str,
+        msg: &[u8],
     ) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         // Depending on the Function, we might employ a basic arena/bump allocator that we must reset at the end of a transaction.
         // This might be a noop if the function defines a working version of `edgeless_mem_free`.
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could not clear memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let component_id_ptr = super::helpers::copy_to_vm(
             &mut self.store.as_context_mut(),
@@ -447,7 +458,9 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             src.function_id.as_bytes(),
         )
         .await
-        .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+        .map_err(|e| e.context("Could copy component_id to vm"))
+        .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
+
         let node_id_ptr = super::helpers::copy_to_vm(
             &mut self.store.as_context_mut(),
             &self.memory,
@@ -455,17 +468,20 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             src.node_id.as_bytes(),
         )
         .await
-        .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+        .map_err(|e| e.context("Could copy node_id to vm"))
+        .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let payload_len = msg.len();
-        let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
+        let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg)
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could copy payload to vm"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let port_len = port.len();
         let port_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could copy port to vm"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let ret = {
             self.edgefunctione_handle_cast
@@ -474,29 +490,34 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     (node_id_ptr, component_id_ptr, port_ptr, port_len as i32, payload_ptr, payload_len as i32),
                 )
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+                .map_err(|e| e.context("Cast call failed"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
             Ok(())
         };
 
         self.edgeless_mem_free
             .call_async(&mut self.store, (component_id_ptr, 16))
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(|e| e.context("Could not free component_id memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         self.edgeless_mem_free
             .call_async(&mut self.store, (node_id_ptr, 16))
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(|e| e.context("Could not free node_id memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         if payload_len > 0 {
             self.edgeless_mem_free
                 .call_async(&mut self.store, (payload_ptr, payload_len as i32))
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                .map_err(|e| e.context("Could not free payload memory"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         }
         if port_len > 0 {
             self.edgeless_mem_free
                 .call_async(&mut self.store, (port_ptr, port_len as i32))
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                .map_err(|e| e.context("Could not free port memory"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         }
         ret
     }
@@ -505,12 +526,13 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         &mut self,
         src: &edgeless_api::function_instance::InstanceId,
         port: &str,
-        msg: &str,
+        msg: &[u8],
     ) -> Result<edgeless_dataplane::core::CallRet, crate::base_runtime::FunctionInstanceError> {
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could not clear memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let component_id_ptr = super::helpers::copy_to_vm(
             &mut self.store.as_context_mut(),
@@ -519,7 +541,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             src.function_id.as_bytes(),
         )
         .await
-        .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+        .map_err(|e| e.context("Could not copy compoent_id to vm"))
+        .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let node_id_ptr = super::helpers::copy_to_vm(
             &mut self.store.as_context_mut(),
@@ -528,29 +551,34 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             src.node_id.as_bytes(),
         )
         .await
-        .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+        .map_err(|e| e.context("Could not copy node_id to vm"))
+        .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let payload_len = msg.len();
-        let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
+        let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg)
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could not copy payload to vm"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let port_len = port.len();
         let port_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could not copy port to vm"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let out_ptr_ptr = self
             .edgeless_mem_alloc
             .call_async(&mut self.store, 4)
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could not allocate memory for output buffer"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let out_len_ptr = self
             .edgeless_mem_alloc
             .call_async(&mut self.store, 4)
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could not allocate memory for output len"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let callret_type = self
             .edgefunctione_handle_call
@@ -568,7 +596,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 ),
             )
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Call call failed"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let ret = match callret_type {
             0 => Ok(edgeless_dataplane::core::CallRet::NoReply),
@@ -576,19 +605,20 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 // load the output pointer (inside the WASM memory) (layer of indirection to work around only using one return param)
                 let out_ptr: [u8; 4] = self.memory.data_mut(&mut self.store)[out_ptr_ptr as usize..(out_ptr_ptr as usize) + 4]
                     .try_into()
-                    .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                    .map_err(|_| anyhow::anyhow!("Could not convert output buffer pointer"))
+                    .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
                 let out_ptr = i32::from_le_bytes(out_ptr);
 
                 // load the output lenght (layer of indirection to work around only using one return param)
                 let out_len: [u8; 4] = self.memory.data_mut(&mut self.store)[out_len_ptr as usize..(out_len_ptr as usize) + 4]
                     .try_into()
-                    .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                    .map_err(|_| anyhow::anyhow!("Could not convert output len pointer"))
+                    .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
                 let out_len = i32::from_le_bytes(out_len);
 
                 // load the atual output param
                 let out_raw = self.memory.data_mut(&mut self.store)[out_ptr as usize..(out_ptr as usize) + out_len as usize].to_vec();
-                // TODO(raphaelhetzel) This unwrap can be removed after we migrate the dataplane to use string slices.
-                let out = std::string::String::from_utf8(out_raw).unwrap();
+                let out = out_raw;
                 Ok(edgeless_dataplane::core::CallRet::Reply(out))
             }
             _ => Ok(edgeless_dataplane::core::CallRet::Err),
@@ -597,34 +627,40 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         self.edgeless_mem_free
             .call_async(&mut self.store, (component_id_ptr, 16))
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(|e| e.context("Could not free component_id memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         self.edgeless_mem_free
             .call_async(&mut self.store, (node_id_ptr, 16))
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(|e| e.context("Could not free node_id memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         // We don't need to free the data referred to by this pointer as we assume them to be stack-allocated.
         self.edgeless_mem_free
             .call_async(&mut self.store, (out_ptr_ptr, 4))
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(|e| e.context("Could not free output buffer ptr memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         // We don't need to free the data referred to by this pointer as we assume them to be stack-allocated.
         self.edgeless_mem_free
             .call_async(&mut self.store, (out_len_ptr, 4))
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(|e| e.context("Could not free output buffer len memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         if payload_len > 0 {
             self.edgeless_mem_free
                 .call_async(&mut self.store, (payload_ptr, payload_len as i32))
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                .map_err(|e| e.context("Could not free payload memory"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         }
 
         if port_len > 0 {
             self.edgeless_mem_free
                 .call_async(&mut self.store, (port_ptr, port_len as i32))
                 .await
-                .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+                .map_err(|e| e.context("Could not free port memory"))
+                .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         }
 
         ret
@@ -634,10 +670,13 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+            .map_err(|e| e.context("Could not clear memory"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
         self.edgefunctione_handle_stop
             .call_async(&mut self.store, ())
             .await
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)
+            .map_err(|e| e.context("Stop call failed"))
+            .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
+        Ok(())
     }
 }

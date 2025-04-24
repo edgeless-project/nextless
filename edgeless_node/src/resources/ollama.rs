@@ -114,7 +114,7 @@ impl OllamaResource {
                     .send(OllamaCommand::Chat(ChatCommand {
                         model_name: model_name.clone(),
                         history_id: history_id.clone(),
-                        prompt,
+                        prompt: String::from_utf8(prompt).unwrap(),
                         resource_id: instance_id,
                         reply_sender,
                     }))
@@ -123,7 +123,9 @@ impl OllamaResource {
                 match reply_receiver.await {
                     Ok(response) => match response {
                         Ok((target, target_port, response)) => {
-                            let _ = dataplane_handle.send(target, target_port, response, opentelemetry::Context::new()).await;
+                            let _ = dataplane_handle
+                                .send(target, target_port, response.as_bytes(), opentelemetry::Context::new())
+                                .await;
                         }
                         Err(err) => {
                             log::warn!("Error from ollama: {}", err)

@@ -145,7 +145,7 @@ mod test {
         let ret_1 = handle_1
             .handle_send(
                 &fid_3,
-                crate::core::Message::Cast("".to_string()),
+                crate::core::Message::Cast(Vec::new()),
                 &fid_1,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
@@ -161,7 +161,7 @@ mod test {
         let ret_2 = handle_1
             .handle_send(
                 &fid_2,
-                crate::core::Message::Cast("".to_string()),
+                crate::core::Message::Cast(Vec::new()),
                 &fid_1,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),

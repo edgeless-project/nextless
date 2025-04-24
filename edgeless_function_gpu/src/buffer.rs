@@ -34,7 +34,7 @@ impl wgpu::custom::BufferInterface for EdgeGpuBuffer {
         let start = range.start;
         let end = range.end;
 
-        log::info!("Ignored Map Async Callback");
+        log::debug!("Ignored Map Async Callback");
 
         unsafe { webgpu_buffer_map_async(self.ident, mode, start, end) }
     }

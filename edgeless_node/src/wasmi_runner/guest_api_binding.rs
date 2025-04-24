@@ -43,7 +43,7 @@ pub fn cast_raw(
 
     let port = load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
 
-    let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     tokio::runtime::Handle::current()
         .block_on(
@@ -78,7 +78,7 @@ pub fn call_raw(
     };
 
     let port = load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
-    let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     let call_ret = tokio::runtime::Handle::current()
         .block_on(
@@ -93,7 +93,7 @@ pub fn call_raw(
         edgeless_dataplane::core::CallRet::Reply(data) => {
             let len = data.len();
 
-            let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes())?;
+            let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_slice())?;
             copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
             copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
 
@@ -113,7 +113,7 @@ pub fn cast(
     let mem = get_memory(&mut caller)?;
 
     let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     match tokio::runtime::Handle::current().block_on(caller.data_mut().host.cast_alias(&target, &payload)) {
         Ok(_) => {}
@@ -139,7 +139,7 @@ pub fn call(
     let alloc = get_alloc(&mut caller)?;
 
     let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     let call_ret = tokio::runtime::Handle::current()
         .block_on(caller.data_mut().host.call_alias(&target, &payload))
@@ -149,7 +149,7 @@ pub fn call(
         edgeless_dataplane::core::CallRet::Reply(data) => {
             let len = data.len();
 
-            let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes())?;
+            let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_slice())?;
             copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
             copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
 
@@ -169,7 +169,7 @@ pub fn delayed_cast(
 ) -> Result<(), wasmi::Error> {
     let mem = get_memory(&mut caller)?;
     let target = load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     tokio::runtime::Handle::current()
         .block_on(caller.data_mut().host.delayed_cast(delay_ms as u64, &target, &payload))

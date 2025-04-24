@@ -47,7 +47,7 @@ pub async fn cast_raw(
     };
 
     let port = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
-    let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = super::helpers::load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     caller
         .data_mut()
@@ -80,7 +80,7 @@ pub async fn call_raw(
     };
 
     let port = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
-    let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = super::helpers::load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     let call_ret = caller
         .data_mut()
@@ -93,7 +93,7 @@ pub async fn call_raw(
         edgeless_dataplane::core::CallRet::Reply(data) => {
             let len = data.len();
 
-            let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes()).await?;
+            let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, &data).await?;
             super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
             super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
 
@@ -113,7 +113,7 @@ pub async fn cast(
     let mem = get_memory(&mut caller)?;
 
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = super::helpers::load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     match caller.data_mut().host.cast_alias(&target, &payload).await {
         Ok(_) => {}
@@ -139,7 +139,7 @@ pub async fn call(
     let alloc = get_alloc(&mut caller)?;
 
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = super::helpers::load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     let call_ret = caller
         .data_mut()
@@ -152,7 +152,7 @@ pub async fn call(
         edgeless_dataplane::core::CallRet::Reply(data) => {
             let len = data.len();
 
-            let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes()).await?;
+            let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, &data).await?;
             super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
             super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
 
@@ -172,7 +172,7 @@ pub async fn delayed_cast(
 ) -> wasmtime::Result<()> {
     let mem = get_memory(&mut caller)?;
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
-    let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let payload = super::helpers::load_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     caller
         .data_mut()
@@ -646,6 +646,18 @@ pub fn webgpu_buffer_unmap(mut caller: wasmtime::Caller<'_, GuestAPI>, buffer_id
         .buffer_unmap(buffer_id)
         .map_err(|_| wasmtime::Error::msg("Buffer Unmap Error"))?;
     Ok(())
+}
+
+pub fn webgpu_compute_pipeline_get_bind_group_layout(
+    mut caller: wasmtime::Caller<'_, GuestAPI>,
+    compute_pipeline_id: u64,
+    index: u32,
+) -> wasmtime::Result<u64> {
+    caller
+        .data_mut()
+        .wgpu_wrapper
+        .compute_pipeline_get_bind_group_layout(compute_pipeline_id, index)
+        .map_err(|_| wasmtime::Error::msg("Compute Pipeline Get Bind Group Error"))
 }
 
 pub fn webgpu_drop(mut caller: wasmtime::Caller<'_, GuestAPI>, resource_id: u64) -> wasmtime::Result<()> {

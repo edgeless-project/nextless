@@ -259,7 +259,7 @@ async fn messaging_cast_raw_input() {
         .send(
             instance_id,
             edgeless_api::function_instance::PortId("test_cast_input".to_string()),
-            "some_message".to_string(),
+            "some_message".as_bytes(),
             opentelemetry::Context::new(),
         )
         .await;
@@ -282,7 +282,7 @@ async fn messaging_cast_raw_output() {
         .send(
             instance_id,
             edgeless_api::function_instance::PortId("test_cast_input".to_string()),
-            "test_cast_raw_output".to_string(),
+            "test_cast_raw_output".as_bytes(),
             opentelemetry::Context::new(),
         )
         .await;
@@ -299,7 +299,7 @@ async fn messaging_cast_raw_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Cast("cast_raw_output".to_string())
+        edgeless_dataplane::core::Message::Cast("cast_raw_output".as_bytes().to_vec())
     );
 }
 
@@ -312,7 +312,7 @@ async fn messaging_call_raw_output() {
         .send(
             instance_id,
             edgeless_api::function_instance::PortId("test_cast_input".to_string()),
-            "test_call_raw_output".to_string(),
+            "test_call_raw_output".as_bytes(),
             opentelemetry::Context::new(),
         )
         .await;
@@ -326,7 +326,7 @@ async fn messaging_call_raw_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Call("call_raw_output".to_string())
+        edgeless_dataplane::core::Message::Call("call_raw_output".as_bytes().to_vec())
     );
 
     test_peer_handle
@@ -348,7 +348,7 @@ async fn messaging_delayed_cast_output() {
         .send(
             instance_id,
             edgeless_api::function_instance::PortId("test_cast_input".to_string()),
-            "test_delayed_cast_output".to_string(),
+            "test_delayed_cast_output".as_bytes(),
             opentelemetry::Context::new(),
         )
         .await;
@@ -360,7 +360,7 @@ async fn messaging_delayed_cast_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Cast("delayed_cast_output".to_string())
+        edgeless_dataplane::core::Message::Cast("delayed_cast_output".as_bytes().to_vec())
     );
 
     let timeout_t_r = tokio::time::timeout(tokio::time::Duration::from_secs(2), telemetry_mock_receiver.recv()).await;
@@ -382,7 +382,7 @@ async fn messaging_cast_output() {
         .send(
             instance_id,
             edgeless_api::function_instance::PortId("test_cast_input".to_string()),
-            "test_cast_output".to_string(),
+            "test_cast_output".as_bytes(),
             opentelemetry::Context::new(),
         )
         .await;
@@ -396,7 +396,10 @@ async fn messaging_cast_output() {
 
     let test_message = next_handle.receive_next().await;
     assert_eq!(test_message.source_id, instance_id);
-    assert_eq!(test_message.message, edgeless_dataplane::core::Message::Cast("cast_output".to_string()));
+    assert_eq!(
+        test_message.message,
+        edgeless_dataplane::core::Message::Cast("cast_output".as_bytes().to_vec())
+    );
 }
 
 // test output: call
@@ -409,7 +412,7 @@ async fn messaging_call_output() {
         .send(
             instance_id,
             edgeless_api::function_instance::PortId("test_cast_input".to_string()),
-            "test_call_output".to_string(),
+            "test_call_output".as_bytes(),
             opentelemetry::Context::new(),
         )
         .await;
@@ -420,7 +423,10 @@ async fn messaging_call_output() {
 
     let test_message = next_handle.receive_next().await;
     assert_eq!(test_message.source_id, instance_id);
-    assert_eq!(test_message.message, edgeless_dataplane::core::Message::Call("call_output".to_string()));
+    assert_eq!(
+        test_message.message,
+        edgeless_dataplane::core::Message::Call("call_output".as_bytes().to_vec())
+    );
 
     next_handle.reply(test_message.source_id, test_message.channel_id, CallRet::NoReply).await;
 
@@ -440,7 +446,7 @@ async fn function_in_call_can_be_stopped() {
         .send(
             instance_id,
             edgeless_api::function_instance::PortId("test_cast_input".to_string()),
-            "test_call_output".to_string(),
+            "test_call_output".as_bytes(),
             opentelemetry::Context::new(),
         )
         .await;
@@ -451,7 +457,10 @@ async fn function_in_call_can_be_stopped() {
 
     let test_message = next_handle.receive_next().await;
     assert_eq!(test_message.source_id, instance_id);
-    assert_eq!(test_message.message, edgeless_dataplane::core::Message::Call("call_output".to_string()));
+    assert_eq!(
+        test_message.message,
+        edgeless_dataplane::core::Message::Call("call_output".as_bytes().to_vec())
+    );
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
@@ -470,7 +479,7 @@ async fn messaging_call_raw_input_noreply() {
         test_peer_handle.call(
             instance_id,
             edgeless_api::function_instance::PortId("test_input_noreply".to_string()),
-            "some_cast".to_string(),
+            "some_cast".as_bytes(),
             opentelemetry::Context::new(),
         ),
     )
@@ -497,13 +506,13 @@ async fn messaging_call_raw_input_reply() {
         test_peer_handle.call(
             instance_id,
             edgeless_api::function_instance::PortId("test_input_reply".to_string()),
-            "test_ret".to_string(),
+            "test_ret".as_bytes(),
             opentelemetry::Context::new(),
         ),
     )
     .await
     .unwrap();
-    assert_eq!(ret, CallRet::Reply("test_reply".to_string()));
+    assert_eq!(ret, CallRet::Reply("test_reply".as_bytes().to_vec()));
 
     let timeout_t_r = tokio::time::timeout(tokio::time::Duration::from_secs(2), telemetry_mock_receiver.recv()).await;
     assert!(timeout_t_r.unwrap().unwrap().is_message_received());
@@ -620,7 +629,7 @@ async fn state_management() {
         .send(
             instance_id,
             edgeless_api::function_instance::PortId("test_cast_input".to_string()),
-            "test_cast_raw_output".to_string(),
+            "test_cast_raw_output".as_bytes(),
             opentelemetry::Context::new(),
         )
         .await;

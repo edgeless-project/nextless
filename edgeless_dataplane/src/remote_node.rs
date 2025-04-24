@@ -158,7 +158,7 @@ mod test {
             target: fid_wrong_component_id,
             source: fid_source,
             stream_id: 0,
-            data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+            data: edgeless_api::invocation::EventData::Cast("Test".as_bytes().to_vec()),
             target_port: edgeless_api::function_instance::PortId("test".to_string()),
             context: opentelemetry::trace::SpanContext::empty_context(),
         })
@@ -172,7 +172,7 @@ mod test {
                 target: fid_wrong_node_id,
                 source: fid_source,
                 stream_id: 0,
-                data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+                data: edgeless_api::invocation::EventData::Cast("Test".as_bytes().to_vec()),
                 target_port: edgeless_api::function_instance::PortId("test".to_string()),
                 context: opentelemetry::trace::SpanContext::empty_context(),
             })
@@ -185,7 +185,7 @@ mod test {
             target: fid_target,
             source: fid_source,
             stream_id: 0,
-            data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+            data: edgeless_api::invocation::EventData::Cast("Test".as_bytes().to_vec()),
             target_port: edgeless_api::function_instance::PortId("test".to_string()),
             context: opentelemetry::trace::SpanContext::empty_context(),
         })
@@ -242,7 +242,7 @@ mod test {
         let res = link
             .handle_send(
                 &fid_target,
-                Message::Cast("Test".to_string()),
+                Message::Cast("Test".as_bytes().to_vec()),
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
@@ -255,7 +255,7 @@ mod test {
         let res = link
             .handle_send(
                 &fid_wrong_component_id,
-                Message::Cast("Test".to_string()),
+                Message::Cast("Test".as_bytes().to_vec()),
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
@@ -268,7 +268,7 @@ mod test {
         let res = link
             .handle_send(
                 &fid_wrong_node_id,
-                Message::Cast("Test".to_string()),
+                Message::Cast("Test".as_bytes().to_vec()),
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
@@ -281,7 +281,7 @@ mod test {
         let res = link
             .handle_send(
                 &fid_target,
-                Message::Cast("Test".to_string()),
+                Message::Cast("Test".as_bytes().to_vec()),
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),

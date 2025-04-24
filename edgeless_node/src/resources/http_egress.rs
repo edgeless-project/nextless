@@ -50,7 +50,7 @@ impl EgressResource {
                     continue;
                 }
 
-                let req = match edgeless_http::request_from_string(&message_data) {
+                let req = match edgeless_http::request_from_string(core::str::from_utf8(&message_data).unwrap()) {
                     Ok(val) => val,
                     Err(_) => {
                         dataplane_handle
@@ -65,7 +65,11 @@ impl EgressResource {
                         Ok(resp) => {
                             let serialized_resp = edgeless_http::response_to_string(&resp);
                             cloned_dataplane
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(serialized_resp))
+                                .reply(
+                                    source_id,
+                                    channel_id,
+                                    edgeless_dataplane::core::CallRet::Reply(serialized_resp.as_bytes().to_vec()),
+                                )
                                 .await;
                         }
                         Err(_) => {

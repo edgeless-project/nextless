@@ -312,7 +312,7 @@ impl GPUWrapper {
             .create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
                 entries: entries.as_slice(),
-                layout: &layout,
+                layout,
             });
 
         self.resources.insert(id, GpuResource::BindGroup(WGPUBindGroup { id, bind_group }));
@@ -604,9 +604,22 @@ impl GPUWrapper {
         Ok(())
     }
 
+    pub(crate) fn compute_pipeline_get_bind_group_layout(&mut self, pipeline_id: u64, index: u32) -> Result<u64, WGPUError> {
+        let pipeline = self.resources.get(&pipeline_id).ok_or(WGPUError::NotFound)?.get_compute_pipeline()?;
+
+        let bind_group_layout = pipeline.pipeline.get_bind_group_layout(index);
+
+        let id = self.next_id;
+        self.next_id += 1;
+        self.resources
+            .insert(id, GpuResource::BindGroupLayout(WGPUBindGroupLayout { bind_group_layout, id }));
+
+        Ok(id)
+    }
+
     pub fn drop_resource(&mut self, resource_id: u64) -> Result<(), WGPUError> {
         if self.resources.remove(&resource_id).is_none() {
-            log::info!("Dropped something that does not exist");
+            log::debug!("Dropped something that does not exist");
         }
         Ok(())
     }

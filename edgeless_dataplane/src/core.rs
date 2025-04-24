@@ -22,15 +22,15 @@ pub trait DataPlaneLink: Send + Sync {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CallRet {
     NoReply,
-    Reply(String),
+    Reply(Vec<u8>),
     Err,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
-    Cast(String),
-    Call(String),
-    CallRet(String),
+    Cast(Vec<u8>),
+    Call(Vec<u8>),
+    CallRet(Vec<u8>),
     CallNoRet,
     Err,
 }

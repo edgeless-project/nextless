@@ -23,13 +23,9 @@ pub enum GuestAPIError {
 }
 
 impl GuestAPIHost {
-    pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
+    pub async fn cast_alias(&mut self, alias: &str, msg: &[u8]) -> Result<(), GuestAPIError> {
         self.data_plane
-            .send_alias(
-                alias.to_string(),
-                msg.to_string(),
-                self.tracing_context.lock().await.parent_context.clone(),
-            )
+            .send_alias(alias.to_string(), msg, self.tracing_context.lock().await.parent_context.clone())
             .await
             .map_err(|_e| GuestAPIError::UnknownAlias)
     }
@@ -38,25 +34,20 @@ impl GuestAPIHost {
         &mut self,
         target: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
-        msg: &str,
+        msg: &[u8],
     ) -> Result<(), GuestAPIError> {
         self.data_plane
-            .send(
-                target,
-                target_port,
-                msg.to_string(),
-                self.tracing_context.lock().await.parent_context.clone(),
-            )
+            .send(target, target_port, msg, self.tracing_context.lock().await.parent_context.clone())
             .await;
         Ok(())
     }
 
-    pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
+    pub async fn call_alias(&mut self, alias: &str, msg: &[u8]) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
                 Ok(edgeless_dataplane::core::CallRet::Err)
             },
-            call_res = Box::pin(self.data_plane.call_alias(alias.to_string(), msg.to_string(), self.tracing_context.lock().await.parent_context.clone()).fuse()) => {
+            call_res = Box::pin(self.data_plane.call_alias(alias.to_string(), msg, self.tracing_context.lock().await.parent_context.clone()).fuse()) => {
                 Ok(call_res)
             }
         }
@@ -66,13 +57,13 @@ impl GuestAPIHost {
         &mut self,
         target: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
-        msg: &str,
+        msg: &[u8],
     ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
                 Ok(edgeless_dataplane::core::CallRet::Err)
             },
-            call_res = Box::pin(self.data_plane.call(target, target_port, msg.to_string(), self.tracing_context.lock().await.parent_context.clone())).fuse() => {
+            call_res = Box::pin(self.data_plane.call(target, target_port, msg, self.tracing_context.lock().await.parent_context.clone())).fuse() => {
                 Ok(call_res)
             }
         }
@@ -89,9 +80,9 @@ impl GuestAPIHost {
         self.instance_id
     }
 
-    pub async fn delayed_cast(&mut self, delay: u64, target_alias: &str, payload: &str) -> Result<(), GuestAPIError> {
+    pub async fn delayed_cast(&mut self, delay: u64, target_alias: &str, payload: &[u8]) -> Result<(), GuestAPIError> {
         let mut cloned_plane = self.data_plane.clone();
-        let cloned_msg = payload.to_string();
+        let cloned_msg = payload.to_vec();
         let cloned_alias = target_alias.to_string();
 
         // let cloned_context = self.tracing_context.lock().await.parent_context.clone();
@@ -99,7 +90,7 @@ impl GuestAPIHost {
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
             cloned_plane
-                .send_alias(cloned_alias, cloned_msg, opentelemetry::Context::new())
+                .send_alias(cloned_alias, &cloned_msg, opentelemetry::Context::new())
                 .await
                 .unwrap();
         });

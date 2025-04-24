@@ -145,7 +145,7 @@ impl DDAResource {
                                         if let Some((target_id, target_port)) = inner.output_mapping.get(&dda_sub.cast_mapping.to_string()) {
                                             log::info!("target id for data {} from subscription is {}", str, target_id);
                                             dataplane_handle
-                                                .send(*target_id, target_port.clone(), str.to_string(), opentelemetry::Context::new())
+                                                .send(*target_id, target_port.clone(), str.as_bytes(), opentelemetry::Context::new())
                                                 .await;
                                         } else {
                                             log::info!("target id unknwon for data {} from subscription", str);
@@ -186,9 +186,9 @@ impl DDAResource {
                 let message_data = match message {
                     edgeless_dataplane::core::Message::Call(data) => {
                         need_reply = true;
-                        data
+                        String::from_utf8(data).unwrap()
                     }
-                    edgeless_dataplane::core::Message::Cast(data) => data,
+                    edgeless_dataplane::core::Message::Cast(data) => String::from_utf8(data).unwrap(),
                     _ => {
                         continue;
                     }
@@ -228,7 +228,7 @@ impl DDAResource {
                                         // we need a reply in case of a call from the dataplane
                                         if need_reply {
                                             dataplane_handle
-                                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(Vec::new()))
                                                 .await;
                                         }
                                     }

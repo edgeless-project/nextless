@@ -2016,6 +2016,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sysinfo",
+ "thiserror 2.0.12",
  "tokio",
  "toml 0.7.8",
  "tonic 0.10.2",

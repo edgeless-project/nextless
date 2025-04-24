@@ -183,9 +183,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         let start = tokio::time::Instant::now();
         let mut span = opentelemetry::global::tracer("actor_runtime").start("init");
 
-        self.function_instance
-            .as_mut()
-            .ok_or(super::FunctionInstanceError::InternalError)?
+        Self::get_function_instance(&mut self.function_instance)?
             .init(self.init_payload.as_deref(), self.serialized_state.as_deref())
             .await?;
 
@@ -234,8 +232,10 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         context: opentelemetry::trace::SpanContext,
     ) -> Result<(), super::FunctionInstanceError> {
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, target_port, payload, context).await,
-            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, target_port, payload, channel_id, context).await,
+            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, target_port, &payload, context).await,
+            edgeless_dataplane::core::Message::Call(payload) => {
+                self.process_call_message(source_id, target_port, &payload, channel_id, context).await
+            }
             _ => {
                 log::debug!("Unprocessed Message");
                 Ok(())
@@ -247,7 +247,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
-        payload: String,
+        payload: &[u8],
         span_context: opentelemetry::trace::SpanContext,
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
@@ -257,11 +257,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         let context = opentelemetry::Context::with_span(&opentelemetry::Context::new(), span);
         self.tracing_context.lock().await.parent_context = context;
 
-        let exec_result = self
-            .function_instance
-            .as_mut()
-            .ok_or(super::FunctionInstanceError::InternalError)?
-            .cast(&source_id, target_port.0.as_str(), &payload)
+        let exec_result = Self::get_function_instance(&mut self.function_instance)?
+            .cast(&source_id, target_port.0.as_str(), payload)
             .await;
         let duration = start.elapsed();
 
@@ -287,7 +284,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
-        payload: String,
+        payload: &[u8],
         channel_id: u64,
         span_context: opentelemetry::trace::SpanContext,
     ) -> Result<(), super::FunctionInstanceError> {
@@ -298,11 +295,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             .await;
         self.tracing_context.lock().await.parent_context = opentelemetry::Context::with_span(&opentelemetry::Context::new(), span);
 
-        let res = self
-            .function_instance
-            .as_mut()
-            .ok_or(super::FunctionInstanceError::InternalError)?
-            .call(&source_id, target_port.0.as_str(), &payload)
+        let res = Self::get_function_instance(&mut self.function_instance)?
+            .call(&source_id, target_port.0.as_str(), payload)
             .await;
         let duration = start.elapsed();
 
@@ -327,11 +321,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     async fn stop(&mut self) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
 
-        self.function_instance
-            .as_mut()
-            .ok_or(super::FunctionInstanceError::InternalError)?
-            .stop()
-            .await?;
+        Self::get_function_instance(&mut self.function_instance)?.stop().await?;
 
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionStop(start.elapsed()),
@@ -342,21 +332,31 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     }
 
     async fn exit(&mut self, exit_status: Result<(), super::FunctionInstanceError>) {
-        self.runtime_api
-            .send(super::runtime::RuntimeRequest::FunctionExit(self.instance_id, exit_status.clone()))
-            .await
-            .unwrap_or_else(|_| log::error!("FunctionInstance outlived runner."));
-
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionExit(match exit_status {
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionExit(match &exit_status {
                 Ok(_) => edgeless_telemetry::telemetry_events::FunctionExitStatus::Ok,
                 Err(exit_err) => match exit_err {
-                    FunctionInstanceError::BadCode => edgeless_telemetry::telemetry_events::FunctionExitStatus::CodeError,
+                    FunctionInstanceError::BadCode(_) => edgeless_telemetry::telemetry_events::FunctionExitStatus::CodeError,
                     _ => edgeless_telemetry::telemetry_events::FunctionExitStatus::InternalError,
                 },
             }),
             std::collections::BTreeMap::new(),
         );
+
+        self.runtime_api
+            .send(super::runtime::RuntimeRequest::FunctionExit(self.instance_id, exit_status))
+            .await
+            .unwrap_or_else(|_| log::error!("FunctionInstance outlived runner."));
+    }
+
+    fn get_function_instance(
+        function_instance: &mut Option<Box<FunctionInstanceType>>,
+    ) -> Result<&mut FunctionInstanceType, super::FunctionInstanceError> {
+        function_instance
+            .as_mut()
+            .map(|i| i.as_mut())
+            .ok_or(anyhow::anyhow!("Function Runtime: Function Instance is None."))
+            .map_err(super::FunctionInstanceError::Internal)
     }
 
     async fn span(

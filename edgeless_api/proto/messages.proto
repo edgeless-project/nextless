@@ -362,7 +362,7 @@ message EventData {
     // Event type.
     EventType event_type = 1;
     // Payload.
-    string payload = 2;
+    bytes payload = 2;
 }
 
 // Event.

@@ -57,5 +57,7 @@ opentelemetry = "0.27"
 
 wgpu = { version = "25", features = ["serde"] }
 
+thiserror = "2"
+
 [build-dependencies]
 tonic-build = "0.10"

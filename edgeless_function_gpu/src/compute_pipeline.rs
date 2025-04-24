@@ -4,6 +4,10 @@
 //
 // See lib.rs for more information about the initial source.
 
+extern "C" {
+    fn webgpu_compute_pipeline_get_bind_group_layout(instance_id: u64, index: u32) -> u64;
+}
+
 #[derive(Debug)]
 pub struct EdgeGpuComputePipeline {
     pub(crate) ident: u64,
@@ -18,8 +22,9 @@ impl Drop for EdgeGpuComputePipeline {
 }
 
 impl wgpu::custom::ComputePipelineInterface for EdgeGpuComputePipeline {
-    fn get_bind_group_layout(&self, _index: u32) -> wgpu::custom::DispatchBindGroupLayout {
-        log::error!("Tried to get Layout");
-        panic!()
+    fn get_bind_group_layout(&self, index: u32) -> wgpu::custom::DispatchBindGroupLayout {
+        let bind_group_ident = unsafe { webgpu_compute_pipeline_get_bind_group_layout(self.ident, index) };
+
+        wgpu::custom::DispatchBindGroupLayout::custom(crate::EdgeGpuBindGroupLayout { ident: bind_group_ident })
     }
 }

@@ -11,6 +11,18 @@ pub enum TelemetryLogLevel {
     Trace,
 }
 
+impl std::fmt::Display for TelemetryLogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TelemetryLogLevel::Error => f.write_str("Error"),
+            TelemetryLogLevel::Warn => f.write_str("Warn"),
+            TelemetryLogLevel::Info => f.write_str("Info"),
+            TelemetryLogLevel::Debug => f.write_str("Debug"),
+            TelemetryLogLevel::Trace => f.write_str("Trace"),
+        }
+    }
+}
+
 pub fn api_to_telemetry(lvl: String) -> TelemetryLogLevel {
     match lvl.as_str() {
         "Trace" => TelemetryLogLevel::Trace,
@@ -120,11 +132,44 @@ pub trait EventProcessor: Sync + Send {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult;
 }
 
-struct EventLogger {}
+// https://stackoverflow.com/a/33206814
+static COLORS: [&str; 12] = ["31", "32", "33", "34", "35", "36", "91", "92", "93", "94", "95", "96"];
+
+#[derive(Default)]
+struct EventLogger {
+    next_color: usize,
+    colors: std::collections::HashMap<String, &'static str>,
+}
+
 
 impl EventProcessor for EventLogger {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
-        println!("Event: {:?} , tags: {:?}", event, event_tags);
+        let f_id = event_tags.get("FUNCTION_ID").unwrap();
+
+        // Escape needs special escale sequence https://github.com/rust-lang/rust/issues/30491
+        let color = self.colors.entry(f_id.clone()).or_insert_with(|| {
+            let c = COLORS[self.next_color];
+            self.next_color += 1;
+            if self.next_color == COLORS.len() {
+                self.next_color = 0;
+            }
+            c
+        });
+
+        match event {
+            TelemetryEvent::FunctionLogEntry(level, component, message) => {
+                println!(
+                    "\x1b[{}m{}\x1b[0m:{}",
+                    color,
+                    f_id,
+                    format_args!("[{}][{}] {}", level, component, message)
+                );
+            }
+            _ => {
+                println!("\x1b[{}m{}\x1b[0m: {:?}", color, f_id, event);
+            }
+        }
+
         TelemetryProcessingResult::PROCESSED
     }
 }
@@ -167,8 +212,8 @@ impl TelemetryProcessor {
 
                 let inner = TelemetryProcessorInner {
                     processing_chain: vec![
+                        Box::new(EventLogger::default()),
                         Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
-                        Box::new(EventLogger {}),
                     ],
                     receiver,
                 };

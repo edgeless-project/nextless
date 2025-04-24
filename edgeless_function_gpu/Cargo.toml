@@ -18,4 +18,5 @@ wgpu = { git = "https://github.com/raphaelhetzel/wgpu.git", branch = "custom_fix
     "wgsl",
     "custom",
     "serde",
+    "fragile-send-sync-non-atomic-wasm",
 ] }

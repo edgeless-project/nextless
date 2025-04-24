@@ -36,15 +36,9 @@ impl CoapInvocationServer {
                             source: invocation_event.source,
                             stream_id: invocation_event.stream_id,
                             data: match invocation_event.data {
-                                edgeless_api_core::invocation::EventData::Cast(val) => {
-                                    crate::invocation::EventData::Cast(String::from_utf8(val.0.to_vec()).unwrap())
-                                }
-                                edgeless_api_core::invocation::EventData::Call(val) => {
-                                    crate::invocation::EventData::Call(String::from_utf8(val.0.to_vec()).unwrap())
-                                }
-                                edgeless_api_core::invocation::EventData::CallRet(val) => {
-                                    crate::invocation::EventData::CallRet(String::from_utf8(val.0.to_vec()).unwrap())
-                                }
+                                edgeless_api_core::invocation::EventData::Cast(val) => crate::invocation::EventData::Cast(val.0.to_vec()),
+                                edgeless_api_core::invocation::EventData::Call(val) => crate::invocation::EventData::Call(val.0.to_vec()),
+                                edgeless_api_core::invocation::EventData::CallRet(val) => crate::invocation::EventData::CallRet(val.0.to_vec()),
                                 edgeless_api_core::invocation::EventData::CallNoRet => crate::invocation::EventData::CallNoRet,
                                 edgeless_api_core::invocation::EventData::Err => crate::invocation::EventData::Err,
                             },
@@ -93,14 +87,14 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
             target_port: edgeless_api_core::port::Port(heapless::String::from_str(&event.target_port.0).unwrap()),
             stream_id: event.stream_id,
             data: match &event.data {
-                crate::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(edgeless_api_core::invocation::DataBuffer(
-                    heapless::Vec::from_slice(val.as_bytes()).unwrap(),
-                )),
-                crate::invocation::EventData::Call(val) => edgeless_api_core::invocation::EventData::Call(edgeless_api_core::invocation::DataBuffer(
-                    heapless::Vec::from_slice(val.as_bytes()).unwrap(),
-                )),
+                crate::invocation::EventData::Cast(val) => {
+                    edgeless_api_core::invocation::EventData::Cast(edgeless_api_core::invocation::DataBuffer(heapless::Vec::from_slice(val).unwrap()))
+                }
+                crate::invocation::EventData::Call(val) => {
+                    edgeless_api_core::invocation::EventData::Call(edgeless_api_core::invocation::DataBuffer(heapless::Vec::from_slice(val).unwrap()))
+                }
                 crate::invocation::EventData::CallRet(val) => edgeless_api_core::invocation::EventData::CallRet(
-                    edgeless_api_core::invocation::DataBuffer(heapless::Vec::from_slice(val.as_bytes()).unwrap()),
+                    edgeless_api_core::invocation::DataBuffer(heapless::Vec::from_slice(val).unwrap()),
                 ),
                 crate::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                 crate::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,

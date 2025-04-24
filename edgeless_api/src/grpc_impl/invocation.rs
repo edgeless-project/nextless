@@ -24,9 +24,9 @@ impl InvocationConverters {
 
     fn parse_api_event_data(api_event_data: &crate::grpc_impl::api::EventData) -> anyhow::Result<crate::invocation::EventData> {
         match api_event_data.event_type {
-            TYPE_CALL => Ok(crate::invocation::EventData::Call(api_event_data.payload.to_string())),
-            TYPE_CAST => Ok(crate::invocation::EventData::Cast(api_event_data.payload.to_string())),
-            TYPE_CALL_RET => Ok(crate::invocation::EventData::CallRet(api_event_data.payload.to_string())),
+            TYPE_CALL => Ok(crate::invocation::EventData::Call(api_event_data.payload.clone())),
+            TYPE_CAST => Ok(crate::invocation::EventData::Cast(api_event_data.payload.clone())),
+            TYPE_CALL_RET => Ok(crate::invocation::EventData::CallRet(api_event_data.payload.clone())),
             TYPE_CALL_NO_RET => Ok(crate::invocation::EventData::CallNoRet),
             _ => Ok(crate::invocation::EventData::Err),
         }
@@ -44,18 +44,18 @@ impl InvocationConverters {
     }
 
     fn encode_crate_event_data(crate_event: &crate::invocation::EventData) -> crate::grpc_impl::api::EventData {
-        let mut payload_buffer = "".to_string();
+        let mut payload_buffer = Vec::new();
         let event = match crate_event {
             crate::invocation::EventData::Call(payload) => {
-                payload_buffer = payload.to_string();
+                payload_buffer = payload.clone();
                 crate::grpc_impl::api::EventType::Call
             }
             crate::invocation::EventData::Cast(payload) => {
-                payload_buffer = payload.to_string();
+                payload_buffer = payload.clone();
                 crate::grpc_impl::api::EventType::Cast
             }
             crate::invocation::EventData::CallRet(payload) => {
-                payload_buffer = payload.to_string();
+                payload_buffer = payload.clone();
                 crate::grpc_impl::api::EventType::CallRet
             }
             crate::invocation::EventData::CallNoRet => crate::grpc_impl::api::EventType::CallNoRet,

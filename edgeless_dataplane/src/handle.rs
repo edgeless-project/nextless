@@ -29,7 +29,7 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
                 },
                 target_port: self.target_port.clone(),
                 channel_id: 0,
-                message: crate::core::Message::Cast(String::from_utf8(msg).unwrap()),
+                message: crate::core::Message::Cast(msg),
                 context: opentelemetry::trace::SpanContext::empty_context(),
             })
             .unwrap();
@@ -149,8 +149,8 @@ impl DataplaneHandle {
                 context,
             }) = self.receiver.lock().await.recv().await
             {
-                if std::mem::discriminant(&message) == std::mem::discriminant(&Message::Cast("".to_string()))
-                    || std::mem::discriminant(&message) == std::mem::discriminant(&Message::Call("".to_string()))
+                if std::mem::discriminant(&message) == std::mem::discriminant(&Message::Cast(Vec::new()))
+                    || std::mem::discriminant(&message) == std::mem::discriminant(&Message::Call(Vec::new()))
                 {
                     return DataplaneEvent {
                         source_id,
@@ -206,13 +206,13 @@ impl DataplaneHandle {
         }
     }
 
-    pub async fn send_alias(&mut self, target: String, msg: String, context: opentelemetry::Context) -> anyhow::Result<()> {
+    pub async fn send_alias(&mut self, target: String, msg: &[u8], context: opentelemetry::Context) -> anyhow::Result<()> {
         let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("send_{}", target), &context);
         let context = opentelemetry::Context::current_with_span(call_handler_span);
         if target == "self" {
             self.send_inner(
                 self.slf,
-                Message::Cast(msg.to_string()),
+                Message::Cast(msg.to_vec()),
                 edgeless_api::function_instance::PortId("INTERNAL".to_string()),
                 0,
                 context,
@@ -222,13 +222,13 @@ impl DataplaneHandle {
         } else if let Some(target) = self.alias_mapping.get_mapping(&target).await {
             match target {
                 edgeless_api::common::Output::Single(instance_id, port_id) => {
-                    self.send_inner(instance_id, Message::Cast(msg.to_string()), port_id.clone(), 0, context.clone())
+                    self.send_inner(instance_id, Message::Cast(msg.to_vec()), port_id.clone(), 0, context.clone())
                         .await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
                     let id = ids.choose(&mut rand::thread_rng());
                     if let Some((instance_id, port_id)) = id {
-                        self.send_inner(*instance_id, Message::Cast(msg.to_string()), port_id.clone(), 0, context.clone())
+                        self.send_inner(*instance_id, Message::Cast(msg.to_vec()), port_id.clone(), 0, context.clone())
                             .await;
                     } else {
                         return Err(anyhow::anyhow!("Unknown Alias"));
@@ -236,12 +236,12 @@ impl DataplaneHandle {
                 }
                 edgeless_api::common::Output::All(ids) => {
                     for (instance_id, port_id) in ids {
-                        self.send_inner(instance_id, Message::Cast(msg.to_string()), port_id.clone(), 0, context.clone())
+                        self.send_inner(instance_id, Message::Cast(msg.to_vec()), port_id.clone(), 0, context.clone())
                             .await;
                     }
                 }
                 edgeless_api::common::Output::Link(link_id) => {
-                    self.send_to_link(&link_id, msg.to_string().into_bytes()).await;
+                    self.send_to_link(&link_id, msg.to_vec()).await;
                 }
             }
             Ok(())
@@ -250,7 +250,7 @@ impl DataplaneHandle {
         }
     }
 
-    pub async fn call_alias(&mut self, alias: String, msg: String, context: opentelemetry::Context) -> CallRet {
+    pub async fn call_alias(&mut self, alias: String, msg: &[u8], context: opentelemetry::Context) -> CallRet {
         let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("call_{}", alias), &context);
         let context = opentelemetry::Context::current_with_span(call_handler_span);
         if alias == "self" {
@@ -303,12 +303,12 @@ impl DataplaneHandle {
         &mut self,
         target: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
-        msg: String,
+        msg: &[u8],
         context: opentelemetry::Context,
     ) {
         let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context("send", &context);
         let context = opentelemetry::Context::current_with_span(call_handler_span);
-        self.send_inner(target, Message::Cast(msg), target_port, 0, context).await;
+        self.send_inner(target, Message::Cast(msg.to_vec()), target_port, 0, context).await;
     }
 
     // Send a `call` event and wait for the return event.
@@ -317,7 +317,7 @@ impl DataplaneHandle {
         &mut self,
         target: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
-        msg: String,
+        msg: &[u8],
         context: opentelemetry::Context,
     ) -> CallRet {
         let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context("call", &context);
@@ -329,7 +329,7 @@ impl DataplaneHandle {
         &mut self,
         target: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
-        msg: String,
+        msg: &[u8],
         context: opentelemetry::Context,
     ) -> CallRet {
         let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
@@ -337,7 +337,7 @@ impl DataplaneHandle {
         self.next_id += 1;
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
-        self.send_inner(target, Message::Call(msg), target_port, channel_id, context.clone())
+        self.send_inner(target, Message::Call(msg.to_vec()), target_port, channel_id, context.clone())
             .await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
@@ -572,7 +572,7 @@ mod test {
             .send(
                 fid_2,
                 edgeless_api::function_instance::PortId("test".to_string()),
-                "Test".to_string(),
+                "Test".as_bytes(),
                 opentelemetry::Context::new(),
             )
             .await;
@@ -580,7 +580,7 @@ mod test {
         let res = handle_2.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&res.message),
-            std::mem::discriminant(&crate::core::Message::Cast("".to_string()))
+            std::mem::discriminant(&crate::core::Message::Cast(Vec::new()))
         );
     }
 
@@ -600,7 +600,7 @@ mod test {
                 .call(
                     fid_2,
                     edgeless_api::function_instance::PortId("test".to_string()),
-                    "Test".to_string(),
+                    "Test".as_bytes(),
                     opentelemetry::Context::new(),
                 )
                 .await
@@ -609,7 +609,7 @@ mod test {
         let req = handle_2.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&req.message),
-            std::mem::discriminant(&crate::core::Message::Call("".to_string()))
+            std::mem::discriminant(&crate::core::Message::Call(Vec::new()))
         );
 
         handle_2.reply(req.source_id, req.channel_id, CallRet::NoReply).await;
@@ -663,14 +663,14 @@ mod test {
             .send(
                 fid_2,
                 edgeless_api::function_instance::PortId("test".to_string()),
-                "Test".to_string(),
+                "Test".as_bytes(),
                 opentelemetry::Context::new(),
             )
             .await;
         let cast_req = handle_2.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&cast_req.message),
-            std::mem::discriminant(&crate::core::Message::Cast("".to_string()))
+            std::mem::discriminant(&crate::core::Message::Cast(Vec::new()))
         );
 
         let cloned_id_1 = fid_1;
@@ -681,7 +681,7 @@ mod test {
                 .call(
                     cloned_id_1,
                     edgeless_api::function_instance::PortId("test".to_string()),
-                    "Test".to_string(),
+                    "Test".as_bytes(),
                     opentelemetry::Context::new(),
                 )
                 .await
@@ -690,7 +690,7 @@ mod test {
         let call_req = handle_1.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&call_req.message),
-            std::mem::discriminant(&crate::core::Message::Call("".to_string()))
+            std::mem::discriminant(&crate::core::Message::Call(Vec::new()))
         );
         handle_1.reply(call_req.source_id, call_req.channel_id, CallRet::NoReply).await;
 

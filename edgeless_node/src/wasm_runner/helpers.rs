@@ -38,6 +38,15 @@ pub(crate) fn load_string_from_vm(
         .map_err(|_| wasmtime::Error::msg("string error"))
 }
 
+pub(crate) fn load_from_vm(
+    ctx: &mut wasmtime::StoreContextMut<'_, super::guest_api_binding::GuestAPI>,
+    memory: &wasmtime::Memory,
+    data_ptr: i32,
+    data_len: i32,
+) -> wasmtime::Result<Vec<u8>> {
+    Ok(memory.data_mut(ctx)[data_ptr as usize..(data_ptr as usize) + data_len as usize].to_vec())
+}
+
 pub(crate) fn level_from_i32(lvl: i32) -> edgeless_telemetry::telemetry_events::TelemetryLogLevel {
     match lvl {
         1 => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Error,
