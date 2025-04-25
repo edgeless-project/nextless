@@ -34,21 +34,20 @@ impl super::StatelessTransformation for TopicConverter {
 
         // Create Outputs
         for (_cid, component) in &mut workflow.components() {
-            component
-                .borrow_mut()
-                .logical_ports()
-                .logical_output_mapping
-                .iter_mut()
-                .for_each(|(_port_id, port_mapping)| {
+            let mut component = component.borrow_mut();
+            let output_mapping = &mut component.logical_ports().logical_output_mapping;
+
+            *output_mapping = std::mem::take(output_mapping)
+                .into_iter()
+                .filter_map(|(port_id, port_mapping)| {
                     if let LogicalOutput::Topic(topic) = port_mapping.clone() {
-                        *port_mapping = LogicalOutput::AllOfTargets(
-                            targets
-                                .get(&topic)
-                                .unwrap_or(&Vec::<(String, edgeless_api::function_instance::PortId)>::new())
-                                .clone(),
-                        );
+                        if let Some(t) = targets.get(&topic) {
+                            return Some((port_id, LogicalOutput::AllOfTargets(t.clone())));
+                        }
                     }
-                });
+                    None
+                })
+                .collect();
         }
     }
 }

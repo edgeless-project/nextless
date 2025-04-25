@@ -218,39 +218,46 @@ async fn main() -> anyhow::Result<()> {
                                                         )
                                                     })
                                                     .collect(),
-                                                function_class_inner_structure: func_spec
-                                                    .klass
-                                                    .inner_structure
-                                                    .iter()
-                                                    .map(|mapping| {
-                                                        (
-                                                            match &mapping.source {
-                                                                edgeless_config::inner_structure::MappingNode::Port(port_id) => {
-                                                                    edgeless_api::function_instance::MappingNode::Port(
-                                                                        edgeless_api::function_instance::PortId(port_id.clone()),
-                                                                    )
-                                                                }
-                                                                edgeless_config::inner_structure::MappingNode::SideEffect => {
-                                                                    edgeless_api::function_instance::MappingNode::SideEffect
-                                                                }
-                                                            },
-                                                            mapping
-                                                                .dests
-                                                                .iter()
-                                                                .map(|dest| match dest {
-                                                                    edgeless_config::inner_structure::MappingNode::Port(port_id) => {
-                                                                        edgeless_api::function_instance::MappingNode::Port(
-                                                                            edgeless_api::function_instance::PortId(port_id.clone()),
-                                                                        )
-                                                                    }
-                                                                    edgeless_config::inner_structure::MappingNode::SideEffect => {
-                                                                        edgeless_api::function_instance::MappingNode::SideEffect
-                                                                    }
-                                                                })
-                                                                .collect(),
-                                                        )
-                                                    })
-                                                    .collect(),
+                                                function_class_inner_structure: func_spec.klass.inner_structure.iter().fold(
+                                                    std::collections::HashMap::<
+                                                        edgeless_api::function_instance::MappingNode,
+                                                        Vec<edgeless_api::function_instance::MappingNode>,
+                                                    >::new(),
+                                                    |mut acc, mapping| {
+                                                        let key = match &mapping.source {
+                                                            edgeless_config::inner_structure::MappingNode::Port(port_id) => {
+                                                                edgeless_api::function_instance::MappingNode::Port(
+                                                                    edgeless_api::function_instance::PortId(port_id.clone()),
+                                                                )
+                                                            }
+                                                            edgeless_config::inner_structure::MappingNode::SideEffect => {
+                                                                edgeless_api::function_instance::MappingNode::SideEffect
+                                                            }
+                                                        };
+
+                                                        let data = acc.entry(key).or_default();
+
+                                                        // I don't think there is a better way: https://stackoverflow.com/a/39803426
+                                                        let mut tmp =
+                                                            std::collections::HashSet::<edgeless_api::function_instance::MappingNode>::from_iter(
+                                                                std::mem::take(data),
+                                                            );
+
+                                                        tmp.extend(mapping.dests.iter().map(|dest| match dest {
+                                                            edgeless_config::inner_structure::MappingNode::Port(port_id) => {
+                                                                edgeless_api::function_instance::MappingNode::Port(
+                                                                    edgeless_api::function_instance::PortId(port_id.clone()),
+                                                                )
+                                                            }
+                                                            edgeless_config::inner_structure::MappingNode::SideEffect => {
+                                                                edgeless_api::function_instance::MappingNode::SideEffect
+                                                            }
+                                                        }));
+
+                                                        *data = tmp.into_iter().collect();
+                                                        acc
+                                                    },
+                                                ),
                                             },
                                             output_mapping: func_spec
                                                 .outputs

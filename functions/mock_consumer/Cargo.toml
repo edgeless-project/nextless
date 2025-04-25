@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
+[workspace]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
+
+[package]
+name = "mock_consumer"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+
+[lib]
+name = "mock_consumer"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
+edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
+log = "0.4"
+
+[features]
+
+input_input1 = []
+input_input2 = []
+input_input3 = []
+input_input4 = []
+input_input5 = []
+input_input6 = []
+input_input7 = []
+input_input8 = []
+input_input9 = []
+input_input10 = []

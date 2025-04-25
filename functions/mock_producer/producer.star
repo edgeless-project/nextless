@@ -1,0 +1,15 @@
+MockProducer = edgeless_actor_class(
+    id = "mock_producer",
+    version = "0.1",
+    outputs = [
+        cast_output("output{}".format(x), "test") for x in range(1, 11)
+    ],
+    inputs = [],
+    inner_structure = [
+        source("output{}".format(x)) for x in range(1, 11)
+    ],
+    code = file("mock_producer.tar.gz"),
+    code_type = "RUST"
+)
+
+el_main = MockProducer
