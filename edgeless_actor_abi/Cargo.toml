@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
+[package]
+name = "edgeless_actor_abi"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+
+[lib]
+name = "edgeless_actor_abi"
+path = "src/lib.rs"
+
+[dependencies]
