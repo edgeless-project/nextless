@@ -152,6 +152,8 @@ message NodeCapabilities {
     uint32 num_cores         = 13;
     // CPU Architecture
     string cpu_arch = 15;
+    // Target Sys
+    string sys = 16;
     // Size of memory available to applications running on the edge node, in MiB.
     uint32 mem_size          = 14;
     // List of labels assigned to this node.

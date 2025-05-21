@@ -1,20 +1,23 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+#![no_std]
+extern crate alloc;
+
 #[derive(Debug, serde::Deserialize)]
 pub struct WorkflowSpecFunctionClass {
-    pub id: String,
-    pub code_type: String,
-    pub version: String,
-    pub code: Option<String>,
-    pub build: Option<String>,
-    pub outputs: std::collections::HashMap<String, PortDefinition>,
-    pub inputs: std::collections::HashMap<String, PortDefinition>,
-    pub inner_structure: Vec<Mapping>,
+    pub id: alloc::string::String,
+    pub code_type: alloc::string::String,
+    pub version: alloc::string::String,
+    pub code: Option<alloc::string::String>,
+    pub build: Option<alloc::string::String>,
+    pub outputs: alloc::collections::BTreeMap<alloc::string::String, PortDefinition>,
+    pub inputs: alloc::collections::BTreeMap<alloc::string::String, PortDefinition>,
+    pub inner_structure: alloc::vec::Vec<Mapping>,
 }
 
 impl WorkflowSpecFunctionClass {
-    pub fn parse(data: String) -> Self {
+    pub fn parse(data: alloc::string::String) -> Self {
         serde_json::from_str(&data).unwrap()
     }
 }
@@ -22,8 +25,8 @@ impl WorkflowSpecFunctionClass {
 #[derive(Debug, serde::Deserialize)]
 pub struct PortDefinition {
     pub method: PortMethod,
-    pub data_type: String,
-    pub return_data_type: Option<String>,
+    pub data_type: alloc::string::String,
+    pub return_data_type: Option<alloc::string::String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -35,7 +38,7 @@ pub enum PortMethod {
 #[derive(Debug, serde::Deserialize, PartialEq)]
 pub struct Mapping {
     pub source: MappingNode,
-    pub dests: Vec<MappingNode>,
+    pub dests: alloc::vec::Vec<MappingNode>,
 }
 
 #[derive(Debug, serde::Deserialize, PartialEq)]
@@ -44,7 +47,7 @@ pub enum MappingNode {
     #[serde(rename = "SIDE_EFFECT")]
     SideEffect,
     #[serde(rename = "PORT")]
-    Port(String),
+    Port(alloc::string::String),
 }
 
 pub trait Deserialize<'a> {
@@ -56,7 +59,7 @@ pub trait Serialize<'a> {
 }
 
 // pub enum EdgelessKVValue {
-//     String(String),
+//     alloc::string::String(alloc::string::String),
 //     Float(f64),
 //     Signed(i64),
 //     Unsigned(u64),
@@ -69,13 +72,13 @@ pub trait Serialize<'a> {
 //     fn set(key: &str, val: EdgelessKVValue);
 // }
 
-impl Deserialize<'_> for std::string::String {
+impl Deserialize<'_> for alloc::string::String {
     fn deserialize(raw: &[u8]) -> Self {
-        String::from_utf8(raw.to_vec()).unwrap()
+        alloc::string::String::from_utf8(raw.to_vec()).unwrap()
     }
 }
 
-impl<'a> Serialize<'a> for std::string::String {
+impl<'a> Serialize<'a> for alloc::string::String {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         self.as_bytes()
     }

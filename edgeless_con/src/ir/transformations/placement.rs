@@ -41,6 +41,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                         if let Some(dst) = dst {
                             *i = PhysicalComponentState::Existing(actor::PhysicalActor {
                                 id: edgeless_api::function_instance::InstanceId::new(dst.node_id),
+                                runtime_type: dst.runtime.id(),
                                 desired_mapping: PhysicalPorts::default(),
                                 image: None,
                                 materialized: None,
@@ -146,7 +147,7 @@ fn find_candidates_for_actor<'b>(actor: &actor::LogicalActor, nodes: &'b crate::
     for node in nodes.values() {
         let mut node_cadidates = feasibility::feasible_node_runtime_candidates(actor, *node);
 
-        node_cadidates.sort_by(|a, b| b.runtime.efficiency_score().total_cmp(&a.runtime.efficiency_score()));
+        node_cadidates.sort_by(|a, b| a.runtime.efficiency_score().total_cmp(&b.runtime.efficiency_score()));
         if let Some(c) = node_cadidates.pop() {
             candiates.push(c);
         }

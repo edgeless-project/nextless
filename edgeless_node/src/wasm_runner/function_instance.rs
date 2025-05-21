@@ -52,7 +52,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
     async fn instantiate(
         _instance_id: &edgeless_api::function_instance::InstanceId,
         _runtime_configuration: std::collections::HashMap<String, String>,
-        guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
+        guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
         code: &[u8],
     ) -> Result<Box<Self>, crate::base_runtime::FunctionInstanceError> {
         let mut config = wasmtime::Config::new();
@@ -64,7 +64,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         let mut store: wasmtime::Store<super::guest_api_binding::GuestAPI> = wasmtime::Store::new(
             &engine,
             super::guest_api_binding::GuestAPI {
-                host: guest_api_host.take().expect("the impossible happened: no GuestAPIHost"),
+                host: guest_api_host,
                 wgpu_wrapper: super::gpu_binding::GPUWrapper::new(),
             },
         );
@@ -376,7 +376,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         }))
     }
 
-    async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&str>) -> Result<(), crate::base_runtime::FunctionInstanceError> {
+    async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&[u8]>) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         let (init_payload_ptr, init_payload_len) = match init_payload {
             Some(payload) => {
                 let len = payload.len();
@@ -397,7 +397,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         let (serialized_state_ptr, serialized_state_len) = match serialized_state {
             Some(state) => {
                 let len = state.len();
-                let ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, state.as_bytes())
+                let ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, state)
                     .await
                     .map_err(|e| e.context("Could not copy serialized_state to vm"))
                     .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;

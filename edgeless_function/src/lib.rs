@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(static_mut_refs)]
 
 #[cfg(feature = "std")]
 pub mod lcg;
@@ -11,7 +12,13 @@ pub mod lcg;
 pub use edgeless_function_macro::generate;
 
 /// These functions are imported by the WASM module.
-pub mod imports;
+#[cfg(target_arch = "wasm32")]
+pub mod interface_wasm;
+#[cfg(target_arch = "wasm32")]
+pub use interface_wasm as imports;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod interface_dynlib;
 
 /// Provides a memory managment wrapper for data that was passed by the host and must be freed outside of the internal functions of this crate.
 /// Mostly exists to only require one abstraction for both std and no_std mode.
@@ -25,10 +32,28 @@ pub use logging::init_logger;
 
 /// Provides the memory management functions required by the host to pass data to the WASM environment.
 /// These functions are exported by the WASM module.
-pub mod memory;
+// pub mod memory;
+#[cfg(target_arch = "wasm32")]
+pub mod memory_wasm;
+#[cfg(target_arch = "wasm32")]
+pub use memory_wasm as memory;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod memory_dynlib;
+#[cfg(not(target_arch = "wasm32"))]
+pub use memory_dynlib as memory;
 
 /// Provides the (reeported) functions that enable the edgeless actors to interact with the outside world.
-pub mod output_api;
+#[cfg(target_arch = "wasm32")]
+pub mod output_api_wasm;
+#[cfg(target_arch = "wasm32")]
+pub use output_api_wasm as output_api;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod output_api_dynlib;
+#[cfg(not(target_arch = "wasm32"))]
+pub use output_api_dynlib as output_api;
+
 pub use output_api::*;
 
 pub enum CallRet {
@@ -37,13 +62,7 @@ pub enum CallRet {
     Err,
 }
 
-#[derive(Clone, Copy)]
-pub struct InstanceId {
-    /// UUID node_id
-    pub node_id: [u8; 16],
-    /// UUID component_id
-    pub component_id: [u8; 16],
-}
+pub type InstanceId = edgeless_actor_abi::ActorId;
 
 pub trait EdgeFunction {
     fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]);

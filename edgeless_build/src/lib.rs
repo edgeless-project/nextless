@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 University of Cambridge, System Research Group
+// SPDX-FileCopyrightText: © 2024 Roman Kolcun <roman.kolcun@cl.cam.ac.uk>
 // SPDX-License-Identifier: MIT
 
 // https://rust-lang-nursery.github.io/rust-cookbook/compression/tar.html
@@ -74,11 +76,115 @@ pub fn rust_to_wasm(
     println!(
         "{:?}",
         std::process::Command::new("wasm-opt")
-            .args(["-Oz", &raw_result, "-o", &out_file])
+            .args(["-Oz", &raw_result, "--enable-bulk-memory", "-o", &out_file])
             .status()?
     );
 
     Ok(out_file)
+}
+
+pub fn rust_to_dynlib(
+    function_source_dir: String,
+    enabled_features: Vec<String>,
+    enable_default_features: bool,
+    enable_all_features: bool,
+    target: String,
+) -> anyhow::Result<String> {
+    let cargo_project_path = std::fs::canonicalize(std::path::PathBuf::from(function_source_dir.clone()))?;
+    let cargo_manifest = cargo_project_path.join("Cargo.toml");
+
+    let build_dir = std::env::temp_dir().join(format!("edgeless-{}", uuid::Uuid::new_v4()));
+
+    let config = &cargo::util::context::GlobalContext::default()?;
+    let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
+    ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
+
+    // TODO(raphaelhetzel) Find a way to patch dependencies: https://github.com/rust-lang/cargo/issues/15564
+    // let mut registry = ws.package_registry().unwrap();
+    // registry.clear_lock();
+    // registry
+    //     .patch(
+    //         &url::Url::parse("https://github.com/edgeless-project/nextless.git").unwrap(),
+    //         &[
+    //             (
+    //                 &cargo::core::Dependency::new_override(
+    //                     cargo::util::interning::InternedString::new("edgeless_function"),
+    //                     cargo::core::SourceId::for_path(std::path::Path::new("/Users/raphael/code/nextless/edgeless_function")).unwrap(),
+    //                 ),
+    //                 None,
+    //             ),
+    //             (
+    //                 &cargo::core::Dependency::new_override(
+    //                     cargo::util::interning::InternedString::new("edgeless_function_core"),
+    //                     cargo::core::SourceId::for_path(std::path::Path::new("/Users/raphael/code/nextless/edgeless_function_core")).unwrap(),
+    //                 ),
+    //                 None,
+    //             ),
+    //             (
+    //                 &cargo::core::Dependency::new_override(
+    //                     cargo::util::interning::InternedString::new("edgeless_actor_abi"),
+    //                     cargo::core::SourceId::for_path(std::path::Path::new("/Users/raphael/code/nextless/edgeless_actor_abi")).unwrap(),
+    //                 ),
+    //                 None,
+    //             ),
+    //         ],
+    //     )
+    //     .unwrap();
+    // registry.lock_patches();
+
+    let pack = ws.current()?;
+
+    let lib_name = match pack.library() {
+        Some(val) => val.name(),
+        None => {
+            return Err(anyhow::anyhow!("Cargo package does not contain library."));
+        }
+    };
+
+    let mut build_config =
+        cargo::core::compiler::BuildConfig::new(config, None, false, &[target.clone()], cargo::core::compiler::CompileMode::Build)?;
+    build_config.requested_profile = cargo::util::interning::InternedString::new("release");
+
+    let feature_settings = cargo::core::resolver::CliFeatures {
+        features: std::rc::Rc::new(
+            enabled_features
+                .iter()
+                .map(|feat| cargo::core::FeatureValue::new(cargo::util::interning::InternedString::new(feat)))
+                .collect(),
+        ),
+        all_features: enable_all_features,
+        uses_default_features: enable_default_features,
+    };
+
+    let compile_options = cargo::ops::CompileOptions {
+        build_config,
+        cli_features: feature_settings,
+        spec: cargo::ops::Packages::Packages(Vec::new()),
+        filter: cargo::ops::CompileFilter::Default {
+            required_features_filterable: false,
+        },
+        target_rustdoc_args: None,
+        target_rustc_args: None,
+        target_rustc_crate_types: None,
+        rustdoc_document_private_items: false,
+        honor_rust_version: Some(true),
+    };
+
+    cargo::ops::compile(&ws, &compile_options)?;
+
+    let file_type = if target.as_str().to_lowercase().contains("darwin") {
+        "dylib"
+    } else {
+        "so"
+    };
+
+    let raw_result = build_dir
+        .join(format!("{}/release/lib{}.{}", target, lib_name, file_type))
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    Ok(raw_result)
 }
 
 pub fn package_rust(function_source_dir: String) -> anyhow::Result<String> {

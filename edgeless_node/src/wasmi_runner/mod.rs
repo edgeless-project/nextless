@@ -57,7 +57,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
     async fn instantiate(
         _instance_id: &edgeless_api::function_instance::InstanceId,
         _runtime_configuration: std::collections::HashMap<String, String>,
-        guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
+        guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
         code: &[u8],
     ) -> Result<Box<Self>, crate::base_runtime::FunctionInstanceError> {
         let _comfig = wasmi::Config::default();
@@ -66,12 +66,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         let module = wasmi::Module::new(&engine, code)
             .map_err(|e| anyhow::anyhow!("Module creation error: {}", e))
             .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
-        let mut store = wasmi::Store::new(
-            &engine,
-            guest_api_binding::GuestAPI {
-                host: guest_api_host.take().expect("the impossible happened: no GuestAPIHost"),
-            },
-        );
+        let mut store = wasmi::Store::new(&engine, guest_api_binding::GuestAPI { host: guest_api_host });
         let mut linker = wasmi::Linker::<guest_api_binding::GuestAPI>::new(&engine);
 
         linker
@@ -156,7 +151,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         }))
     }
 
-    async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&str>) -> Result<(), crate::base_runtime::FunctionInstanceError> {
+    async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&[u8]>) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         let (init_payload_ptr, init_payload_len) = match init_payload {
             Some(payload) => {
                 let len = payload.len();
@@ -176,7 +171,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         let (serialized_state_ptr, serialized_state_len) = match serialized_state {
             Some(state) => {
                 let len = state.len();
-                let ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, state.as_bytes())
+                let ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, state)
                     .map_err(|e| anyhow::anyhow!("Copy state to vm error: {}", e))
                     .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
                 (ptr, len as i32)

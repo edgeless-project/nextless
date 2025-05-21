@@ -134,7 +134,16 @@ pub type Nodes<'a> = std::collections::HashMap<edgeless_api::function_instance::
 #[derive(Clone)]
 pub enum Runtime<'a> {
     WasmBase(&'a dyn WasmRuntime),
-    Native(&'a dyn NativeRuntime),
+    NativeBase(&'a dyn NativeRuntime),
+}
+
+impl Runtime<'_> {
+    fn id(&self) -> String {
+        match self {
+            Runtime::WasmBase(_) => "WASM_BASE".to_string(),
+            Runtime::NativeBase(_) => "NATIVE_BASE".to_string(),
+        }
+    }
 }
 
 pub type Runtimes<'a> = std::collections::HashMap<String, Runtime<'a>>;
@@ -150,15 +159,22 @@ pub trait NativeRuntime {
     fn num_cores(&self) -> u32;
     fn cpu_freq_hz(&self) -> f32;
     fn mem_size_bytes(&self) -> u32;
-    #[allow(unused)]
-    fn architecture(&self) -> NodeArchitecture;
+    fn node_architecture(&self) -> NodeArchitecture;
+    fn node_sys(&self) -> NodeSys;
     fn runtime_info(&self) -> Option<Box<dyn WasmRuntimeInfo>>;
 }
 
+#[derive(PartialEq)]
 pub enum NodeArchitecture {
     Amd64,
     Arm64,
     Xtensa,
+}
+
+#[derive(PartialEq)]
+pub enum NodeSys {
+    Linux,
+    Darwin,
 }
 
 pub trait WasmRuntimeInfo {

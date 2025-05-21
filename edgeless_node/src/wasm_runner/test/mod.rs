@@ -108,8 +108,10 @@ async fn basic_lifecycle() {
         sender: telemetry_mock_sender,
     });
 
-    let (mut client, mut rt_task) =
-        crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(dataplane_provider, state_manager, telemetry_handle);
+    let (mut client, mut rt_task) = crate::base_runtime::runtime::create::<
+        super::function_instance::WASMFunctionInstance,
+        crate::base_runtime::function_instance_runner::FunctionInstanceRunner<super::function_instance::WASMFunctionInstance>,
+    >(dataplane_provider, state_manager, telemetry_handle);
 
     tokio::spawn(async move { rt_task.run().await });
 
@@ -192,8 +194,10 @@ async fn messaging_test_setup() -> (
         sender: telemetry_mock_sender,
     });
 
-    let (mut client, mut rt_task) =
-        crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(dataplane_provider, state_manager, telemetry_handle);
+    let (mut client, mut rt_task) = crate::base_runtime::runtime::create::<
+        super::function_instance::WASMFunctionInstance,
+        crate::base_runtime::function_instance_runner::FunctionInstanceRunner<super::function_instance::WASMFunctionInstance>,
+    >(dataplane_provider, state_manager, telemetry_handle);
 
     tokio::spawn(async move { rt_task.run().await });
 
@@ -570,11 +574,10 @@ async fn state_management() {
     let test_peer_fid = edgeless_api::function_instance::InstanceId::new(node_id);
     let mut test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid, None).await;
 
-    let (mut client, mut rt_task) = crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(
-        dataplane_provider,
-        mock_state_manager,
-        telemetry_handle,
-    );
+    let (mut client, mut rt_task) = crate::base_runtime::runtime::create::<
+        super::function_instance::WASMFunctionInstance,
+        crate::base_runtime::function_instance_runner::FunctionInstanceRunner<super::function_instance::WASMFunctionInstance>,
+    >(dataplane_provider, mock_state_manager, telemetry_handle);
 
     tokio::spawn(async move { rt_task.run().await });
 

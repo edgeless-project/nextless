@@ -50,6 +50,7 @@ impl super::LogicalComponent for LogicalActor {
 
 pub struct PhysicalActor {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
+    pub(crate) runtime_type: String,
     pub(crate) creation_tine: std::time::Instant,
     pub(crate) image: Option<ActorImage>,
     pub(crate) desired_mapping: super::PhysicalPorts,

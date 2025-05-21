@@ -15,6 +15,8 @@ pub mod wasm_runner;
 #[cfg(any(feature = "wasmi", test))]
 pub mod wasmi_runner;
 
+pub mod native_so_runner;
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
     /// General settings.
@@ -197,6 +199,11 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
             .num_cores
             .unwrap_or(sysinfo::System::physical_core_count().unwrap_or(1) as u32),
         cpu_arch: sysinfo::System::cpu_arch(),
+        sys: if sysinfo::System::kernel_long_version().to_lowercase().contains("darwin") {
+            "darwin".to_string()
+        } else {
+            "linux".to_string()
+        },
         mem_size: user_node_capabilities.mem_size.unwrap_or((sys.total_memory() / 1024 / 1024) as u32),
         labels: user_node_capabilities.labels.unwrap_or_default(),
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
@@ -451,16 +458,18 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                     #[allow(unused_variables)]
                     #[cfg(feature = "wasmtime")]
                     {
-                        let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) =
-                            base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
-                                data_plane.clone(),
-                                state_manager.clone(),
-                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                    ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-                                    ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
-                                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
-                                ]))),
-                            );
+                        let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) = base_runtime::runtime::create::<
+                            wasm_runner::function_instance::WASMFunctionInstance,
+                            base_runtime::function_instance_runner::FunctionInstanceRunner<wasm_runner::function_instance::WASMFunctionInstance>,
+                        >(
+                            data_plane.clone(),
+                            state_manager.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+                                ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
+                                ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                            ]))),
+                        );
                         runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
                         tokio::spawn(async move {
                             wasmtime_runtime_task_s.run().await;
@@ -471,7 +480,10 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                     #[allow(unused_variables)]
                     #[cfg(feature = "wasmi")]
                     {
-                        let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<wasmi_runner::WASMIFunctionInstance>(
+                        let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<
+                            wasm_runner::function_instance::WASMFunctionInstance,
+                            base_runtime::function_instance_runner::FunctionInstanceRunner<wasm_runner::function_instance::WASMFunctionInstance>,
+                        >(
                             data_plane.clone(),
                             state_manager.clone(),
                             Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
@@ -490,6 +502,24 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
             }
         }
         None => tokio::spawn(async {}),
+    };
+
+    let native_runtime_task = {
+        let (native_runtime_client, mut native_runtime_task) = base_runtime::runtime::create::<
+            native_so_runner::NativeFunctionInstance,
+            base_runtime::function_instance_runner_thread::FunctionInstanceRunner<native_so_runner::NativeFunctionInstance>,
+        >(
+            data_plane.clone(),
+            state_manager.clone(),
+            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                ("FUNCTION_TYPE".to_string(), "NATIVE_BASE".to_string()),
+                ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+            ]))),
+        );
+        runners.insert("NATIVE_BASE".to_string(), Box::new(native_runtime_client.clone()));
+        tokio::spawn(async move {
+            native_runtime_task.run().await;
+        })
     };
 
     // Create the resources.
@@ -512,6 +542,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     // Wait for all the tasks to complete.
     let _ = futures::join!(
         rust_runtime_task,
+        native_runtime_task,
         agent_task,
         agent_api_server,
         register_node(

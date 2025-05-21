@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use edgeless_actor_abi::HostApi;
+
 #[cfg(not(feature = "std"))]
 static mut data_arena: [u8; 32 * 1024] = [0; 32 * 1024];
 #[cfg(not(feature = "std"))]
@@ -70,3 +72,22 @@ pub unsafe extern "C" fn edgeless_mem_free(ptr: *mut u8, size: usize) {
     let layout = std::alloc::Layout::from_size_align_unchecked(size, align);
     std::alloc::dealloc(ptr, layout);
 }
+
+struct EdgelessGlobalAlloc {}
+
+unsafe impl Sync for EdgelessGlobalAlloc {}
+
+unsafe impl core::alloc::GlobalAlloc for EdgelessGlobalAlloc {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        // core::ptr::null_mut()
+        edgeless_mem_alloc(layout.size())
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+        edgeless_mem_free(ptr, layout.size());
+    }
+}
+
+#[cfg(not(feature = "std"))]
+#[global_allocator]
+static ALLOCATOR: EdgelessGlobalAlloc = EdgelessGlobalAlloc {};

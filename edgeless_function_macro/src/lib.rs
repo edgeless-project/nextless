@@ -54,6 +54,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     if port == #key {
                         let param = <<#parsed_ident as #trait_name>::#cloned_ident as edgeless_function_core::Deserialize>::deserialize(encoded_message);
                         <#parsed_ident as #trait_name>::#method_name(src.clone(), param);
+                        return Ok(());
                     }
 
                 });
@@ -72,7 +73,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                     let return_statement = quote! {
                         let serialized = <<#parsed_ident as #trait_name>::#return_type_ident as edgeless_function_core::Serialize>::serialize(&res);
-                        return edgeless_function::CallRet::Reply(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(serialized.as_ref()));
+                        return Ok(edgeless_function::CallRet::Reply(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(serialized.as_ref())));
                     };
 
                     (Some(return_type_ident), return_statement)
@@ -168,7 +169,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     let handler_ident = quote::format_ident!("call_{}", output_id);
                     let rt = if let Some(return_type_ident) = return_type_ident  {
                         quote!{
-                            Result<<#parsed_ident as #trait_name>::#return_type_ident, ()>
+                            Result<<#parsed_ident as #trait_name<'a>>::#return_type_ident, ()>
                         }
                     } else {
                         quote!{
@@ -176,11 +177,11 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         }
                     };
                     quote! {
-                        fn #handler_ident(payload: &<#parsed_ident as #trait_name>::#type_ident) -> #rt {
+                        fn #handler_ident<'a>(payload: &'a <#parsed_ident as #trait_name>::#type_ident) -> #rt {
                             #[cfg(feature = #feature)]
                             {
                                 let serialized = <<#parsed_ident as #trait_name>::#type_ident as edgeless_function_core::Serialize>::serialize(payload);
-                                let res = call(#output_id, &serialized);
+                                let res = call(#output_id, serialized.as_ref());
                                 #return_statement
                             }
                             #[cfg(not(feature = #feature))]
@@ -221,19 +222,27 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         #(#output_handlers)*
 
-        pub fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]) {
+        //edgeless_actor_abi::HandleCast
+        #[no_mangle]
+        pub fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_actor_abi::ActorResult<()> {
             #(#cast_inputs)*
 
             if port == "INTERNAL" {
                 <#parsed_ident as #trait_name>::handle_internal(encoded_message);
+                return Ok(());
             }
+
+            Err(edgeless_actor_abi::ActorError::UndefinedPort)
         }
 
-        pub fn handle_call(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_function::CallRet {
+        //edgeless_actor_abi::HandleCall
+        #[no_mangle]
+        pub fn handle_call(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_actor_abi::ActorResult<edgeless_function::CallRet> {
             #(#call_inputs)*
-            return edgeless_function::CallRet::NoReply;
+            return Err(edgeless_actor_abi::ActorError::UndefinedPort);
         }
 
+        #[cfg(target_arch = "wasm32")]
         #[no_mangle]
         pub unsafe extern "C" fn handle_cast_asm(
             node_id_ptr: *mut u8,
@@ -251,9 +260,10 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             let port: &str = core::str::from_utf8(core::slice::from_raw_parts(port_ptr, port_len)).unwrap();
 
-            handle_cast(instance_id, port, payload);
+            handle_cast(instance_id, port, payload).unwrap();
         }
 
+        #[cfg(target_arch = "wasm32")]
         #[no_mangle]
         pub unsafe extern "C" fn handle_call_asm(
             node_id_ptr: *mut u8,
@@ -274,7 +284,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             let port: &str = core::str::from_utf8(core::slice::from_raw_parts(port_ptr, port_len)).unwrap();
 
-            let ret = handle_call(instance_id, port, payload);
+            let ret = handle_call(instance_id, port, payload).unwrap();
 
             let (ret, output_params) = match ret {
                 CallRet::NoReply => (0, None),
@@ -288,6 +298,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             ret
         }
 
+        #[cfg(target_arch = "wasm32")]
         #[no_mangle]
         pub unsafe extern "C" fn handle_init_asm(
             payload_ptr: *mut u8,
@@ -310,9 +321,26 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             <#parsed_ident as #trait_name>::handle_init(payload, serialized_state);
         }
 
+        //edgeless_actor_abi::HandleInit
+        #[cfg(not(target_arch = "wasm32"))]
+        #[no_mangle]
+        pub fn handle_init(payload: Option<&[u8]>, serialized_state: Option<&[u8]>) -> edgeless_actor_abi::ActorResult<()> {
+            <#parsed_ident as #trait_name>::handle_init(payload, serialized_state);
+            Ok(())
+        }
+
+        #[cfg(target_arch = "wasm32")]
         #[no_mangle]
         pub extern "C" fn handle_stop_asm() {
-            <#parsed_ident as #trait_name>::handle_stop()
+            <#parsed_ident as #trait_name>::handle_stop();
+        }
+
+        //edgeless_actor_abi::HandleStop
+        #[cfg(not(target_arch = "wasm32"))]
+        #[no_mangle]
+        pub extern "C" fn handle_stop() -> edgeless_actor_abi::ActorResult<()> {
+            <#parsed_ident as #trait_name>::handle_stop();
+            Ok(())
         }
 
     }

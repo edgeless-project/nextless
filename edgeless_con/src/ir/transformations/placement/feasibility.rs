@@ -57,6 +57,6 @@ fn node_fulfills_constraints(actor: &crate::ir::actor::LogicalActor, node: &dyn 
 fn runtime_supported(code_format: &str, runtime: &crate::ir::Runtime) -> bool {
     match runtime {
         super::Runtime::WasmBase(_wasm_runtime) => ["RUST", "RUST_WASM"].contains(&code_format),
-        super::Runtime::Native(_native_runtime) => ["RUST", "RUST_WASM"].contains(&code_format),
+        super::Runtime::NativeBase(_native_runtime) => ["RUST"].contains(&code_format),
     }
 }

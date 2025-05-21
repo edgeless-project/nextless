@@ -24,8 +24,10 @@ pub struct NodeCapabilities {
     pub clock_freq_cpu: f32,
     // Number of cores for each CPU.
     pub num_cores: u32,
-    // CPU Architecture
+    // CPU Architecture (Arch-Sub in the Target Triple)
     pub cpu_arch: String,
+    // Sys-Part of the Target Triple
+    pub sys: String,
     // Size of memory available to applications running on the edge node, in MiB.
     pub mem_size: u32,
     // List of labels assigned to this node.
@@ -47,6 +49,7 @@ impl NodeCapabilities {
             clock_freq_cpu: 0.0,
             num_cores: 0,
             cpu_arch: "".to_string(),
+            sys: "".to_string(),
             mem_size: 0,
             labels: vec![],
             is_tee_running: false,
@@ -63,6 +66,7 @@ impl NodeCapabilities {
             clock_freq_cpu: 0.0,
             num_cores: 1,
             cpu_arch: "".to_string(),
+            sys: "".to_string(),
             mem_size: 0,
             labels: vec![],
             is_tee_running: false,

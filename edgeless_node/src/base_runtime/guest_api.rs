@@ -12,7 +12,8 @@ pub struct GuestAPIHost {
     pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
     pub telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     pub poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
-    pub tracing_context: std::sync::Arc<tokio::sync::Mutex<super::function_instance_runner::TracingContext>>,
+    pub tracing_context: std::sync::Arc<tokio::sync::Mutex<super::function_instance_runner_common::TracingContext>>,
+    pub handle: tokio::runtime::Handle,
 }
 
 /// Errors to be reported by the host side of the guest binding.
@@ -85,9 +86,7 @@ impl GuestAPIHost {
         let cloned_msg = payload.to_vec();
         let cloned_alias = target_alias.to_string();
 
-        // let cloned_context = self.tracing_context.lock().await.parent_context.clone();
-
-        tokio::spawn(async move {
+        self.handle.spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
             cloned_plane
                 .send_alias(cloned_alias, &cloned_msg, opentelemetry::Context::new())

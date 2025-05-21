@@ -50,7 +50,7 @@ impl OwnedByteBuff {
     /// This can only be called on valid pointers. Only used in WASM.
     pub unsafe fn consume(self) -> (*mut u8, usize) {
         let res = (self.data, self.size);
-        core::mem::drop(self);
+        core::mem::forget(self);
         res
     }
 }

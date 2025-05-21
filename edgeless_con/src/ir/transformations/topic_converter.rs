@@ -44,7 +44,7 @@ impl super::StatelessTransformation for TopicConverter {
                         if let Some(t) = targets.get(&topic) {
                             return Some((port_id, LogicalOutput::AllOfTargets(t.clone())));
                         }
-                        return None;
+                        None
                     } else {
                         Some((port_id, port_mapping))
                     }

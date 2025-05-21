@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-FileCopyrightText: © 2023 University of Cambridge, System Research Group
+// SPDX-FileCopyrightText: © 2024 Roman Kolcun <roman.kolcun@cl.cam.ac.uk>
 // SPDX-License-Identifier: MIT
 
 // This contains code originally developed in edgeless_orc (also in some of the related files).
@@ -65,7 +67,7 @@ impl crate::ir::Node for WorkerNode {
             .iter()
             .filter_map(|id| match id.as_str() {
                 "RUST_WASM" => Some(("RUST_WASM".to_string(), crate::ir::Runtime::WasmBase(self))),
-                "NATIVE_BASE" => Some(("NATIVE_BASE".to_string(), crate::ir::Runtime::Native(self))),
+                "NATIVE_BASE" => Some(("NATIVE_BASE".to_string(), crate::ir::Runtime::NativeBase(self))),
                 _ => None,
             })
             .collect()
@@ -130,7 +132,7 @@ impl crate::ir::NativeRuntime for WorkerNode {
         self.capabilities.mem_size
     }
 
-    fn architecture(&self) -> crate::ir::NodeArchitecture {
+    fn node_architecture(&self) -> crate::ir::NodeArchitecture {
         match self.capabilities.cpu_arch.as_str() {
             "amd64" => crate::ir::NodeArchitecture::Amd64,
             "arm64" => crate::ir::NodeArchitecture::Arm64,
@@ -144,6 +146,17 @@ impl crate::ir::NativeRuntime for WorkerNode {
 
     fn runtime_info(&self) -> Option<Box<dyn crate::ir::WasmRuntimeInfo>> {
         todo!()
+    }
+
+    fn node_sys(&self) -> crate::ir::NodeSys {
+        match self.capabilities.sys.as_str() {
+            "linux" => crate::ir::NodeSys::Linux,
+            "darwin" => crate::ir::NodeSys::Darwin,
+            _ => {
+                log::error!("Bad Node Architecture; Defaulting to \"linux\"");
+                crate::ir::NodeSys::Linux
+            }
+        }
     }
 }
 

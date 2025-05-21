@@ -1749,8 +1749,16 @@ dependencies = [
  "env_logger",
  "heapless",
  "log",
- "static_cell",
+ "static_cell 1.3.0",
  "uuid",
+]
+
+[[package]]
+name = "edgeless_actor_abi"
+version = "0.1.0"
+dependencies = [
+ "allocator-api2",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -1801,6 +1809,7 @@ dependencies = [
  "log",
  "tar",
  "tokio",
+ "url",
  "uuid",
 ]
 
@@ -1864,6 +1873,7 @@ dependencies = [
  "log",
  "serde",
  "starlark",
+ "starlark_lsp",
 ]
 
 [[package]]
@@ -1904,7 +1914,7 @@ dependencies = [
  "heapless",
  "log",
  "minicbor",
- "static_cell",
+ "static_cell 1.3.0",
  "ufmt",
  "uuid",
  "wasmi",
@@ -1914,8 +1924,11 @@ dependencies = [
 name = "edgeless_function"
 version = "0.1.0"
 dependencies = [
+ "allocator-api2",
+ "edgeless_actor_abi",
  "edgeless_function_macro",
  "log",
+ "static_cell 2.1.0",
 ]
 
 [[package]]
@@ -1931,6 +1944,7 @@ dependencies = [
 name = "edgeless_function_macro"
 version = "0.1.0"
 dependencies = [
+ "edgeless_actor_abi",
  "edgeless_function_core",
  "proc-macro2",
  "quote",
@@ -1942,12 +1956,9 @@ dependencies = [
 name = "edgeless_http"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-trait",
  "edgeless_function_core",
  "hyper 1.6.0",
  "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -1992,11 +2003,14 @@ dependencies = [
 name = "edgeless_node"
 version = "0.1.0"
 dependencies = [
+ "allocator-api2",
  "anyhow",
  "async-trait",
  "base64 0.21.7",
+ "bumpalo",
  "chrono",
  "clap",
+ "edgeless_actor_abi",
  "edgeless_api",
  "edgeless_dataplane",
  "edgeless_http",
@@ -2006,6 +2020,7 @@ dependencies = [
  "http-body-util",
  "hyper 1.6.0",
  "hyper-util",
+ "libloading",
  "log",
  "ollama-rs",
  "openssl",
@@ -2015,7 +2030,10 @@ dependencies = [
  "reqwest 0.11.27",
  "serde",
  "serde_json",
+ "spin 0.10.0",
  "sysinfo",
+ "talc",
+ "tempfile",
  "thiserror 2.0.12",
  "tokio",
  "toml 0.7.8",
@@ -3649,7 +3667,7 @@ dependencies = [
  "log",
  "presser",
  "thiserror 1.0.69",
- "windows 0.57.0",
+ "windows 0.58.0",
 ]
 
 [[package]]
@@ -4777,6 +4795,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lsp-server"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9462c4dc73e17f971ec1f171d44bfffb72e65a130117233388a0ebc7ec5656f9"
+dependencies = [
+ "crossbeam-channel",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "lsp-types"
 version = "0.94.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5013,7 +5044,7 @@ dependencies = [
  "log",
  "memchr",
  "mime",
- "spin",
+ "spin 0.9.8",
  "version_check",
 ]
 
@@ -6814,6 +6845,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 
 [[package]]
+name = "spin"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5fe4ccb98d9c292d56fec89a5e07da7fc4cf0dc11e156b41793132775d3e591"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
 name = "spirv"
 version = "0.3.0+sdk-1.3.268.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6896,6 +6936,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "starlark_lsp"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6af517825dea0e72e8312924d26d67f25e4b724197d172ef35938659e29c2dc"
+dependencies = [
+ "anyhow",
+ "derivative",
+ "derive_more",
+ "dupe",
+ "itertools 0.10.5",
+ "lsp-server",
+ "lsp-types",
+ "serde",
+ "serde_json",
+ "starlark",
+ "starlark_syntax",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "starlark_map"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6944,6 +7004,15 @@ name = "static_cell"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cd3f559c6c41cde362aed95cd84765907e06057f087b17269b41750ec40a3e7"
+dependencies = [
+ "portable-atomic",
+]
+
+[[package]]
+name = "static_cell"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d89b0684884a883431282db1e4343f34afc2ff6996fe1f4a1664519b66e14c1e"
 dependencies = [
  "portable-atomic",
 ]
@@ -7114,6 +7183,16 @@ dependencies = [
  "rustix 0.38.44",
  "windows-sys 0.48.0",
  "winx 0.36.4",
+]
+
+[[package]]
+name = "talc"
+version = "4.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fcad3be1cfe36eb7d716a04791eba36a197da9d9b6ea1e28e64ac569da3701d"
+dependencies = [
+ "allocator-api2",
+ "lock_api",
 ]
 
 [[package]]
@@ -8097,7 +8176,7 @@ dependencies = [
  "arrayvec",
  "multi-stash",
  "smallvec",
- "spin",
+ "spin 0.9.8",
  "wasmi_collections",
  "wasmi_core",
  "wasmi_ir",

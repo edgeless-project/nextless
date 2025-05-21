@@ -9,16 +9,14 @@ pub struct RuntimeClient {
     sender: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
 }
 
-pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
+pub struct RuntimeTask<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner<FunctionInstanceType>> {
     receiver: futures::channel::mpsc::UnboundedReceiver<RuntimeRequest>,
     data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
-    functions: std::collections::HashMap<
-        edgeless_api::function_instance::InstanceId,
-        super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>,
-    >,
+    functions: std::collections::HashMap<edgeless_api::function_instance::InstanceId, FunctionInstanceRunner>,
+    _pd: std::marker::PhantomData<FunctionInstanceType>,
 }
 
 pub enum RuntimeRequest {
@@ -29,20 +27,23 @@ pub enum RuntimeRequest {
 }
 
 /// Entrypoint for all runtimes based on the base_runtime.
-pub fn create<FunctionInstanceType: super::FunctionInstance>(
+pub fn create<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner<FunctionInstanceType>>(
     data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-) -> (RuntimeClient, RuntimeTask<FunctionInstanceType>) {
+) -> (RuntimeClient, RuntimeTask<FunctionInstanceType, FunctionInstanceRunner>) {
     let (sender, receiver) = futures::channel::mpsc::unbounded();
-    let task: RuntimeTask<FunctionInstanceType> = RuntimeTask::new(receiver, data_plane_provider, state_manager, telemetry_handle, sender.clone());
+    let task: RuntimeTask<FunctionInstanceType, FunctionInstanceRunner> =
+        RuntimeTask::new(receiver, data_plane_provider, state_manager, telemetry_handle, sender.clone());
 
     let client = RuntimeClient::new(sender);
 
     (client, task)
 }
 
-impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstanceType> {
+impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner<FunctionInstanceType>>
+    RuntimeTask<FunctionInstanceType, FunctionInstanceRunner>
+{
     fn new(
         receiver: futures::channel::mpsc::UnboundedReceiver<RuntimeRequest>,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
@@ -57,6 +58,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
             telemetry_handle,
             slf_channel,
             functions: std::collections::HashMap::new(),
+            _pd: std::marker::PhantomData {},
         }
     }
 
@@ -90,7 +92,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         )]));
         let mut data_plane = self.data_plane_provider.get_handle_for(instance_id, Some(telemetry_handle.clone())).await;
         data_plane.update_mapping(spawn_request.input_mapping, spawn_request.output_mapping).await;
-        let instance = super::function_instance_runner::FunctionInstanceRunner::new(
+        let instance = FunctionInstanceRunner::new(
             cloned_req,
             data_plane,
             self.slf_channel.clone(),

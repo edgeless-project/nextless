@@ -11,3 +11,8 @@ name = "edgeless_actor_abi"
 path = "src/lib.rs"
 
 [dependencies]
+allocator-api2 = { version = "0.2.8", default-features = false, features = [
+    "alloc",
+] }
+
+thiserror = { version = "2", default-features = false }

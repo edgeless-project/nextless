@@ -3,6 +3,7 @@
 
 #![no_std]
 
+#[derive(Clone)]
 pub struct ActorId {
     pub node_id: [u8; 16],
     pub component_id: [u8; 16],
@@ -12,9 +13,9 @@ pub struct Port<'a>(pub &'a str);
 
 pub struct Message<'a>(pub &'a [u8]);
 
-pub enum CallRet {
+pub enum CallRet<'a> {
     NoReply,
-    Reply([u8; 1500]),
+    Reply(allocator_api2::vec::Vec<u8, &'a dyn allocator_api2::alloc::Allocator>),
     Err,
 }
 
@@ -26,52 +27,48 @@ pub enum LogLevel {
     Trace = 5,
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum HostError {
+    #[error("Internal error on the host node.")]
     Internal,
+    #[error("Actor used unknown alias.")]
     BadAlias,
+    #[error("Actor exceeded resource limit.")]
     ResourceLimit,
+    #[error("Actor attemted unautorized interaction.")]
     Forbidden,
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ActorError {
+    #[error("Internal error in actor infrastructure.")]
     Internal,
+    #[error("Error in developer-provided handler.")]
+    Handler,
+    #[error("Error when calling host: {0}.")]
+    Host(HostError),
+    #[error("Actor received message targeting undefined port.")]
+    UndefinedPort,
 }
 
 pub type HostResult<T> = core::result::Result<T, HostError>;
 pub type ActorResult<T> = core::result::Result<T, ActorError>;
 
 // Guest -> Host
-// pub type Cast = fn(output_port: Port, msg: Message) -> HostResult<()>;
-// pub type CastRaw = fn(dst_id: ActorId, dst_input_port: Port, msg: Message) -> HostResult<()>;
-// pub type DelayedCast = fn(delay_ms: u64, output_port: Port, msg: Message) -> HostResult<()>;
-// pub type CallRaw = fn(dst_id: ActorId, dst_port: Port, msg: Message) -> HostResult<CallRet>;
-// pub type Call = fn(output_port: Port, msg: Message) -> HostResult<CallRet>;
-// pub type TelemetryLog = fn(level: LogLevel, &'static str, msg: &str) -> HostResult<()>;
-// pub type Slf = fn() -> ActorId;
-// pub type StateSync = fn(state: &[u8]);
-
-// pub struct HostApi {
-//     pub cast: Cast,
-//     pub cast_raw: CastRaw,
-//     pub delayed_cast: DelayedCast,
-//     pub call_raw: CallRaw,
-//     pub call: Call,
-//     pub telemetry_log: TelemetryLog,
-//     pub slf: Slf,
-//     pub state_sync: StateSync,
-// }
-
-pub trait HostApi {
+pub trait HostApi<'a> {
     fn cast(&mut self, output_port: Port, msg: Message) -> HostResult<()>;
     fn cast_raw(&mut self, dst_id: ActorId, dst_input_port: Port, msg: Message) -> HostResult<()>;
     fn delayed_cast(&mut self, delay_ms: u64, output_port: Port, msg: Message) -> HostResult<()>;
-    fn call_raw(&mut self, dst_id: ActorId, dst_port: Port, msg: Message) -> HostResult<CallRet>;
-    fn call(&mut self, output_port: Port, msg: Message) -> HostResult<CallRet>;
+    fn call_raw(&'a mut self, dst_id: ActorId, dst_port: Port, msg: Message) -> HostResult<CallRet<'a>>;
+    fn call(&'a mut self, output_port: Port, msg: Message) -> HostResult<CallRet<'a>>;
     fn telemetry_log(&mut self, level: LogLevel, component: &str, msg: &str) -> HostResult<()>;
     fn slf(&mut self) -> HostResult<ActorId>;
     fn state_sync(&mut self, state: &[u8]) -> HostResult<()>;
-    fn alloc(&mut self, layout: core::alloc::Layout) -> HostResult<*mut u8>;
-    unsafe fn dealloc(&mut self, ptr: *mut u8, layout: core::alloc::Layout) -> HostResult<()>;
+    fn allocator(&mut self) -> &dyn allocator_api2::alloc::Allocator;
 }
+
+// Host -> Guest
+pub type HandleInit = fn(Option<&[u8]>, Option<&[u8]>) -> ActorResult<()>;
+pub type HandleCast = fn(ActorId, &str, &[u8]) -> ActorResult<()>;
+pub type HandleCall<'a> = fn(ActorId, &str, &[u8]) -> ActorResult<CallRet<'a>>;
+pub type HandleStop = fn() -> ActorResult<()>;
