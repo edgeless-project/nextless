@@ -13,13 +13,13 @@ codegen-units = 1
 strip = true
 
 [package]
-name = "image_detection_tester"
+name = "image_scaler"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
 
 [lib]
-name = "image_detection_tester"
+name = "image_scaler"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
@@ -27,14 +27,11 @@ crate-type = ["cdylib"]
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
 edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types" }
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+
 log = "0.4"
-image = { version = "0.25", default-features = false, features = [
-    "jpeg",
-    "bmp",
-] }
 
 [features]
 
-default = ["input_detection", "output_test_image"]
-input_detection = []
-output_test_image = []
+input_unscaled = []
+output_scaled = []
