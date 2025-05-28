@@ -212,6 +212,26 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     });
 
     quote! {
+
+
+        #[cfg(not(target_arch = "wasm32"))]
+        #[no_mangle]
+        fn init<'a>(host_api: &'static mut dyn edgeless_actor_abi::HostApi<'static>) -> edgeless_actor_abi::GuestApi<'a> {
+            unsafe { edgeless_function::interface_dynlib::HOST_API = Some(host_api) };
+
+            let addr = edgeless_actor_abi::GuestApi {
+                handle_cast: handle_cast,
+                handle_call: handle_call,
+                handle_init: handle_init,
+                handle_stop: handle_stop,
+            };
+            core::hint::black_box(&addr.handle_call);
+            core::hint::black_box(&addr.handle_cast);
+            core::hint::black_box(&addr.handle_init);
+            core::hint::black_box(&addr.handle_stop);
+            addr
+        }
+
         trait #trait_name<'a> {
             #(#quoted_types)*
             #(#handlers)*
@@ -237,7 +257,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         //edgeless_actor_abi::HandleCall
         #[no_mangle]
-        pub fn handle_call(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_actor_abi::ActorResult<edgeless_function::CallRet> {
+        pub fn handle_call<'a>(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_actor_abi::ActorResult<edgeless_actor_abi::CallRet<'a>> {
             #(#call_inputs)*
             return Err(edgeless_actor_abi::ActorError::UndefinedPort);
         }
@@ -338,7 +358,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         //edgeless_actor_abi::HandleStop
         #[cfg(not(target_arch = "wasm32"))]
         #[no_mangle]
-        pub extern "C" fn handle_stop() -> edgeless_actor_abi::ActorResult<()> {
+        fn handle_stop() -> edgeless_actor_abi::ActorResult<()> {
             <#parsed_ident as #trait_name>::handle_stop();
             Ok(())
         }

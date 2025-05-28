@@ -127,6 +127,8 @@
             rustup
             espup
             espflash
+            binutils
+            lld
           ];
           shellHook = ''
             rustup install stable

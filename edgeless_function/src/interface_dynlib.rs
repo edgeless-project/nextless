@@ -6,11 +6,6 @@
 #[unsafe(no_mangle)]
 pub static mut HOST_API: Option<&'static mut dyn edgeless_actor_abi::HostApi> = None;
 
-// https://github.com/rust-lang/rust/issues/44871#issuecomment-2404152302
-#[cfg(not(feature = "std"))]
-#[link(name = "System", kind = "dylib")]
-extern "C" {}
-
 #[cfg(not(feature = "std"))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {

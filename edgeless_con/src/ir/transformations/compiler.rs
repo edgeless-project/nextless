@@ -84,19 +84,11 @@ fn compile_native(
     let rt = rts.get("NATIVE_BASE").ok_or(anyhow::anyhow!("Called native build function on "))?;
 
     let target = if let Runtime::NativeBase(rt) = rt {
-        let target_arch = if rt.node_architecture() == crate::ir::NodeArchitecture::Arm64 {
-            "aarch64"
+        if rt.node_architecture() == crate::ir::NodeArchitecture::Arm64 {
+            edgeless_build::NativeTarget::AARCH64
         } else {
-            "x86_64"
-        };
-
-        let target_sys = if rt.node_sys() == crate::ir::NodeSys::Darwin {
-            "apple-darwin"
-        } else {
-            "unknown-linux-gnu"
-        };
-
-        format!("{}-{}", target_arch, target_sys)
+            edgeless_build::NativeTarget::AMD64
+        }
     } else {
         return Err(anyhow::anyhow!("Unsupported Target"));
     };

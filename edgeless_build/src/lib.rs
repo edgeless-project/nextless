@@ -5,6 +5,14 @@
 
 // https://rust-lang-nursery.github.io/rust-cookbook/compression/tar.html
 
+// We use a custom bare metal target for native (aarch64-edgeless-none-actor.json):
+// https://lowenware.com/blog/aarch64-bare-metal-program-in-rust/
+
+pub enum NativeTarget {
+    AARCH64,
+    AMD64,
+}
+
 pub fn rust_to_wasm(
     function_source_dir: String,
     enabled_features: Vec<String>,
@@ -76,7 +84,7 @@ pub fn rust_to_wasm(
     println!(
         "{:?}",
         std::process::Command::new("wasm-opt")
-            .args(["-Oz", &raw_result, "--enable-bulk-memory", "-o", &out_file])
+            .args(["-Oz", &raw_result, "--all-features", "--enable-bulk-memory", "-o", &out_file])
             .status()?
     );
 
@@ -88,15 +96,29 @@ pub fn rust_to_dynlib(
     enabled_features: Vec<String>,
     enable_default_features: bool,
     enable_all_features: bool,
-    target: String,
+    target: NativeTarget,
 ) -> anyhow::Result<String> {
     let cargo_project_path = std::fs::canonicalize(std::path::PathBuf::from(function_source_dir.clone()))?;
     let cargo_manifest = cargo_project_path.join("Cargo.toml");
 
     let build_dir = std::env::temp_dir().join(format!("edgeless-{}", uuid::Uuid::new_v4()));
 
-    let config = &cargo::util::context::GlobalContext::default()?;
-    let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
+    let mut config = cargo::util::context::GlobalContext::default()?;
+    config
+        .configure(
+            0,
+            false,
+            None,
+            false,
+            false,
+            false,
+            &Some(build_dir.clone()),
+            &["build-std=compiler_builtins,core,alloc".to_string()],
+            &[],
+        )
+        .unwrap();
+
+    let mut ws = cargo::core::Workspace::new(&cargo_manifest, &config)?;
     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
     // TODO(raphaelhetzel) Find a way to patch dependencies: https://github.com/rust-lang/cargo/issues/15564
@@ -141,8 +163,18 @@ pub fn rust_to_dynlib(
         }
     };
 
-    let mut build_config =
-        cargo::core::compiler::BuildConfig::new(config, None, false, &[target.clone()], cargo::core::compiler::CompileMode::Build)?;
+    let target_tripple = match target {
+        NativeTarget::AARCH64 => "aarch64-edgeless-none-actor",
+        NativeTarget::AMD64 => "amd64-edgeless-none-actor",
+    };
+
+    let mut build_config = cargo::core::compiler::BuildConfig::new(
+        &config,
+        None,
+        false,
+        &[format!("{}/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))],
+        cargo::core::compiler::CompileMode::Build,
+    )?;
     build_config.requested_profile = cargo::util::interning::InternedString::new("release");
 
     let feature_settings = cargo::core::resolver::CliFeatures {
@@ -172,14 +204,8 @@ pub fn rust_to_dynlib(
 
     cargo::ops::compile(&ws, &compile_options)?;
 
-    let file_type = if target.as_str().to_lowercase().contains("darwin") {
-        "dylib"
-    } else {
-        "so"
-    };
-
     let raw_result = build_dir
-        .join(format!("{}/release/lib{}.{}", target, lib_name, file_type))
+        .join(format!("{}/release/{}.actor", target_tripple, lib_name))
         .to_str()
         .unwrap()
         .to_string();

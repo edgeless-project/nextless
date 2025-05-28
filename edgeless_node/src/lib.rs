@@ -15,7 +15,7 @@ pub mod wasm_runner;
 #[cfg(any(feature = "wasmi", test))]
 pub mod wasmi_runner;
 
-pub mod native_so_runner;
+pub mod native_runner;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
@@ -506,8 +506,8 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     let native_runtime_task = {
         let (native_runtime_client, mut native_runtime_task) = base_runtime::runtime::create::<
-            native_so_runner::NativeFunctionInstance,
-            base_runtime::function_instance_runner_thread::FunctionInstanceRunner<native_so_runner::NativeFunctionInstance>,
+            native_runner::NativeFunctionInstance,
+            base_runtime::function_instance_runner_thread::FunctionInstanceRunner<native_runner::NativeFunctionInstance>,
         >(
             data_plane.clone(),
             state_manager.clone(),

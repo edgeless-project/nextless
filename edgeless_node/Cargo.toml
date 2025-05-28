@@ -64,15 +64,14 @@ talc = { version = "4.4", default-features = false, features = [
     "lock_api",
 ] }
 
-bumpalo = { version = "3", default-features = false, features = [
-    "allocator-api2",
-] }
-
-libloading = "0.8"
-tempfile = "3.2"
 allocator-api2 = "0.2.8"
 edgeless_actor_abi = { path = "../edgeless_actor_abi" }
 spin = { version = "0.10", features = ["lock_api"] }
+
+rustix = { version = "1", features = ["mm"] }
+
+elfloader = { git = "https://github.com/raphaelhetzel/rust-elfloader.git", branch = "so_fixes" }
+
 
 [build-dependencies]
 tonic-build = "0.10"

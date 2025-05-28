@@ -72,3 +72,13 @@ pub type HandleInit = fn(Option<&[u8]>, Option<&[u8]>) -> ActorResult<()>;
 pub type HandleCast = fn(ActorId, &str, &[u8]) -> ActorResult<()>;
 pub type HandleCall<'a> = fn(ActorId, &str, &[u8]) -> ActorResult<CallRet<'a>>;
 pub type HandleStop = fn() -> ActorResult<()>;
+
+pub struct GuestApi<'a> {
+    pub handle_cast: HandleCast,
+    pub handle_call: HandleCall<'a>,
+    pub handle_init: HandleInit,
+    pub handle_stop: HandleStop,
+}
+
+// Guest EntryPoint
+pub type ActorInit<'a> = fn(host_api: &'a mut dyn HostApi<'a>) -> GuestApi<'a>;
