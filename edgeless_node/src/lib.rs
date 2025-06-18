@@ -233,9 +233,15 @@ pub async fn register_node(
                 true => settings.agent_url.clone(),
                 false => settings.agent_url_announced.clone(),
             },
-            match settings.invocation_url_announced.is_empty() {
-                true => settings.invocation_url.clone(),
-                false => settings.invocation_url_announced.clone(),
+            match settings.invocation_url_announced_coap.or(settings.invocation_url_coap) {
+                Some(url) => url.clone(),
+                None => {
+                    if settings.invocation_url_announced.is_empty() {
+                        settings.invocation_url.clone()
+                    } else {
+                        settings.invocation_url_announced.clone()
+                    }
+                }
             },
             resource_provider_specifications,
             capabilities,

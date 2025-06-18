@@ -24,7 +24,7 @@ impl<P: PlacementStrategy> super::TransformationPipeline<P::GlobalState> for Def
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut P::GlobalState,
+        global_state: &P::GlobalState,
     ) {
         self.apply_dynamic(workflow, nodes, peer_clusters, global_state);
     }
@@ -34,7 +34,7 @@ impl<P: PlacementStrategy> super::TransformationPipeline<P::GlobalState> for Def
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut P::GlobalState,
+        global_state: &P::GlobalState,
     ) {
         self.scaler.apply(workflow, nodes, peer_clusters);
         self.placement.apply(workflow, nodes, peer_clusters, global_state);

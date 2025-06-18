@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+#[derive(Clone)]
 pub struct AgentAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_id::InstanceId>>,
     node_management_client: Box<dyn crate::node_management::NodeManagementAPI>,
@@ -106,8 +107,8 @@ impl AgentAPIServer {
                         Ok(_) => {
                             log::debug!("Clean Exit");
                         }
-                        Err(_) => {
-                            log::error!("GRPC Server Failure");
+                        Err(e) => {
+                            log::error!("GRPC Server Failure: {}", e);
                         }
                     }
                 }

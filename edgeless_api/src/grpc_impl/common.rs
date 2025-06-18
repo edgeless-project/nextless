@@ -140,7 +140,14 @@ impl CommonConverters {
                     Err(_) => None,
                 })
                 .collect(),
-            input_mapping: std::collections::HashMap::new(),
+            input_mapping: api_update
+                .input_mapping
+                .iter()
+                .filter_map(|(key, value)| match CommonConverters::parse_input(value) {
+                    Ok(val) => Some((crate::function_instance::PortId(key.clone()), val)),
+                    Err(_) => None,
+                })
+                .collect(),
         })
     }
 
@@ -193,7 +200,11 @@ impl CommonConverters {
                 .iter()
                 .map(|(key, value)| (key.0.clone(), Self::serialize_output(value)))
                 .collect(),
-            input_mapping: std::collections::HashMap::new(),
+            input_mapping: crate_update
+                .input_mapping
+                .iter()
+                .filter_map(|(key, value)| Self::serialize_input(value).and_then(|v| Some((key.0.clone(), v))))
+                .collect(),
         }
     }
 

@@ -27,7 +27,7 @@ impl super::TransformationPipeline<()> for DefaultLogicalPipeline {
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        _global_state: &mut (),
+        _global_state: &(),
     ) {
         self.topic_converter.apply(workflow, nodes, peer_clusters);
         self.input_linker.apply(workflow, nodes, peer_clusters);
@@ -40,7 +40,7 @@ impl super::TransformationPipeline<()> for DefaultLogicalPipeline {
         _workflow: &mut crate::ir::workflow::ActiveWorkflow,
         _nodes: &crate::ir::Nodes,
         _peer_clusters: &crate::ir::Clusters,
-        _global_state: &mut (),
+        _global_state: &(),
     ) {
     }
 }

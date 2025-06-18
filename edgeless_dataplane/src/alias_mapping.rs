@@ -57,7 +57,7 @@ impl AliasMapping {
             match new_input_mapping.entry(edgeless_api::function_instance::PortId(i_id.to_string())) {
                 std::collections::hash_map::Entry::Occupied(val) => {
                     if i != val.get() {
-                        removed_inputs.insert(i_id.to_string(), val.get().clone());
+                        removed_inputs.insert(i_id.to_string(), i.clone());
                     }
                 }
                 std::collections::hash_map::Entry::Vacant(_) => {
@@ -71,7 +71,7 @@ impl AliasMapping {
             match new_output_mapping.entry(edgeless_api::function_instance::PortId(o_id.to_string())) {
                 std::collections::hash_map::Entry::Occupied(val) => {
                     if o != val.get() {
-                        removed_output.insert(o_id.to_string(), val.get().clone());
+                        removed_output.insert(o_id.to_string(), o.clone());
                     }
                 }
                 std::collections::hash_map::Entry::Vacant(_) => {
@@ -112,5 +112,46 @@ impl AliasMapping {
         }
 
         ((removed_inputs, removed_output), (added_inputs, added_outputs))
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+    #[tokio::test]
+    async fn updated_output_link() {
+        let a_port = edgeless_api::function_instance::PortId("a".to_string());
+        let b_port = edgeless_api::function_instance::PortId("b".to_string());
+        let initial_output =
+            edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()), b_port.clone());
+        let link_output = edgeless_api::common::Output::Link(edgeless_api::link::LinkInstanceId(uuid::Uuid::new_v4()));
+
+        let mut a = AliasMapping::new();
+        let ((removed_inputs, removed_outputs), (added_inputs, mut added_outputs)) = a
+            .update(
+                std::collections::HashMap::new(),
+                std::collections::HashMap::from([(a_port.clone(), initial_output.clone())]),
+            )
+            .await;
+
+        assert_eq!(removed_inputs.len(), 0);
+        assert_eq!(added_inputs.len(), 0);
+        assert_eq!(added_outputs.len(), 1);
+        assert_eq!(removed_outputs.len(), 0);
+        assert_eq!(added_outputs.remove("a").unwrap(), initial_output.clone());
+
+        let ((removed_inputs2, mut removed_outputs2), (added_inputs2, mut added_outputs2)) = a
+            .update(
+                std::collections::HashMap::new(),
+                std::collections::HashMap::from([(a_port.clone(), link_output.clone())]),
+            )
+            .await;
+
+        assert_eq!(removed_inputs2.len(), 0);
+        assert_eq!(added_inputs2.len(), 0);
+        assert_eq!(added_outputs2.len(), 1);
+        assert_eq!(added_outputs2.remove("a").unwrap(), link_output.clone());
+        assert_eq!(removed_outputs2.len(), 1);
+        assert_eq!(removed_outputs2.remove("a").unwrap(), initial_output.clone());
     }
 }

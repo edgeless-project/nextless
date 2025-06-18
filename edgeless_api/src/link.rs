@@ -67,7 +67,7 @@ pub trait LinkController: Send + Sync {
 
 #[async_trait::async_trait]
 pub trait LinkWriter: Send {
-    async fn handle(&mut self, msg: Vec<u8>);
+    async fn handle(&mut self, src: edgeless_api_core::instance_id::InstanceId, msg: Vec<u8>);
 }
 
 // https://stackoverflow.com/a/30353928

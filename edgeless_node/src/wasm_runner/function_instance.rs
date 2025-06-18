@@ -346,6 +346,14 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         linker
             .func_wrap("env", "webgpu_drop", super::guest_api_binding::webgpu_drop)
             .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
+        linker
+            .func_wrap_async("env", "eval_sleep", |_store, (delay_ms,)| {
+                Box::new(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                    Ok(())
+                })
+            })
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         let instance = linker.instantiate_async(&mut store, &module).await.unwrap();
 
         Ok(Box::new(Self {

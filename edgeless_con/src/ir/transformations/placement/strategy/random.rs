@@ -15,7 +15,7 @@ impl super::PlacementStrategy for Random {
     fn select_candidate<'b>(
         &mut self,
         candidates: Vec<crate::ir::transformations::placement::Candidate<'b>>,
-        _global_state: &mut Self::GlobalState,
+        _global_state: &Self::GlobalState,
     ) -> Option<crate::ir::transformations::placement::Candidate<'b>> {
         if candidates.is_empty() {
             return None;

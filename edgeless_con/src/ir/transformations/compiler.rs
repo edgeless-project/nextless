@@ -9,27 +9,66 @@ use super::super::*;
 
 pub struct Compiler {}
 
+#[derive(Default)]
+pub struct CompilerStore {
+    inner: std::sync::Arc<tokio::sync::Mutex<CompilerStoreInner>>,
+}
+
+#[derive(Default)]
+struct CompilerStoreInner {
+    images: std::collections::HashMap<crate::ir::actor::ActorImageIdent, crate::ir::actor::ActorImage>,
+}
+
 impl Compiler {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl super::StatelessTransformation for Compiler {
-    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
+impl super::StatefulTransformation<CompilerStore> for Compiler {
+    fn apply(
+        &mut self,
+        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+        store: &CompilerStore,
+    ) {
         for function in workflow.functions.values() {
             let function = function.borrow_mut();
-            if function.image.format != "RUST" {
+            if function.image.id.format != "RUST" {
                 continue;
             }
             for instance in &function.instances {
                 if let super::super::PhysicalComponentState::Existing(instance) = &mut *instance.borrow_mut() {
                     if instance.image.is_none() {
-                        match instance.runtime_type.as_str() {
-                            "WASM_BASE" => compile_wasm(&function, instance),
-                            "NATIVE_BASE" => compile_native(&function, instance, *nodes.get(&instance.id.node_id).unwrap()),
-                            _ => continue,
+                        let image_ident = actor::ActorImageIdent {
+                            class_id: function.image.class.id.clone(),
+                            format: match instance.runtime_type.as_str() {
+                                "WASM_BASE" => "RUST_WASM".to_string(),
+                                _ => instance.runtime_type.clone(),
+                            },
+                            enabled_inputs: function.enabled_inputs().iter().cloned().collect(),
+                            enabled_outputs: function.enabled_outputs().iter().cloned().collect(),
                         };
+
+                        match store.inner.blocking_lock().images.entry(image_ident.clone()) {
+                            std::collections::hash_map::Entry::Occupied(occupied_entry) => instance.image = Some(occupied_entry.get().clone()),
+                            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                                let image_result = match instance.runtime_type.as_str() {
+                                    "WASM_BASE" => compile_wasm(&function, image_ident),
+                                    // TODO: The Architecture needs to be part of the ident.
+                                    "NATIVE_BASE" => compile_native(&function, image_ident, *nodes.get(&instance.id.node_id).unwrap()),
+                                    _ => continue,
+                                };
+
+                                if let Ok(image) = image_result {
+                                    instance.image = Some(image.clone());
+                                    vacant_entry.insert(image);
+                                } else {
+                                    log::error!("Failed Compiling Image");
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -37,48 +76,26 @@ impl super::StatelessTransformation for Compiler {
     }
 }
 
-fn compile_wasm(actor: &crate::ir::actor::LogicalActor, instance: &mut crate::ir::actor::PhysicalActor) -> Result<(), anyhow::Error> {
-    let enabled_inputs = actor.enabled_inputs();
-    let enabled_outputs = actor.enabled_outputs();
-
-    let mut enabled_features: Vec<String> = Vec::new();
-    for input in &enabled_inputs {
-        enabled_features.push(format!("input_{}", input.0))
-    }
-    for output in &enabled_outputs {
-        enabled_features.push(format!("output_{}", output.0))
-    }
+fn compile_wasm(actor: &crate::ir::actor::LogicalActor, image_ident: actor::ActorImageIdent) -> Result<actor::ActorImage, anyhow::Error> {
+    let enabled_features = port_features_for(&image_ident);
 
     let rust_dir = edgeless_build::unpack_rust_package(&actor.image.code).unwrap();
     let wasm_file = edgeless_build::rust_to_wasm(rust_dir, enabled_features, true, false).unwrap();
     let wasm_code = std::fs::read(wasm_file).unwrap();
 
-    instance.image = Some(actor::ActorImage {
+    Ok(actor::ActorImage {
         class: actor.image.class.clone(),
-        format: "RUST_WASM".to_string(),
-        enabled_inputs: enabled_inputs.iter().cloned().collect(),
-        enabled_outputs: enabled_outputs.iter().cloned().collect(),
+        id: image_ident,
         code: wasm_code.clone(),
-    });
-
-    Ok(())
+    })
 }
 
 fn compile_native(
     actor: &crate::ir::actor::LogicalActor,
-    instance: &mut crate::ir::actor::PhysicalActor,
+    image_ident: crate::ir::actor::ActorImageIdent,
     node: &dyn crate::ir::Node,
-) -> Result<(), anyhow::Error> {
-    let enabled_inputs = actor.enabled_inputs();
-    let enabled_outputs = actor.enabled_outputs();
-
-    let mut enabled_features: Vec<String> = Vec::new();
-    for input in &enabled_inputs {
-        enabled_features.push(format!("input_{}", input.0))
-    }
-    for output in &enabled_outputs {
-        enabled_features.push(format!("output_{}", output.0))
-    }
+) -> Result<actor::ActorImage, anyhow::Error> {
+    let enabled_features = port_features_for(&image_ident);
 
     let rts = node.available_runtimes();
     let rt = rts.get("NATIVE_BASE").ok_or(anyhow::anyhow!("Called native build function on "))?;
@@ -97,12 +114,21 @@ fn compile_native(
     let so_file = edgeless_build::rust_to_dynlib(rust_dir, enabled_features, true, false, target).unwrap();
     let so_code = std::fs::read(so_file).unwrap();
 
-    instance.image = Some(actor::ActorImage {
+    Ok(actor::ActorImage {
         class: actor.image.class.clone(),
-        format: "NATIVE_BASE".to_string(),
-        enabled_inputs: enabled_inputs.iter().cloned().collect(),
-        enabled_outputs: enabled_outputs.iter().cloned().collect(),
+        id: image_ident,
         code: so_code.clone(),
-    });
-    Ok(())
+    })
+}
+
+fn port_features_for(image_ident: &actor::ActorImageIdent) -> Vec<String> {
+    let mut enabled_features: Vec<String> = Vec::new();
+    for input in &image_ident.enabled_inputs {
+        enabled_features.push(format!("input_{}", input.0))
+    }
+    for output in &image_ident.enabled_outputs {
+        enabled_features.push(format!("output_{}", output.0))
+    }
+
+    enabled_features
 }

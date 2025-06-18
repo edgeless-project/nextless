@@ -92,15 +92,15 @@ impl super::MaterializedComponent for MaterializedActor {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ActorIdentifier {
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct ActorClassIdent {
     pub id: String,
     pub version: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ActorClass {
-    pub id: ActorIdentifier,
+    pub id: ActorClassIdent,
     pub inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::function_instance::Port>,
     pub outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::function_instance::Port>,
     pub inner_structure: std::collections::HashMap<
@@ -111,26 +111,36 @@ pub struct ActorClass {
 
 #[derive(Clone, Debug)]
 pub struct ActorImage {
+    pub id: ActorImageIdent,
     pub class: ActorClass,
-    pub format: String,
-    #[allow(unused)]
-    pub enabled_inputs: std::collections::HashSet<edgeless_api::function_instance::PortId>,
-    #[allow(unused)]
-    pub enabled_outputs: std::collections::HashSet<edgeless_api::function_instance::PortId>,
     pub code: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ActorImageIdent {
+    pub class_id: ActorClassIdent,
+    pub format: String,
+    pub enabled_inputs: std::collections::BTreeSet<edgeless_api::function_instance::PortId>,
+    pub enabled_outputs: std::collections::BTreeSet<edgeless_api::function_instance::PortId>,
 }
 
 impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
     fn from(function_req: edgeless_api::workflow_instance::WorkflowFunction) -> Self {
+        let class_id = ActorClassIdent {
+            id: function_req.function_class_specification.function_class_id,
+            version: function_req.function_class_specification.function_class_version,
+        };
+
         Self {
             image: ActorImage {
-                enabled_inputs: function_req.function_class_specification.function_class_inputs.keys().cloned().collect(),
-                enabled_outputs: function_req.function_class_specification.function_class_outputs.keys().cloned().collect(),
+                id: ActorImageIdent {
+                    class_id: class_id.clone(),
+                    format: function_req.function_class_specification.function_class_type,
+                    enabled_inputs: function_req.function_class_specification.function_class_inputs.keys().cloned().collect(),
+                    enabled_outputs: function_req.function_class_specification.function_class_outputs.keys().cloned().collect(),
+                },
                 class: ActorClass {
-                    id: ActorIdentifier {
-                        id: function_req.function_class_specification.function_class_id,
-                        version: function_req.function_class_specification.function_class_version,
-                    },
+                    id: class_id,
                     inputs: function_req.function_class_specification.function_class_inputs,
                     outputs: function_req.function_class_specification.function_class_outputs,
                     inner_structure: function_req
@@ -140,7 +150,7 @@ impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
                         .map(|(k, v)| (k, std::collections::HashSet::from_iter(v)))
                         .collect(),
                 },
-                format: function_req.function_class_specification.function_class_type,
+
                 code: function_req.function_class_specification.function_class_code,
             },
             instances: Vec::new(),

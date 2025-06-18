@@ -4,12 +4,16 @@
 // SPDX-License-Identifier: MIT
 
 pub mod client;
+pub mod image_repository;
+pub mod node;
+pub mod peer_cluster;
+pub mod resource_provider;
 pub mod server;
-// TODO Split and fix
+pub mod workflow;
+// TODO(raphaelhetzel) Split and fix
 // #[cfg(test)]
 // pub mod test;
 //
-pub mod image_repository;
 
 pub struct Controller {
     sender: futures::channel::mpsc::UnboundedSender<ControllerRequest>,

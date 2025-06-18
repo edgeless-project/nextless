@@ -6,8 +6,8 @@ pub mod round_robin;
 pub mod weighted_random;
 
 pub trait PlacementStrategy: Send + Sync {
-    type GlobalState: Default;
-    fn select_candidate<'b>(&mut self, candidates: Vec<super::Candidate<'b>>, global_state: &mut Self::GlobalState) -> Option<super::Candidate<'b>>;
+    type GlobalState: Default + Send + Sync;
+    fn select_candidate<'b>(&mut self, candidates: Vec<super::Candidate<'b>>, global_state: &Self::GlobalState) -> Option<super::Candidate<'b>>;
 
     fn new() -> Self;
 }

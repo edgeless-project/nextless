@@ -29,7 +29,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         &mut self,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
+        global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
         log::info!("Initial Spawn");
         self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters, global_state);
@@ -40,7 +40,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         &mut self,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
+        global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
         self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
         self.materialize()
@@ -51,7 +51,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         removed_node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
+        global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
         if self.remove_nodes(removed_node_ids) {
             self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
@@ -66,7 +66,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         update: edgeless_api::common::PatchRequest,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
+        global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
         {
             let mut prx = self.wf.proxy.borrow_mut();
@@ -96,16 +96,18 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                     link_id: link_id.clone(),
                     class: link.class.clone(),
                 });
+                link.materialized = true;
             }
 
-            for (node, link_provider_id, node_config, node_materialized) in &link.nodes {
-                if !node_materialized {
+            for (node, link_provider_id, node_config, node_materialized) in &mut link.nodes {
+                if !*node_materialized {
                     changes.push(super::RequiredChange::CreateLinkOnNode {
                         node_id: *node,
                         provider_id: link_provider_id.clone(),
                         link_id: link_id.clone(),
                         config: node_config.clone(),
                     });
+                    *node_materialized = true;
                 }
             }
         }
@@ -119,6 +121,11 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                         if let Some(materialized) = &current.materialized {
                             let mut materialized = materialized.borrow_mut();
                             if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
+                                log::info!(
+                                    "Patch: New: O {:?}, i {:?}",
+                                    current.desired_mapping.physical_output_mapping,
+                                    current.desired_mapping.physical_input_mapping
+                                );
                                 changes.push(super::RequiredChange::PatchFunction {
                                     function_id: current.id,
                                     function_name: f_name.clone(),
@@ -217,7 +224,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                         }
                     }
                     _ => {
-                        panic!("Tried to materialize invalid physical instance.")
+                        log::warn!("Cannot materialize invalid physical instance.")
                     }
                 }
             }

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+#[derive(Clone)]
 pub struct ControllerAPIClient {
     workflow_instance_client: Box<dyn crate::workflow_instance::WorkflowInstanceAPI>,
     node_registration_client: Box<dyn crate::node_registration::NodeRegistrationAPI>,

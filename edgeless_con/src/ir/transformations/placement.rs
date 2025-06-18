@@ -26,7 +26,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut P::GlobalState,
+        global_state: &P::GlobalState,
     ) {
         for (f_id, function) in &mut workflow.functions {
             let function = function.borrow_mut();

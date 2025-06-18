@@ -5,24 +5,48 @@ use futures::FutureExt;
 
 #[derive(Clone)]
 struct MulticastWriter {
-    sender: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
+    sender: tokio::sync::mpsc::UnboundedSender<MulticastMessage>,
 }
 
 #[derive(Clone)]
 pub struct MulticastLink {
     reader: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn edgeless_api::link::LinkWriter>>>>,
     writer: Box<MulticastWriter>,
-    task: std::sync::Arc<tokio::sync::Mutex<tokio::task::JoinHandle<()>>>,
+    _task: std::sync::Arc<tokio::sync::Mutex<MulticastTaskHandle>>,
 }
+
+struct MulticastTaskHandle(tokio::task::JoinHandle<()>);
 
 #[derive(Clone)]
 pub struct MulticastProvider {
     links: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkInstanceId, Box<MulticastLink>>>>,
 }
 
+struct MulticastMessage(Vec<u8>);
+
+impl MulticastMessage {
+    fn new(src: &edgeless_api::function_instance::InstanceId, data: &[u8]) -> Self {
+        let mut v = Vec::with_capacity(16 * 2 + data.len());
+        v.extend(data);
+        v.extend(src.function_id.as_bytes());
+        v.extend(src.node_id.as_bytes());
+        Self(v)
+    }
+
+    fn parts(mut self) -> (edgeless_api::function_instance::InstanceId, Vec<u8>) {
+        assert!(self.0.len() >= 32);
+        let instance_id = edgeless_api::function_instance::InstanceId {
+            node_id: uuid::Uuid::from_slice(&self.0[self.0.len() - 16..]).unwrap(),
+            function_id: uuid::Uuid::from_slice(&self.0[self.0.len() - 32..self.0.len() - 16]).unwrap(),
+        };
+        self.0.resize(self.0.len() - 32, 0);
+        (instance_id, self.0)
+    }
+}
+
 impl MulticastLink {
     pub fn new(addr: std::net::Ipv4Addr, port: u16) -> Self {
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<MulticastMessage>();
         let reader: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn edgeless_api::link::LinkWriter>>>> =
             std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
@@ -42,15 +66,16 @@ impl MulticastLink {
                 tokio::select! {
                     outgoing = Box::pin(receiver.recv()).fuse() => {
                         if let Some(outgoing) = outgoing {
-                            sock.send_to(&outgoing[..], sock_addr).await.unwrap();
+                            sock.send_to(&outgoing.0[..], sock_addr).await.unwrap();
                         }
                     },
                     incomming = Box::pin(sock.recv_from(&mut buffer[..])).fuse() => {
                         match incomming {
                             Ok((data_size, _sender)) => {
                                 for r in reader_clone.lock().await.iter_mut() {
-                                    let data = Vec::from(&buffer[0..data_size]);
-                                    r.handle(data).await;
+                                    let data = MulticastMessage(Vec::from(&buffer[0..data_size]));
+                                    let (src, data) = data.parts();
+                                    r.handle(src, data).await;
                                 }
                             },
                             Err(err) => {
@@ -65,7 +90,7 @@ impl MulticastLink {
         MulticastLink {
             reader,
             writer: Box::new(MulticastWriter { sender }),
-            task: std::sync::Arc::new(tokio::sync::Mutex::new(task)),
+            _task: std::sync::Arc::new(tokio::sync::Mutex::new(MulticastTaskHandle(task))),
         }
     }
 }
@@ -84,9 +109,9 @@ impl MulticastProvider {
     }
 }
 
-impl Drop for MulticastLink {
+impl Drop for MulticastTaskHandle {
     fn drop(&mut self) {
-        self.task.blocking_lock().abort();
+        self.0.abort();
     }
 }
 
@@ -97,13 +122,15 @@ impl edgeless_api::link::LinkProvider for MulticastProvider {
     }
 
     async fn create(&mut self, req: edgeless_api::link::CreateLinkRequest) -> anyhow::Result<Box<dyn edgeless_api::link::LinkInstance>> {
-        let cfg: crate::common::MulticastConfig = serde_json::from_slice(&req.config).unwrap();
-
-        let link = Box::new(MulticastLink::new(cfg.ip, cfg.port));
-
-        self.links.lock().await.insert(req.id, link.clone());
-
-        return Ok(link);
+        match self.links.lock().await.entry(req.id.clone()) {
+            std::collections::hash_map::Entry::Occupied(occupied_entry) => Ok(occupied_entry.get().clone()),
+            std::collections::hash_map::Entry::Vacant(vacant_entry) => {
+                let cfg: crate::common::MulticastConfig = serde_json::from_slice(&req.config).unwrap();
+                let link = Box::new(MulticastLink::new(cfg.ip, cfg.port));
+                vacant_entry.insert(link.clone());
+                return Ok(link);
+            }
+        }
     }
     async fn remove(&mut self, id: edgeless_api::link::LinkInstanceId) -> anyhow::Result<()> {
         self.links.lock().await.remove(&id);
@@ -139,7 +166,43 @@ impl edgeless_api::link::LinkInstance for MulticastLink {
 
 #[async_trait::async_trait]
 impl edgeless_api::link::LinkWriter for MulticastWriter {
-    async fn handle(&mut self, msg: Vec<u8>) {
-        self.sender.send(msg).unwrap();
+    async fn handle(&mut self, src: edgeless_api::function_instance::InstanceId, msg: Vec<u8>) {
+        self.sender.send(MulticastMessage::new(&src, &msg[..])).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn multicast_serialize_deserialize() {
+        let data = vec![1, 2, 3, 4];
+        let src = edgeless_api::function_instance::InstanceId {
+            node_id: uuid::Uuid::new_v4(),
+            function_id: uuid::Uuid::new_v4(),
+        };
+
+        let serialized = MulticastMessage::new(&src, &data[..]);
+
+        let (deserialized_src, deserialized_data) = serialized.parts();
+
+        assert_eq!(deserialized_src, src);
+        assert_eq!(deserialized_data, data);
+    }
+
+    #[test]
+    fn multicast_serialize_deserialize_empty_data() {
+        let data = vec![];
+        let src = edgeless_api::function_instance::InstanceId {
+            node_id: uuid::Uuid::new_v4(),
+            function_id: uuid::Uuid::new_v4(),
+        };
+
+        let serialized = MulticastMessage::new(&src, &data[..]);
+
+        let (deserialized_src, deserialized_data) = serialized.parts();
+
+        assert_eq!(deserialized_src, src);
+        assert_eq!(deserialized_data, data);
     }
 }

@@ -9,6 +9,11 @@ pub struct DefaultPhysicalPipeline {
     compiler: crate::ir::transformations::compiler::Compiler,
 }
 
+pub struct PhysicalPipelineState {
+    pub pipe_generator_state: crate::ir::transformations::pipe_generator::PipeGeneratorState,
+    pub compiler_state: crate::ir::transformations::compiler::CompilerStore,
+}
+
 impl DefaultPhysicalPipeline {
     pub fn new() -> Self {
         DefaultPhysicalPipeline {
@@ -19,17 +24,18 @@ impl DefaultPhysicalPipeline {
     }
 }
 
-impl crate::ir::pipeline::TransformationPipeline<crate::ir::transformations::pipe_generator::PipeGeneratorState> for DefaultPhysicalPipeline {
+impl crate::ir::pipeline::TransformationPipeline<PhysicalPipelineState> for DefaultPhysicalPipeline {
     fn apply_all(
         &mut self,
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut crate::ir::transformations::pipe_generator::PipeGeneratorState,
+        global_state: &PhysicalPipelineState,
     ) {
         self.physical_connection_mapper.apply(workflow, nodes, peer_clusters);
-        self.pipe_generator.apply(workflow, nodes, peer_clusters, global_state);
-        self.compiler.apply(workflow, nodes, peer_clusters);
+        self.pipe_generator
+            .apply(workflow, nodes, peer_clusters, &global_state.pipe_generator_state);
+        self.compiler.apply(workflow, nodes, peer_clusters, &global_state.compiler_state);
     }
 
     fn apply_dynamic(
@@ -37,7 +43,7 @@ impl crate::ir::pipeline::TransformationPipeline<crate::ir::transformations::pip
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut crate::ir::transformations::pipe_generator::PipeGeneratorState,
+        global_state: &PhysicalPipelineState,
     ) {
         self.apply_all(workflow, nodes, peer_clusters, global_state);
     }

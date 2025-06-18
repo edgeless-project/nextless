@@ -75,7 +75,7 @@ mod tests {
 
         let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url.as_str()).await;
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         (handles, con_client.workflow_instance_api())
     }

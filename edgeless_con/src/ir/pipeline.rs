@@ -12,13 +12,13 @@ pub trait TransformationPipeline<GlobalState> {
         workflow: &mut super::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut GlobalState,
+        global_state: &GlobalState,
     );
     fn apply_dynamic(
         &mut self,
         workflow: &mut super::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut GlobalState,
+        global_state: &GlobalState,
     );
 }

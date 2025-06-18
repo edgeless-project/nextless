@@ -16,3 +16,4 @@ secrets/
 .venv
 .DS_Store
 *.swp
+eval/

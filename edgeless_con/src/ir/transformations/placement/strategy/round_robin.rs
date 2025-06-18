@@ -7,7 +7,7 @@ pub struct RoundRobin {}
 
 #[derive(Default)]
 pub struct RoundRobinState {
-    node_order: std::collections::LinkedList<edgeless_api::function_instance::NodeId>,
+    node_order: std::sync::Mutex<std::collections::LinkedList<edgeless_api::function_instance::NodeId>>,
 }
 
 impl super::PlacementStrategy for RoundRobin {
@@ -19,16 +19,16 @@ impl super::PlacementStrategy for RoundRobin {
     fn select_candidate<'b>(
         &mut self,
         candidates: Vec<crate::ir::transformations::placement::Candidate<'b>>,
-        state: &mut RoundRobinState,
+        state: &RoundRobinState,
     ) -> Option<crate::ir::transformations::placement::Candidate<'b>> {
         for c in &candidates {
-            if !state.node_order.iter().any(|i| *i == c.node_id) {
-                state.node_order.push_back(c.node_id);
+            if !state.node_order.lock().unwrap().iter().any(|i| *i == c.node_id) {
+                state.node_order.lock().unwrap().push_back(c.node_id);
             }
         }
 
-        while let Some(current) = state.node_order.pop_front() {
-            state.node_order.push_back(current);
+        while let Some(current) = state.node_order.lock().unwrap().pop_front() {
+            state.node_order.lock().unwrap().push_back(current);
             if let Some(c) = candidates.iter().find(|c| c.node_id == current) {
                 return Some(c.clone());
             }

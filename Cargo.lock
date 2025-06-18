@@ -1858,6 +1858,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
+ "thiserror 2.0.12",
  "tokio",
  "toml 0.7.8",
  "uuid",
@@ -1873,7 +1874,6 @@ dependencies = [
  "log",
  "serde",
  "starlark",
- "starlark_lsp",
 ]
 
 [[package]]
@@ -1956,6 +1956,8 @@ dependencies = [
 name = "edgeless_http"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "edgeless_function_core",
  "hyper 1.6.0",
  "serde",
@@ -4784,19 +4786,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lsp-server"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9462c4dc73e17f971ec1f171d44bfffb72e65a130117233388a0ebc7ec5656f9"
-dependencies = [
- "crossbeam-channel",
- "log",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
 name = "lsp-types"
 version = "0.94.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6939,26 +6928,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.101",
-]
-
-[[package]]
-name = "starlark_lsp"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6af517825dea0e72e8312924d26d67f25e4b724197d172ef35938659e29c2dc"
-dependencies = [
- "anyhow",
- "derivative",
- "derive_more",
- "dupe",
- "itertools 0.10.5",
- "lsp-server",
- "lsp-types",
- "serde",
- "serde_json",
- "starlark",
- "starlark_syntax",
- "thiserror 1.0.69",
 ]
 
 [[package]]

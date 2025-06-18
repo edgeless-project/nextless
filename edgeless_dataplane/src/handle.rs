@@ -16,11 +16,23 @@ struct IncommingLink {
     #[allow(unused)]
     target_id: edgeless_api::function_instance::InstanceId,
     target_port: edgeless_api::function_instance::PortId,
+    telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
 }
 
 #[async_trait::async_trait]
 impl edgeless_api::link::LinkWriter for IncommingLink {
-    async fn handle(&mut self, msg: Vec<u8>) {
+    async fn handle(&mut self, src: edgeless_api::function_instance::InstanceId, msg: Vec<u8>) {
+        if let Some(telemetry_handle) = &mut self.telemetry_handle {
+            telemetry_handle.observe(
+                edgeless_telemetry::telemetry_events::TelemetryEvent::MessageReceived(msg.len() as u64),
+                std::collections::BTreeMap::from([
+                    ("SOURCE_NODE_ID".to_string(), src.node_id.to_string()),
+                    ("SOURCE_FUNCTION_ID".to_string(), src.function_id.to_string()),
+                    ("SOURCE_PORT".to_string(), "UNKNOWN".to_string()),
+                    ("DEST_PORT".to_string(), self.target_port.0.clone()),
+                ]),
+            );
+        }
         self.sender
             .send(DataplaneEvent {
                 source_id: edgeless_api::function_instance::InstanceId {
@@ -46,7 +58,14 @@ pub struct DataplaneHandle {
     sender: tokio::sync::mpsc::UnboundedSender<DataplaneEvent>,
     receiver: std::sync::Arc<tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<DataplaneEvent>>>,
     link_manager: Box<dyn edgeless_api::link::LinkManager>,
-    links: std::collections::HashMap<edgeless_api::link::LinkInstanceId, std::sync::Arc<tokio::sync::Mutex<Box<dyn edgeless_api::link::LinkWriter>>>>,
+    links: std::sync::Arc<
+        tokio::sync::Mutex<
+            std::collections::HashMap<
+                edgeless_api::link::LinkInstanceId,
+                std::sync::Arc<tokio::sync::Mutex<Box<dyn edgeless_api::link::LinkWriter>>>,
+            >,
+        >,
+    >,
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
@@ -129,7 +148,7 @@ impl DataplaneHandle {
             receiver: std::sync::Arc::new(tokio::sync::Mutex::new(main_receiver)),
             output_chain: std::sync::Arc::new(tokio::sync::Mutex::new(output_chain)),
             link_manager,
-            links: std::collections::HashMap::new(),
+            links: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             receiver_overwrites,
             next_id: 1,
             telemetry_handle,
@@ -170,9 +189,16 @@ impl DataplaneHandle {
         new_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
         new_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
     ) {
-        log::info!("{:?}", new_output_mapping);
-        let ((_removed_inputs, _removed_output), (added_inputs, added_outputs)) =
+        log::debug!("Got Update: Outputs: {:?}; Inputs: {:?}", new_output_mapping, new_input_mapping);
+        let ((removed_inputs, removed_outputs), (added_inputs, added_outputs)) =
             self.alias_mapping.update(new_input_mapping, new_output_mapping).await;
+        log::debug!(
+            "Update Processed: RemovedI: {:?}; RemovedO: {:?}; AddedI: {:?}, AddedO: {:?}",
+            removed_inputs,
+            removed_outputs,
+            added_inputs,
+            added_outputs
+        );
 
         for (added_i_id, i) in added_inputs {
             if let edgeless_api::common::Input::Link(l) = i {
@@ -192,6 +218,7 @@ impl DataplaneHandle {
             sender: self.sender.clone(),
             target_id: self.slf,
             target_port: port,
+            telemetry_handle: self.telemetry_handle.clone(),
         });
 
         self.link_manager.register_reader(link_id, incomming_link.clone()).await.unwrap();
@@ -202,7 +229,13 @@ impl DataplaneHandle {
     async fn add_outgoing_link(&mut self, _port: edgeless_api::function_instance::PortId, link_id: &edgeless_api::link::LinkInstanceId) {
         let link = self.link_manager.get_writer(link_id).await;
         if let Some(link) = link {
-            self.links.insert(link_id.clone(), std::sync::Arc::new(tokio::sync::Mutex::new(link)));
+            self.links
+                .lock()
+                .await
+                .insert(link_id.clone(), std::sync::Arc::new(tokio::sync::Mutex::new(link)));
+            log::info!("Added Link: {}", link_id.0);
+        } else {
+            log::error!("Could not get Requested Link");
         }
     }
 
@@ -291,10 +324,10 @@ impl DataplaneHandle {
     }
 
     pub async fn send_to_link(&mut self, link_id: &edgeless_api::link::LinkInstanceId, msg: Vec<u8>) {
-        if let Some(link) = self.links.get(link_id) {
-            link.lock().await.handle(msg).await;
+        if let Some(link) = self.links.lock().await.get(link_id) {
+            link.lock().await.handle(self.slf.clone(), msg).await;
         } else {
-            log::info!("Link not found");
+            log::info!("Link not found: {}", link_id.0);
         }
     }
 
@@ -518,7 +551,7 @@ impl edgeless_api::link::LinkManager for DataplaneProvider {
             link.register_reader(reader).await.unwrap();
             return Ok(());
         }
-        return Err(anyhow::anyhow!("Link not Found"));
+        return Err(anyhow::anyhow!("Link not Found: {}", link_id.0));
     }
 
     async fn get_writer(&mut self, link_id: &edgeless_api::link::LinkInstanceId) -> Option<Box<dyn edgeless_api::link::LinkWriter>> {

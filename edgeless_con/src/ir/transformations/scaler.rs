@@ -19,9 +19,9 @@ impl super::StatelessTransformation for Scaler {
             }
 
             let can_scale_up = if let Some(max_instances) = f.constraints.max_instances {
-                f.instances.len() < max_instances
+                f.instances.len() <= max_instances
             } else {
-                f.instances.len() < 5
+                f.instances.len() <= 5
             };
 
             let mut processing_rate = 0.0;

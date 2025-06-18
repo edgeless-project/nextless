@@ -23,6 +23,6 @@ pub trait StatefulTransformation<G>: Send + Sync {
         workflow: &mut super::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &mut G,
+        global_state: &G,
     );
 }

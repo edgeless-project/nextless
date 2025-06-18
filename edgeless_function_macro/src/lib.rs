@@ -307,9 +307,9 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let ret = handle_call(instance_id, port, payload).unwrap();
 
             let (ret, output_params) = match ret {
-                CallRet::NoReply => (0, None),
-                CallRet::Reply(reply) => (1, Some(reply.consume())),
-                CallRet::Err => (2, None),
+                edgeless_actor_abi::CallRet::NoReply => (0, None),
+                edgeless_actor_abi::CallRet::Reply(reply) => (1, Some(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(&reply).consume())),
+                edgeless_actor_abi::CallRet::Err => (2, None),
             };
             if let (Some((output_ptr, output_len))) = output_params {
                 *out_ptr_ptr = output_ptr;

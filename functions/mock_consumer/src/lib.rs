@@ -4,6 +4,16 @@ use edgeless_function::*;
 
 struct MockConsumer;
 
+extern "C" {
+    fn eval_sleep(delay_ms: u64);
+}
+
+fn fake_work() {
+    unsafe {
+        eval_sleep(1600);
+    }
+}
+
 edgeless_function::generate!(MockConsumer);
 
 impl MockConsumerAPI<'_> for MockConsumer {
@@ -11,33 +21,43 @@ impl MockConsumerAPI<'_> for MockConsumer {
 
     fn handle_cast_input1(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input2(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input3(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input4(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input5(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input6(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input7(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input8(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input9(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
     fn handle_cast_input10(_src: InstanceId, test_msg: String) {
         log::info!("Consumer Got Message: {}", test_msg);
+        fake_work();
     }
 
     fn handle_internal(_data: &[u8]) {

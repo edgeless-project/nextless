@@ -129,6 +129,11 @@
             espflash
             binutils
             lld
+            (pkgs.python3.withPackages (pypkg: [
+              pypkg.pandas
+              pypkg.scapy
+              pypkg.seaborn
+            ]))
           ];
           shellHook = ''
             rustup install stable

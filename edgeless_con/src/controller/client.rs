@@ -5,6 +5,7 @@
 
 use futures::SinkExt;
 
+#[derive(Clone)]
 pub struct ControllerClient {
     workflow_instance_client: Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
     node_registration_client: Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,

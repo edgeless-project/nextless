@@ -8,159 +8,21 @@
 // This contains code originally developed in edgeless_orc (also in some of the related files).
 // Refer to the orchestrator's history for the history/authorship of those snippets.
 
-use edgeless_api::{common::ResponseError, image_repository::FunctionImageHash};
+use edgeless_api::common::ResponseError;
 use futures::StreamExt;
-
-use crate::ir::RequiredChange;
 
 pub struct ControllerTask<P: crate::ir::transformations::placement::strategy::PlacementStrategy> {
     request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
     cluster_id: edgeless_api::function_instance::NodeId,
-    nodes: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, WorkerNode>>>,
-    peer_clusters: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::function_instance::NodeId, PeerCluster>>>,
-    active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::super::ir::managed_worflow::ManagedWorkflow<P>>,
+    nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, super::node::WorkerNode>,
+    peer_clusters: std::collections::HashMap<edgeless_api::function_instance::NodeId, super::peer_cluster::PeerCluster>,
+    active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::workflow::WorkflowInstance>,
     telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
     image_repository: super::image_repository::ImageRepository,
-    global_pipeline_state: crate::ir::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
-}
-pub struct WorkerNode {
-    pub agent_url: String,
-    pub invocation_url: String,
-    pub api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
-    pub resource_providers: std::collections::HashMap<String, ResourceProvider>,
-    pub capabilities: edgeless_api::node_registration::NodeCapabilities,
-    pub health_status: edgeless_api::node_management::HealthStatus,
-    pub supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
-    // This should probably be based on link types and is a placeholder
-    pub is_proxy: bool,
-    telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
-    id: edgeless_api::function_instance::NodeId,
-    cluster_id: edgeless_api::function_instance::NodeId,
+    global_pipeline_state: std::sync::Arc<crate::ir::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>>,
 }
 
-pub struct PeerCluster {
-    pub _controller_url: String,
-    pub api: Box<dyn edgeless_api::controller::ControllerAPI + Send>,
-    pub _supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
-}
-
-#[derive(serde::Serialize)]
-pub struct ResourceProvider {
-    pub class_type: String,
-    pub outputs: Vec<String>,
-}
-
-impl crate::ir::ResourceProvider for ResourceProvider {
-    fn class_type(&self) -> String {
-        self.class_type.clone()
-    }
-
-    fn outputs(&self) -> Vec<String> {
-        self.outputs.clone()
-    }
-}
-
-impl crate::ir::Node for WorkerNode {
-    fn available_runtimes(&self) -> std::collections::HashMap<String, crate::ir::Runtime> {
-        self.capabilities
-            .runtimes
-            .iter()
-            .filter_map(|id| match id.as_str() {
-                "RUST_WASM" => Some(("RUST_WASM".to_string(), crate::ir::Runtime::WasmBase(self))),
-                "NATIVE_BASE" => Some(("NATIVE_BASE".to_string(), crate::ir::Runtime::NativeBase(self))),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn available_resource_providers(&self) -> crate::ir::ResourceProviders {
-        self.resource_providers
-            .iter()
-            .map(|(k, v)| (k.clone(), v as &dyn crate::ir::ResourceProvider))
-            .collect()
-    }
-
-    fn available_link_types(&self) -> crate::ir::LinkProviders {
-        self.supported_link_types.clone()
-    }
-
-    fn labels(&self) -> Vec<String> {
-        self.capabilities.labels.clone()
-    }
-
-    fn is_proxy(&self) -> bool {
-        self.is_proxy
-    }
-
-    fn node_id(&self) -> edgeless_api::function_instance::NodeId {
-        self.id
-    }
-
-    fn cluster_id(&self) -> edgeless_api::function_instance::NodeId {
-        self.cluster_id
-    }
-}
-
-impl crate::ir::WasmRuntime for WorkerNode {
-    fn num_cores(&self) -> u32 {
-        self.capabilities.num_cores
-    }
-
-    fn cpu_freq_hz(&self) -> f32 {
-        self.capabilities.clock_freq_cpu
-    }
-
-    fn mem_size_bytes(&self) -> u32 {
-        self.capabilities.mem_size
-    }
-
-    fn runtime_info(&self) -> Option<Box<dyn crate::ir::WasmRuntimeInfo>> {
-        self.telemetry_provider.as_ref().map(|t| t.wasm_runtime_statistics_for(&self.id))
-    }
-}
-
-impl crate::ir::NativeRuntime for WorkerNode {
-    fn num_cores(&self) -> u32 {
-        self.capabilities.num_cores
-    }
-
-    fn cpu_freq_hz(&self) -> f32 {
-        self.capabilities.clock_freq_cpu
-    }
-
-    fn mem_size_bytes(&self) -> u32 {
-        self.capabilities.mem_size
-    }
-
-    fn node_architecture(&self) -> crate::ir::NodeArchitecture {
-        match self.capabilities.cpu_arch.as_str() {
-            "amd64" => crate::ir::NodeArchitecture::Amd64,
-            "arm64" => crate::ir::NodeArchitecture::Arm64,
-            "xtensa" => crate::ir::NodeArchitecture::Xtensa,
-            _ => {
-                log::error!("Bad Node Architecture; Defaulting to amd64.");
-                crate::ir::NodeArchitecture::Amd64
-            }
-        }
-    }
-
-    fn runtime_info(&self) -> Option<Box<dyn crate::ir::WasmRuntimeInfo>> {
-        todo!()
-    }
-
-    fn node_sys(&self) -> crate::ir::NodeSys {
-        match self.capabilities.sys.as_str() {
-            "linux" => crate::ir::NodeSys::Linux,
-            "darwin" => crate::ir::NodeSys::Darwin,
-            _ => {
-                log::error!("Bad Node Architecture; Defaulting to \"linux\"");
-                crate::ir::NodeSys::Linux
-            }
-        }
-    }
-}
-
-impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> ControllerTask<P> {
+impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'static> ControllerTask<P> {
     pub fn new(
         cluster_id: edgeless_api::function_instance::NodeId,
         request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
@@ -169,23 +31,24 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
     ) -> Self {
         let global_pipeline_state = crate::ir::pipeline::default::DefaultTransformationPipelineState::<P::GlobalState> {
             placement_strategy_state: P::GlobalState::default(),
-            pipe_generator_state: crate::ir::transformations::pipe_generator::PipeGeneratorState {
-                inner: std::collections::HashMap::from([(
+            physical_pipeline_state: crate::ir::pipeline::default_physical::PhysicalPipelineState {
+                pipe_generator_state: crate::ir::transformations::pipe_generator::PipeGeneratorState::new(std::collections::HashMap::from([(
                     edgeless_api::link::LinkType("MULTICAST".to_string()),
                     Box::new(edgeless_link_multicast::controller::MulticastController::new()) as Box<dyn edgeless_api::link::LinkController>,
-                )]),
+                )])),
+                compiler_state: crate::ir::transformations::compiler::CompilerStore::default(),
             },
         };
 
         Self {
             request_receiver,
-            nodes: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+            nodes: std::collections::HashMap::new(),
             cluster_id,
-            peer_clusters: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+            peer_clusters: std::collections::HashMap::new(),
             active_workflows: std::collections::HashMap::new(),
             telemetry_provider,
             image_repository,
-            global_pipeline_state,
+            global_pipeline_state: std::sync::Arc::new(global_pipeline_state),
         }
     }
 
@@ -202,13 +65,16 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                         match req {
                             super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
                                 // log::info!("{:?}", spawn_workflow_request);
-                                let reply = self.start_workflow(spawn_workflow_request).await;
-                                match reply_sender.send(reply) {
-                                    Ok(_) => {}
-                                    Err(err) => {
-                                        log::error!("Unhandled: {:?}", err);
+                                self.start_workflow(spawn_workflow_request, move |r| {
+                                    log::info!("Send Response");
+                                    match reply_sender.send(r) {
+                                        Ok(_) => {}
+                                        Err(err) => {
+                                            log::error!("Unhandled: {:?}", err);
+                                        }
                                     }
-                                }
+                                }).await;
+
                             }
                             super::ControllerRequest::Stop(wf_id) => {
                                 self.stop_workflow(&wf_id).await;
@@ -235,7 +101,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
                                 }
                             },
                             super::ControllerRequest::Patch(update) => {
-                                let _res = self.patch_workflow(&update).await;
+                                let _res = self.patch_workflow(update).await;
                             }
                         }
                     }
@@ -251,64 +117,36 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
     async fn start_workflow(
         &mut self,
         spawn_workflow_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
-    ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
+        completion_hook: impl FnOnce(anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>) + Send + 'static,
+    ) {
         // Assign a new identifier to the newly-created workflow.
         let wf_id = edgeless_api::workflow_instance::WorkflowId {
             workflow_id: uuid::Uuid::new_v4(),
         };
 
-        let mut wf = super::super::ir::managed_worflow::ManagedWorkflow::new(
+        let wf = super::super::ir::managed_worflow::ManagedWorkflow::new(
             spawn_workflow_request.clone(),
             wf_id.clone(),
-            // self.link_controllers.clone(),
             self.telemetry_provider.clone(),
             P::new(),
         );
 
-        let required_changes = {
-            let nodes = self.nodes.lock().await;
-            let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
-                nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
-            tokio::task::block_in_place(|| wf.initial_spawn(&ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state))
-        };
+        let cloned_nodes = self.nodes.clone();
+        let cloned_state = self.global_pipeline_state.clone();
+        let cloned_peers = self.peer_clusters.clone();
 
-        let desc = edgeless_api::workflow_instance::WorkflowInstance {
-            workflow_id: wf_id.clone(),
-            node_mapping: wf
-                .wf
-                .components()
-                .iter()
-                .filter_map(|(id, a)| {
-                    let instances: Vec<_> = a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect();
-                    if !instances.is_empty() {
-                        Some(edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                            name: id.to_string(),
-                            node_ids: instances,
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
-        };
-
-        self.active_workflows.insert(wf_id.clone(), wf);
-
-        let res = self.materialize(wf_id.clone(), required_changes).await;
-
-        if res.is_err() {
-            self.stop_workflow(&wf_id).await;
-        }
-
-        match res {
-            Ok(_) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(desc)),
-            Err(err) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
-                edgeless_api::common::ResponseError {
-                    summary: "Workflow creation failed".to_string(),
-                    detail: Some(err.join(";")),
-                },
-            )),
-        }
+        self.active_workflows.insert(
+            wf_id,
+            super::workflow::WorkflowInstance::launch::<P>(
+                wf,
+                completion_hook,
+                cloned_nodes,
+                cloned_peers,
+                cloned_state,
+                self.image_repository.clone(),
+            )
+            .await,
+        );
     }
 
     async fn stop_workflow(&mut self, wf_id: &edgeless_api::workflow_instance::WorkflowId) {
@@ -319,66 +157,40 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
             }
             Some(val) => val,
         };
-
-        let changes = workflow.stop();
-        if let Err(errs) = self.materialize(wf_id.clone(), changes).await {
-            log::info!("Failures while stopping workflow: {}", errs.join(";"));
-        };
+        if let Err(e) = workflow.stop().await {
+            log::error!("Could Not Stop Workflow: {e:?}")
+        }
     }
 
     async fn list_workflows(
         &mut self,
         workflow_id: &edgeless_api::workflow_instance::WorkflowId,
     ) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>> {
-        let ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = if let Some(wf) = self.active_workflows.get(workflow_id) {
+        let ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = if let Some(_wf) = self.active_workflows.get(workflow_id) {
             vec![edgeless_api::workflow_instance::WorkflowInstance {
                 workflow_id: workflow_id.clone(),
-                node_mapping: wf
-                    .wf
-                    .components()
-                    .iter()
-                    .map(|(id, a)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                        name: id.to_string(),
-                        node_ids: a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect(),
-                    })
-                    .collect(),
+                //TODO(raphaelhetzel) Replace this with a new representation.
+                node_mapping: Vec::new(),
             }]
         } else {
             self.active_workflows
                 .iter()
-                .map(|(wf_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
+                .map(|(wf_id, _wf)| edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: wf_id.clone(),
-                    node_mapping: wf
-                        .wf
-                        .components()
-                        .iter()
-                        .map(|(id, a)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                            name: id.to_string(),
-                            node_ids: a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect(),
-                        })
-                        .collect(),
+                    //TODO(raphaelhetzel) Replace this with a new representation.
+                    node_mapping: Vec::new(),
                 })
                 .collect()
         };
         Ok(ret)
     }
 
-    async fn patch_workflow(&mut self, req: &edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+    async fn patch_workflow(&mut self, req: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         let id = edgeless_api::workflow_instance::WorkflowId {
             workflow_id: req.function_id.function_id,
         };
         if let Some(wf) = self.active_workflows.get_mut(&id) {
-            let required_changes = {
-                let nodes = self.nodes.lock().await;
-                let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
-                    nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
-                tokio::task::block_in_place(|| {
-                    wf.patch_external_links(req.clone(), &ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state)
-                })
-            };
-            if let Err(errs) = self.materialize(id.clone(), required_changes).await {
-                log::info!("Failures while stopping workflow: {}", errs.join(";"));
-            };
+            wf.patch(req).await;
         }
         Ok(())
     }
@@ -392,8 +204,9 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         capabilities: edgeless_api::node_registration::NodeCapabilities,
         link_providers: Vec<edgeless_api::node_registration::LinkProviderSpecification>,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        if let Some(node) = self.nodes.lock().await.get(&node_id) {
-            if node.agent_url == agent_url && node.invocation_url == invocation_url {
+        log::info!("Node Registration: {}, {}, {}", node_id, agent_url, invocation_url);
+        if let Some(node) = self.nodes.get(&node_id) {
+            if node.agent_url() == agent_url && node.invocation_url() == invocation_url {
                 return Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted);
             } else {
                 return Ok(edgeless_api::node_registration::UpdateNodeResponse::ResponseError(ResponseError {
@@ -403,35 +216,19 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
             }
         }
 
-        let api = Self::get_api_for_url(&agent_url).await;
-
-        self.nodes.lock().await.insert(
+        let n = super::node::WorkerNode::new(
             node_id,
-            WorkerNode {
-                agent_url,
-                invocation_url: invocation_url.clone(),
-                api,
-                resource_providers: resource_providers
-                    .into_iter()
-                    .map(|r| {
-                        (
-                            r.provider_id,
-                            ResourceProvider {
-                                class_type: r.class_type,
-                                outputs: r.outputs,
-                            },
-                        )
-                    })
-                    .collect(),
-                capabilities,
-                health_status: edgeless_api::node_management::HealthStatus::empty(),
-                supported_link_types: link_providers.into_iter().map(|p| (p.class, p.provider_id)).collect(),
-                is_proxy: true,
-                id: node_id,
-                cluster_id: self.cluster_id,
-                telemetry_provider: self.telemetry_provider.clone(),
-            },
-        );
+            agent_url,
+            invocation_url.clone(),
+            resource_providers,
+            capabilities,
+            link_providers,
+            self.telemetry_provider.clone(),
+            self.cluster_id.clone(),
+        )
+        .await;
+
+        self.nodes.insert(node_id, n.clone());
 
         self.send_peer_updates(vec![edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url)])
             .await;
@@ -439,15 +236,10 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         // Send information about all nodes to the new node.
         let updates: Vec<_> = self
             .nodes
-            .lock()
-            .await
             .iter()
             .filter_map(|(n_id, n_spec)| {
                 if n_id != &node_id {
-                    Some(edgeless_api::node_management::UpdatePeersRequest::Add(
-                        *n_id,
-                        n_spec.invocation_url.clone(),
-                    ))
+                    Some(edgeless_api::node_management::UpdatePeersRequest::Add(*n_id, n_spec.invocation_url()))
                 } else {
                     None
                 }
@@ -455,11 +247,13 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
             .collect();
         {
             // let n = self.nodes.borrow_mut().get_mut(&node_id).unwrap();
-            if let Some(node) = self.nodes.lock().await.get_mut(&node_id) {
-                for update in updates {
-                    node.api.node_management_api().update_peers(update).await.unwrap();
-                }
+            if let Some(node) = self.nodes.get_mut(&node_id) {
+                node.update_peers(&updates).await.unwrap();
             }
+        }
+
+        for (_, wf) in &mut self.active_workflows {
+            wf.add_nodes(vec![n.clone()]).await;
         }
 
         Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted)
@@ -469,7 +263,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         &mut self,
         node_id: edgeless_api::function_instance::NodeId,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        let old_value = self.nodes.lock().await.remove(&node_id);
+        let old_value = self.nodes.remove(&node_id);
         if old_value.is_some() {
             self.handle_node_removal(&std::collections::HashSet::from_iter(vec![node_id].into_iter()))
                 .await;
@@ -481,294 +275,24 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
         }
     }
 
-    async fn materialize(
-        &mut self,
-        wf_id: edgeless_api::workflow_instance::WorkflowId,
-        required_changes: Vec<RequiredChange>,
-    ) -> Result<(), Vec<String>> {
-        let mut results = Vec::<Result<(), String>>::new();
-
-        // This could be parallel
-        for f in required_changes.into_iter() {
-            results.push(match f {
-                RequiredChange::StartFunction {
-                    function_id,
-                    image,
-                    input_mapping,
-                    output_mapping,
-                    function_name,
-                    annotations,
-                } => {
-                    self.start_workflow_function_on_node(&wf_id, function_name, function_id, image, input_mapping, output_mapping, annotations)
-                        .await
-                }
-                RequiredChange::StartResource {
-                    resource_id,
-                    resource_name,
-                    class_type,
-                    input_mapping,
-                    output_mapping,
-                    configuration,
-                } => {
-                    self.start_workflow_resource_on_node(
-                        &wf_id,
-                        resource_name,
-                        resource_id,
-                        class_type,
-                        output_mapping,
-                        input_mapping,
-                        configuration,
-                    )
-                    .await
-                }
-                RequiredChange::PatchFunction {
-                    function_id,
-                    function_name,
-                    input_mapping,
-                    output_mapping,
-                } => {
-                    self.patch_outputs(function_id, super::ComponentType::Function, output_mapping, input_mapping, &function_name)
-                        .await
-                }
-                RequiredChange::PatchResource {
-                    resource_id,
-                    resource_name,
-                    input_mapping,
-                    output_mapping,
-                } => {
-                    self.patch_outputs(resource_id, super::ComponentType::Resource, output_mapping, input_mapping, &resource_name)
-                        .await
-                }
-                RequiredChange::InstantiateLinkControlPlane { link_id, class } => self.create_link_control_plane(link_id, class).await,
-                RequiredChange::CreateLinkOnNode {
-                    link_id,
-                    node_id,
-                    config,
-                    provider_id,
-                } => self.create_link_on_node(link_id, node_id, provider_id, config).await,
-                RequiredChange::RemoveLinkFromNode { link_id, node_id } => self.remove_link_from_node(link_id, node_id).await,
-                RequiredChange::CreateSubflow { subflow_id, spawn_req } => self.start_subflow_on_cluster(subflow_id, spawn_req).await,
-                RequiredChange::PatchSubflow {
-                    subflow_id,
-                    input_mapping,
-                    output_mapping,
-                } => {
-                    self.patch_outputs(subflow_id, super::ComponentType::SubFlow, output_mapping, input_mapping, "subflow")
-                        .await
-                }
-                RequiredChange::PatchProxy {
-                    proxy_id,
-                    internal_inputs,
-                    internal_outputs,
-                    external_inputs,
-                    external_outputs,
-                } => {
-                    self.patch_proxy_instance(proxy_id, internal_inputs, internal_outputs, external_inputs, external_outputs)
-                        .await
-                }
-                RequiredChange::CrateProxy {
-                    proxy_id,
-                    internal_inputs,
-                    internal_outputs,
-                    external_inputs,
-                    external_outputs,
-                } => {
-                    self.start_proxy_on_node(proxy_id, internal_inputs, internal_outputs, external_inputs, external_outputs)
-                        .await
-                }
-                RequiredChange::StopFunction { function_id } => self.stop_workflow_function_on_node(function_id).await,
-            });
-        }
-
-        let mut error_msg = Vec::new();
-        for res in results {
-            if let Err(msg) = res {
-                error_msg.push(msg);
-            }
-        }
-
-        if error_msg.is_empty() {
-            Ok(())
-        } else {
-            Err(error_msg)
-        }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    async fn start_workflow_function_on_node(
-        &mut self,
-        wf_id: &edgeless_api::workflow_instance::WorkflowId,
-        f_name: String,
-        function_id: edgeless_api::function_instance::InstanceId,
-        image: super::super::ir::actor::ActorImage,
-        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalInput>,
-        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalOutput>,
-        annotations: std::collections::HashMap<String, String>,
-    ) -> Result<(), String> {
-        // [TODO] Issue#95
-        // The state_specification configuration should be
-        // read from the function annotations.
-        log::debug!("state specifications currently forced to NodeLocal");
-        log::info!("{:?}", output_mapping);
-
-        self.image_repository.update(image.code.image_hash(), image.code.clone()).await;
-
-        let response = self
-            .fn_client(&function_id.node_id)
-            .await
-            .ok_or(format!("No function client for node: {}", &function_id.node_id))?
-            .start(edgeless_api::function_instance::SpawnFunctionRequest {
-                instance_id: function_id,
-                code: edgeless_api::function_instance::FunctionClassSpecification {
-                    function_class_id: image.class.id.id.clone(),
-                    function_class_type: image.format.clone(),
-                    function_class_version: image.class.id.version.clone(),
-                    function_class_code: image.code.clone(),
-                    function_class_outputs: image.class.outputs.clone(),
-                    function_class_inputs: image.class.inputs.clone(),
-                    function_class_inner_structure: image
-                        .class
-                        .inner_structure
-                        .iter()
-                        .map(|(src, dst)| (src.clone(), dst.clone().into_iter().collect()))
-                        .collect(),
-                },
-                annotations: annotations.clone(),
-                state_specification: edgeless_api::function_instance::StateSpecification {
-                    state_id: uuid::Uuid::new_v4(),
-                    state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
-                },
-                input_mapping: input_mapping.clone(),
-                output_mapping: output_mapping.clone(),
-            })
-            .await;
-
-        match response {
-            Ok(response) => match response {
-                edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    log::warn!("function instance {}:{} creation rejected: {}", wf_id, f_name, error);
-                    Err(format!("function instance creation rejected: {} ", error))
-                }
-                edgeless_api::common::StartComponentResponse::InstanceId(_id) => Ok(()),
-            },
-            Err(err) => Err(format!("failed interaction when creating a function instance: {}", err)),
-        }
-    }
-
-    async fn stop_workflow_function_on_node(&mut self, function_id: edgeless_api::function_instance::InstanceId) -> Result<(), String> {
-        if let Some(node_api) = self.nodes.lock().await.get_mut(&function_id.node_id) {
-            if let Err(e) = node_api.api.function_instance_api().stop(function_id).await {
-                Err(format!("Stopping Node Failed: {}", e))
-            } else {
-                Ok(())
-            }
-        } else {
-            Err("Invalid Function ID".to_string())
-        }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    async fn start_workflow_resource_on_node(
-        &mut self,
-        wf_id: &edgeless_api::workflow_instance::WorkflowId,
-        r_name: String,
-        resource_id: edgeless_api::function_instance::InstanceId,
-        class_type: String,
-        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalOutput>,
-        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalInput>,
-        configurations: std::collections::HashMap<String, String>,
-    ) -> Result<(), String> {
-        let response = self
-            .resource_client(&resource_id.node_id)
-            .await
-            .ok_or(format!("No resource client for node: {}", &resource_id.node_id))?
-            .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
-                resource_id,
-                class_type: class_type.clone(),
-                configuration: configurations.clone(),
-                output_mapping: output_mapping.clone(),
-                input_mapping: input_mapping.clone(),
-            })
-            .await;
-
-        match response {
-            Ok(response) => match response {
-                edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    log::warn!("resource start rejected: {}", error);
-                    Err(format!("resource start rejected: {} ", error))
-                }
-                edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    log::info!("workflow {} resource {} started with fid {}", wf_id, &r_name, &id);
-                    Ok(())
-                }
-            },
-            Err(err) => Err(format!("failed interaction when starting a resource: {}", err)),
-        }
-    }
-
-    async fn start_subflow_on_cluster(
-        &mut self,
-        subflow_id: edgeless_api::function_instance::InstanceId,
-        spawn_req: edgeless_api::workflow_instance::SpawnWorkflowRequest,
-    ) -> Result<(), String> {
-        if let Some(cluster) = self.peer_clusters.lock().await.get_mut(&subflow_id.node_id) {
-            cluster.api.workflow_instance_api().start(spawn_req).await.map_err(|e| e.to_string())?;
-            Ok(())
-        } else {
-            Err("Failed to start subflow".to_string())
-        }
-    }
-
-    async fn start_proxy_on_node(
-        &mut self,
-        proxy_id: edgeless_api::function_instance::InstanceId,
-        internal_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        internal_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
-        external_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
-    ) -> Result<(), String> {
-        match self
-            .proxy_client(&proxy_id.node_id)
-            .await
-            .ok_or(format!("No proxy client for node {}", proxy_id.node_id))?
-            .start(edgeless_api::proxy_instance::ProxySpec {
-                instance_id: proxy_id,
-                inner_outputs: internal_outputs,
-                inner_inputs: internal_inputs,
-                external_outputs,
-                external_inputs,
-            })
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(format!("failed starting proxy: {}", err)),
-        }
-    }
-
     async fn periodic_health_check(&mut self) {
         // First check if there are nodes that must be disconnected
         // because they failed to reply to a keep-alive.
         let to_be_disconnected = self.find_dead_nodes().await;
 
-        if to_be_disconnected.is_empty() {
-            return self.optimize().await;
-        }
-
         // Second, remove all those nodes from the map of clients.
         for node_id in to_be_disconnected.iter() {
             log::info!("disconnected node not replying to keep-alive: {}", &node_id);
-            let val = self.nodes.lock().await.remove(node_id);
+            let val = self.nodes.remove(node_id);
             assert!(val.is_some());
         }
 
         // Update the peers of (still alive) nodes by
         // deleting the missing-in-action peers.
         for removed_node_id in &to_be_disconnected {
-            for (_, client_desc) in self.nodes.lock().await.iter_mut() {
+            for (_, client_desc) in self.nodes.iter_mut() {
                 match client_desc
-                    .api
-                    .node_management_api()
-                    .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(*removed_node_id))
+                    .update_peers(&[edgeless_api::node_management::UpdatePeersRequest::Del(*removed_node_id)])
                     .await
                 {
                     Ok(_) => {}
@@ -784,15 +308,10 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
 
     async fn find_dead_nodes(&mut self) -> std::collections::HashSet<edgeless_api::function_instance::NodeId> {
         let mut dead_nodes = std::collections::HashSet::new();
-        for (node_id, client_desc) in self.nodes.lock().await.iter_mut() {
-            match client_desc.api.node_management_api().keep_alive().await {
-                Ok(health_status) => {
-                    client_desc.health_status = health_status;
-                }
-                Err(_) => {
-                    dead_nodes.insert(*node_id);
-                }
-            };
+        for (node_id, client_desc) in self.nodes.iter_mut() {
+            if client_desc.health_check().await.is_err() {
+                dead_nodes.insert(*node_id);
+            }
         }
         dead_nodes
     }
@@ -804,246 +323,15 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy> Cont
             .cloned()
             .collect::<Vec<edgeless_api::workflow_instance::WorkflowId>>()
         {
-            self.handle_node_removal_for_workflow(removed_nodes, wf_id.clone()).await;
-        }
-    }
-
-    async fn handle_node_removal_for_workflow(
-        &mut self,
-        removed_nodes: &std::collections::HashSet<edgeless_api::function_instance::NodeId>,
-        wf_id: edgeless_api::workflow_instance::WorkflowId,
-    ) {
-        if let Some(wf) = self.active_workflows.get_mut(&wf_id) {
-            let required_changes = {
-                let nodes = self.nodes.lock().await;
-                let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
-                    nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
-                tokio::task::block_in_place(|| {
-                    wf.node_removal(
-                        removed_nodes,
-                        &ir_nodes,
-                        &std::collections::HashMap::new(),
-                        &mut self.global_pipeline_state,
-                    )
-                })
-            };
-            if let Err(errs) = self.materialize(wf_id, required_changes).await {
-                log::error!("Failures Handling Node Removal: {}", errs.join(";"));
+            if let Some(wf) = self.active_workflows.get_mut(&wf_id) {
+                wf.remove_nodes(removed_nodes.clone()).await;
             }
         }
-    }
-
-    async fn optimize(&mut self) {
-        for wf_id in self
-            .active_workflows
-            .keys()
-            .cloned()
-            .collect::<Vec<edgeless_api::workflow_instance::WorkflowId>>()
-        {
-            self.optimize_workflow(wf_id.clone()).await;
-        }
-    }
-
-    async fn optimize_workflow(&mut self, wf_id: edgeless_api::workflow_instance::WorkflowId) {
-        if let Some(wf) = self.active_workflows.get_mut(&wf_id) {
-            let required_changes = {
-                let nodes = self.nodes.lock().await;
-                let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
-                    nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
-                tokio::task::block_in_place(|| wf.periodic_optimize(&ir_nodes, &std::collections::HashMap::new(), &mut self.global_pipeline_state))
-            };
-            if let Err(errs) = self.materialize(wf_id, required_changes).await {
-                log::error!("Failures Handling Periodic Optimization: {}", errs.join(";"));
-            }
-        }
-    }
-
-    async fn patch_outputs(
-        &mut self,
-        origin_id: edgeless_api::function_instance::InstanceId,
-        origin_type: super::ComponentType,
-        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
-        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        name_in_workflow: &str,
-    ) -> Result<(), String> {
-        match origin_type {
-            super::ComponentType::Function => {
-                match self
-                    .fn_client(&origin_id.node_id)
-                    .await
-                    .ok_or(format!("No function client for node: {}", origin_id.node_id))?
-                    .patch(edgeless_api::common::PatchRequest {
-                        function_id: origin_id,
-                        output_mapping,
-                        input_mapping,
-                    })
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
-                }
-            }
-            super::ComponentType::Resource => {
-                match self
-                    .resource_client(&origin_id.node_id)
-                    .await
-                    .ok_or(format!("No resource client for node: {}", origin_id.node_id))?
-                    .patch(edgeless_api::common::PatchRequest {
-                        function_id: origin_id,
-                        output_mapping,
-                        input_mapping,
-                    })
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
-                }
-            }
-            super::ComponentType::SubFlow => {
-                match self
-                    .workflow_client(&origin_id.node_id)
-                    .await
-                    .ok_or(format!("No workflow client for cluster {}", origin_id.node_id))?
-                    .patch(edgeless_api::common::PatchRequest {
-                        function_id: origin_id,
-                        output_mapping,
-                        input_mapping,
-                    })
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
-                }
-            }
-        }
-    }
-
-    async fn patch_proxy_instance(
-        &mut self,
-        proxy_id: edgeless_api::function_instance::InstanceId,
-        internal_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        internal_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
-        external_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
-    ) -> Result<(), String> {
-        match self
-            .proxy_client(&proxy_id.node_id)
-            .await
-            .ok_or(format!("No proxy client for node {}", proxy_id.node_id))?
-            .patch(edgeless_api::proxy_instance::ProxySpec {
-                instance_id: proxy_id,
-                inner_outputs: internal_outputs,
-                inner_inputs: internal_inputs,
-                external_outputs,
-                external_inputs,
-            })
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(format!("failed patching proxy {}", err)),
-        }
-    }
-
-    async fn create_link_control_plane(
-        &mut self,
-        link_id: edgeless_api::link::LinkInstanceId,
-        class: edgeless_api::link::LinkType,
-    ) -> Result<(), String> {
-        if let Some(lc) = self.global_pipeline_state.pipe_generator_state.inner.get_mut(&class) {
-            lc.instantiate_control_plane(link_id).await;
-        }
-        Ok(())
-    }
-
-    async fn create_link_on_node(
-        &mut self,
-        link_id: edgeless_api::link::LinkInstanceId,
-        node_id: edgeless_api::function_instance::NodeId,
-        link_provider_id: edgeless_api::link::LinkProviderId,
-        config: Vec<u8>,
-    ) -> Result<(), String> {
-        if let Some(node) = self.nodes.lock().await.get_mut(&node_id) {
-            node.api
-                .link_instance_api()
-                .create(edgeless_api::link::CreateLinkRequest {
-                    id: link_id,
-                    provider: link_provider_id,
-                    config,
-                    direction: edgeless_api::link::LinkDirection::BiDi,
-                })
-                .await
-                .map_err(|e| e.to_string())?;
-            Ok(())
-        } else {
-            Err("Node Not Found".to_string())
-        }
-    }
-
-    async fn remove_link_from_node(
-        &mut self,
-        link_id: edgeless_api::link::LinkInstanceId,
-        node_id: edgeless_api::function_instance::NodeId,
-    ) -> Result<(), String> {
-        if let Some(node) = self.nodes.lock().await.get_mut(&node_id) {
-            node.api.link_instance_api().remove(link_id).await.map_err(|e| e.to_string())?;
-            Ok(())
-        } else {
-            Err("Node Not Found".to_string())
-        }
-    }
-
-    async fn fn_client(
-        &mut self,
-        node_id: &edgeless_api::function_instance::NodeId,
-    ) -> Option<Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>>> {
-        Some(self.nodes.lock().await.get_mut(node_id)?.api.function_instance_api())
-    }
-
-    async fn resource_client(
-        &mut self,
-        node_id: &edgeless_api::function_instance::NodeId,
-    ) -> Option<Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>> {
-        Some(self.nodes.lock().await.get_mut(node_id)?.api.resource_configuration_api())
-    }
-
-    async fn workflow_client(
-        &mut self,
-        cluster_id: &edgeless_api::function_instance::NodeId,
-    ) -> Option<Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>> {
-        Some(self.peer_clusters.lock().await.get_mut(cluster_id)?.api.workflow_instance_api())
-    }
-
-    async fn proxy_client(
-        &mut self,
-        node_id: &edgeless_api::function_instance::NodeId,
-    ) -> Option<Box<dyn edgeless_api::proxy_instance::ProxyInstanceAPI>> {
-        Some(self.nodes.lock().await.get_mut(node_id)?.api.proxy_instance_api())
     }
 
     async fn send_peer_updates(&mut self, updates: Vec<edgeless_api::node_management::UpdatePeersRequest>) {
-        for (n_id, n_spec) in self.nodes.lock().await.iter_mut() {
-            for update in &updates {
-                let is_self = match update {
-                    edgeless_api::node_management::UpdatePeersRequest::Add(id, _) => id == n_id,
-                    edgeless_api::node_management::UpdatePeersRequest::Del(id) => id == n_id,
-                    edgeless_api::node_management::UpdatePeersRequest::Clear => false,
-                };
-
-                if !is_self {
-                    n_spec.api.node_management_api().update_peers(update.clone()).await.unwrap();
-                }
-            }
-        }
-    }
-
-    async fn get_api_for_url(agent_url: &str) -> Box<dyn edgeless_api::agent::AgentAPI + Send> {
-        let (proto, host, port) = edgeless_api::util::parse_http_host(agent_url).unwrap();
-        match proto {
-            edgeless_api::util::Proto::COAP => {
-                let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
-                Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
-            }
-            _ => Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(agent_url).await),
+        for (_n_id, n_spec) in self.nodes.iter_mut() {
+            n_spec.update_peers(&updates).await.unwrap();
         }
     }
 }
