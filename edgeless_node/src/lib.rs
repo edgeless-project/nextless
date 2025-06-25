@@ -141,9 +141,9 @@ impl EdgelessNodeSettings {
     /// Create settings for a node with WASM run-time and no resources
     /// binding the given ports on the same address.
     pub fn new_without_resources(controller_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
-        let agent_url = format!("http://{}:{}", node_address, agent_port);
-        let invocation_url = format!("http://{}:{}", node_address, invocation_port);
-        let invocation_url_coap = Some(format!("coap://{}:{}", node_address, invocation_port));
+        let agent_url = format!("http://{node_address}:{agent_port}");
+        let invocation_url = format!("http://{node_address}:{invocation_port}");
+        let invocation_url_coap = Some(format!("coap://{node_address}:{invocation_port}"));
         Self {
             general: EdgelessNodeGeneralSettings {
                 node_id: uuid::Uuid::new_v4(),
@@ -153,7 +153,7 @@ impl EdgelessNodeSettings {
                 invocation_url_announced: invocation_url,
                 invocation_url_coap: invocation_url_coap.clone(),
                 invocation_url_announced_coap: invocation_url_coap,
-                metrics_url: format!("http://{}:{}", node_address, metrics_port),
+                metrics_url: format!("http://{node_address}:{metrics_port}"),
                 controller_url: controller_url.to_string(),
             },
             wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
@@ -181,14 +181,14 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         None => "".to_string(),
     };
     if model_name_set.len() > 1 {
-        log::debug!("CPUs have different models, using: {}", model_name_cpu);
+        log::debug!("CPUs have different models, using: {model_name_cpu}");
     }
     let clock_freq_cpu = match clock_freq_cpu_set.iter().next() {
         Some(val) => *val as f32,
         None => 0.0,
     };
     if clock_freq_cpu_set.len() > 1 {
-        log::debug!("CPUs have different frequencies, using: {}", clock_freq_cpu);
+        log::debug!("CPUs have different frequencies, using: {clock_freq_cpu}");
     }
 
     edgeless_api::node_registration::NodeCapabilities {
@@ -273,7 +273,7 @@ async fn fill_resources(
         if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider) {
             if !http_ingress_url.is_empty() && !provider_id.is_empty() {
                 let class_type = "http-ingress".to_string();
-                log::info!("Creating resource '{}' at {}", provider_id, http_ingress_url);
+                log::info!("Creating resource '{provider_id}' at {http_ingress_url}");
                 ret.insert(
                     provider_id.clone(),
                     agent::ResourceDesc {
@@ -296,7 +296,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.http_egress_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating resource '{provider_id}'");
                 let class_type = "http-egress".to_string();
                 ret.insert(
                     provider_id.clone(),
@@ -321,7 +321,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.file_log_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating resource '{provider_id}'");
                 let class_type = "file-log".to_string();
                 ret.insert(
                     provider_id.clone(),
@@ -346,7 +346,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.redis_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating resource '{provider_id}'");
                 let class_type = "redis".to_string();
                 ret.insert(
                     provider_id.clone(),
@@ -371,7 +371,7 @@ async fn fill_resources(
 
         if let (Some(dda_url), Some(provider_id)) = (&settings.dda_url, &settings.dda_provider) {
             if !dda_url.is_empty() && !provider_id.is_empty() {
-                log::info!("Creating resource '{}' at {}", provider_id, dda_url);
+                log::info!("Creating resource '{provider_id}' at {dda_url}");
                 let class_type = "dda".to_string();
                 ret.insert(
                     provider_id.clone(),
@@ -433,7 +433,7 @@ async fn fill_resources(
 
 pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     log::info!("Starting Edgeless Node");
-    log::debug!("Settings: {:?}", settings);
+    log::debug!("Settings: {settings:?}");
 
     // Create the state manager.
     let state_manager = Box::new(state_management::StateManager::new().await);

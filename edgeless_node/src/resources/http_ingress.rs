@@ -142,12 +142,12 @@ pub async fn ingress_task(
                         io,
                         IngressService {
                             interests: cloned_interests,
-                            listen_addr: format!("{}:{}", cloned_host, cloned_port).to_string(),
+                            listen_addr: format!("{cloned_host}:{cloned_port}").to_string(),
                         },
                     )
                     .await
                 {
-                    println!("Error serving connection: {:?}", err);
+                    println!("Error serving connection: {err:?}");
                 }
             });
         }

@@ -106,7 +106,7 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
     }
 
     async fn stop_function(&mut self, instance_id: edgeless_api::function_instance::InstanceId) {
-        log::info!("Stop Function {:?}", instance_id);
+        log::info!("Stop Function {instance_id:?}");
         if let Some(instance) = self.functions.get_mut(&instance_id) {
             instance.stop().await;
         }
@@ -120,7 +120,7 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
     }
 
     async fn function_exit(&mut self, instance_id: edgeless_api::function_instance::InstanceId, status: Result<(), super::FunctionInstanceError>) {
-        log::info!("Function Exit Event: {:?} {:?}", instance_id, status);
+        log::info!("Function Exit Event: {instance_id:?} {status:?}");
         self.functions.remove(&instance_id);
     }
 }

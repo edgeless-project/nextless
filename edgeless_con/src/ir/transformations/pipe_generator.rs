@@ -50,8 +50,8 @@ impl super::StatefulTransformation<PipeGeneratorState> for PipeGenerator {
             let mut current = c.borrow_mut();
             let (logical_ports, physical_instances) = current.split_view();
             for i in &physical_instances {
-                if let Some(i) = i.borrow_mut().try_unpack() {
-                    let own_id = i.id().node_id.clone();
+                if let Some(i) = i.borrow_mut().try_unpack_mut() {
+                    let own_id = i.id().node_id;
                     for (out_id, out) in &mut i.physical_ports().physical_output_mapping {
                         if let edgeless_api::common::Output::All(targets) = out {
                             if targets.len() >= 2 {
@@ -112,7 +112,7 @@ impl super::StatefulTransformation<PipeGeneratorState> for PipeGenerator {
                                             .instances()
                                             .iter()
                                             .for_each(|i| {
-                                                if let Some(i) = i.borrow_mut().try_unpack() {
+                                                if let Some(i) = i.borrow_mut().try_unpack_mut() {
                                                     i.physical_ports()
                                                         .physical_input_mapping
                                                         .insert(target_port_id.clone(), PhysicalInput::Link(new_link.clone()));

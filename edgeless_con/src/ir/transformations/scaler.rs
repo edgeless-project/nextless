@@ -59,11 +59,7 @@ impl super::StatelessTransformation for Scaler {
             };
 
             if can_scale_up && should_scale_up && wait_period_exceeded {
-                log::info!(
-                    "Attempting to Scale Up. Message Rate:{} Processing Rate:{}",
-                    message_rate,
-                    processing_rate
-                );
+                log::info!("Attempting to Scale Up. Message Rate:{message_rate} Processing Rate:{processing_rate}");
                 f.instances.push(std::cell::RefCell::new(super::super::PhysicalComponentState::new()));
             }
 

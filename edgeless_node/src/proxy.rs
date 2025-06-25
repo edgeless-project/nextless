@@ -57,7 +57,7 @@ impl ProxyInstanceTask {
                         match internal_message.message {
                             edgeless_dataplane::core::Message::Cast(msg) => {
                                 if let Err(e) = self.external_dataplane.send_alias(internal_message.target_port.0, &msg, opentelemetry::Context::new()).await {
-                                    log::error!("Proxy External Send Error: {}", e);
+                                    log::error!("Proxy External Send Error: {e}");
                                 }
                             },
                             edgeless_dataplane::core::Message::Call(msg) => {
@@ -75,7 +75,7 @@ impl ProxyInstanceTask {
                         match external_message.message {
                             edgeless_dataplane::core::Message::Cast(msg) => {
                                 if let Err(e) = self.internal_dataplane.send_alias(external_message.target_port.0, &msg, opentelemetry::Context::new()).await {
-                                    log::error!("Proxy Internal Send Error: {}", e);
+                                    log::error!("Proxy Internal Send Error: {e}");
                                 }
                             },
                             edgeless_dataplane::core::Message::Call(msg) => {

@@ -119,7 +119,7 @@ pub async fn cast(
         Ok(_) => {}
         Err(_) => {
             // We ignore casts to unknown targets.
-            log::warn!("Cast to unknown target: {}", target);
+            log::warn!("Cast to unknown target: {target}");
         }
     };
 
@@ -229,7 +229,7 @@ pub async fn webgpu_instance_adapter_create(mut caller: wasmtime::Caller<'_, Gue
     log::info!("New Adapter");
     let ret = caller.data_mut().wgpu_wrapper.new_adapter(instance_id).await;
 
-    log::info!("{:?}", ret);
+    log::info!("{ret:?}");
     ret.map_err(|_| wasmtime::Error::msg("WGPU Adapter Create Failure"))
 }
 
@@ -403,7 +403,7 @@ pub fn webgpu_device_poll(
         2 => wgpu::PollType::Wait,
         3 => wgpu::PollType::Poll,
         _ => {
-            log::error!("Tries to Use Unsupported Poll Type: {}", poll_type);
+            log::error!("Tries to Use Unsupported Poll Type: {poll_type}");
             return Err(wasmtime::Error::msg("Bad Poll Type"));
         }
     };

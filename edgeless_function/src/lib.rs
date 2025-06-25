@@ -81,10 +81,10 @@ pub fn parse_init_payload(payload: &str) -> std::collections::HashMap<&str, &str
             if let Some(value) = inner_tokens.next() {
                 arguments.insert(key, value);
             } else {
-                log::error!("invalid initialization token: {}", token);
+                log::error!("invalid initialization token: {token}");
             }
         } else {
-            log::error!("invalid initialization token: {}", token);
+            log::error!("invalid initialization token: {token}");
         }
     }
     arguments

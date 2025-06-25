@@ -66,7 +66,7 @@ impl crate::grpc_impl::api::proxy_instance_server::ProxyInstance for ProxyInstan
 
         match self.root_api.lock().await.start(parsed).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(e) => Err(tonic::Status::internal(format!("could not start proxy {}", e))),
+            Err(e) => Err(tonic::Status::internal(format!("could not start proxy {e}"))),
         }
     }
 
@@ -82,7 +82,7 @@ impl crate::grpc_impl::api::proxy_instance_server::ProxyInstance for ProxyInstan
 
         match self.root_api.lock().await.stop(parsed).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(e) => Err(tonic::Status::internal(format!("could not stop proxy {}", e))),
+            Err(e) => Err(tonic::Status::internal(format!("could not stop proxy {e}"))),
         }
     }
 
@@ -98,7 +98,7 @@ impl crate::grpc_impl::api::proxy_instance_server::ProxyInstance for ProxyInstan
 
         match self.root_api.lock().await.patch(parsed).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(e) => Err(tonic::Status::internal(format!("could not patch proxy: {}", e))),
+            Err(e) => Err(tonic::Status::internal(format!("could not patch proxy: {e}"))),
         }
     }
 }

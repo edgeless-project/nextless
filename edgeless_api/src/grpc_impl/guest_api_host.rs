@@ -95,14 +95,13 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an OutputEventData message: {}",
-                    err
+                    "Error when parsing an OutputEventData message: {err}"
                 )));
             }
         };
         match self.guest_api_host.lock().await.cast(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when casting an event: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when casting an event: {err}"))),
         }
     }
 
@@ -111,14 +110,13 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an OutputEventDataRaw message: {}",
-                    err
+                    "Error when parsing an OutputEventDataRaw message: {err}"
                 )));
             }
         };
         match self.guest_api_host.lock().await.cast_raw(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when raw-casting an event: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when raw-casting an event: {err}"))),
         }
     }
 
@@ -130,14 +128,13 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an OutputEventData message: {}",
-                    err
+                    "Error when parsing an OutputEventData message: {err}"
                 )));
             }
         };
         match self.guest_api_host.lock().await.call(parsed_request).await {
             Ok(msg) => Ok(tonic::Response::new(crate::grpc_impl::guest_api_function::serialize_call_return(&msg))),
-            Err(err) => Err(tonic::Status::internal(format!("Error when calling a function: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when calling a function: {err}"))),
         }
     }
 
@@ -149,14 +146,13 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an OutputEventDataRaw message: {}",
-                    err
+                    "Error when parsing an OutputEventDataRaw message: {err}"
                 )));
             }
         };
         match self.guest_api_host.lock().await.call_raw(parsed_request).await {
             Ok(msg) => Ok(tonic::Response::new(crate::grpc_impl::guest_api_function::serialize_call_return(&msg))),
-            Err(err) => Err(tonic::Status::internal(format!("Error when raw-calling a function: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when raw-calling a function: {err}"))),
         }
     }
 
@@ -165,14 +161,13 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing a TelemetryLogEvent message: {}",
-                    err
+                    "Error when parsing a TelemetryLogEvent message: {err}"
                 )));
             }
         };
         match self.guest_api_host.lock().await.telemetry_log(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when emitting a telemetry log event: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when emitting a telemetry log event: {err}"))),
         }
     }
 
@@ -181,7 +176,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             Ok(msg) => Ok(tonic::Response::new(crate::grpc_impl::common::CommonConverters::serialize_instance_id(
                 &msg,
             ))),
-            Err(err) => Err(tonic::Status::internal(format!("Error when raw-casting an event: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when raw-casting an event: {err}"))),
         }
     }
 
@@ -190,14 +185,13 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing a DelayedEventData message: {}",
-                    err
+                    "Error when parsing a DelayedEventData message: {err}"
                 )));
             }
         };
         match self.guest_api_host.lock().await.delayed_cast(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when casting a delayed event: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when casting a delayed event: {err}"))),
         }
     }
 
@@ -205,12 +199,12 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
         let parsed_request = match parse_sync_data(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
-                return Err(tonic::Status::invalid_argument(format!("Error when parsing a SyncData message: {}", err)));
+                return Err(tonic::Status::invalid_argument(format!("Error when parsing a SyncData message: {err}")));
             }
         };
         match self.guest_api_host.lock().await.sync(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when synchronizing: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when synchronizing: {err}"))),
         }
     }
 }

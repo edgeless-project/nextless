@@ -340,16 +340,13 @@ where
         let stop_function_id = match crate::grpc_impl::common::ParseableId::<FunctionIdType>::parse(&request.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
-                log::error!("Error when stopping a function instance: {}", err);
-                return Err(tonic::Status::invalid_argument(format!(
-                    "Error when stopping a function instance: {}",
-                    err
-                )));
+                log::error!("Error when stopping a function instance: {err}");
+                return Err(tonic::Status::invalid_argument(format!("Error when stopping a function instance: {err}")));
             }
         };
         match self.root_api.lock().await.stop(stop_function_id).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Function instance stopping error: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Function instance stopping error: {err}"))),
         }
     }
 
@@ -357,18 +354,16 @@ where
         let parsed_update = match CommonConverters::parse_patch_request(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
-                log::error!("Parse UpdateFunctionLinks Failed: {}", err);
+                log::error!("Parse UpdateFunctionLinks Failed: {err}");
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when updating the links of a function instance: {}",
-                    err
+                    "Error when updating the links of a function instance: {err}"
                 )));
             }
         };
         match self.root_api.lock().await.patch(parsed_update).await {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::internal(format!(
-                "Error when updating the links of a function instance: {}",
-                err
+                "Error when updating the links of a function instance: {err}"
             ))),
         }
     }

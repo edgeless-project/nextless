@@ -57,16 +57,15 @@ impl crate::grpc_impl::api::node_registration_server::NodeRegistration for NodeR
         let parsed_request = match parse_update_node_request(&request.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
-                log::error!("Parse UpdateNodeRequest Failed: {}", err);
+                log::error!("Parse UpdateNodeRequest Failed: {err}");
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an UpdateNodeRequest message: {}",
-                    err
+                    "Error when parsing an UpdateNodeRequest message: {err}"
                 )));
             }
         };
         match self.node_registration_api.lock().await.update_node(parsed_request).await {
             Ok(res) => Ok(tonic::Response::new(serialize_update_node_response(&res))),
-            Err(err) => Err(tonic::Status::internal(format!("Error when updating a node: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when updating a node: {err}"))),
         }
     }
 }

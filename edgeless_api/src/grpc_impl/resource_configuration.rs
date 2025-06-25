@@ -79,7 +79,7 @@ impl<ResourceIdType> ResourceConfigurationClient<ResourceIdType> {
                 Err(err) => match retry_interval {
                     Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
                     None => {
-                        log::warn!("Error when connecting to {}: {}", server_addr, err);
+                        log::warn!("Error when connecting to {server_addr}: {err}");
                         return Self {
                             client: None,
                             _phantom: std::marker::PhantomData {},
@@ -194,12 +194,12 @@ where
         let parsed_id = match crate::grpc_impl::common::ParseableId::<ResourceIdType>::parse(&inner) {
             Ok(val) => val,
             Err(err) => {
-                return Err(tonic::Status::invalid_argument(format!("Error when deleting a resource: {}", err)));
+                return Err(tonic::Status::invalid_argument(format!("Error when deleting a resource: {err}")));
             }
         };
         match self.root_api.lock().await.stop(parsed_id).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when deleting a resource: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when deleting a resource: {err}"))),
         }
     }
 
@@ -208,12 +208,12 @@ where
         let parsed_request = match CommonConverters::parse_patch_request(&inner) {
             Ok(val) => val,
             Err(err) => {
-                return Err(tonic::Status::invalid_argument(format!("Error when patching a resource: {}", err)));
+                return Err(tonic::Status::invalid_argument(format!("Error when patching a resource: {err}")));
             }
         };
         match self.root_api.lock().await.patch(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when patching a resource: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when patching a resource: {err}"))),
         }
     }
 }

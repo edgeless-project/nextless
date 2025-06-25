@@ -70,7 +70,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                                     match reply_sender.send(r) {
                                         Ok(_) => {}
                                         Err(err) => {
-                                            log::error!("Unhandled: {:?}", err);
+                                            log::error!("Unhandled: {err:?}");
                                         }
                                     }
                                 }).await;
@@ -84,7 +84,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                                 match reply_sender.send(reply) {
                                     Ok(_) => {}
                                     Err(err) => {
-                                        log::error!("Unhandled: {:?}", err);
+                                        log::error!("Unhandled: {err:?}");
                                     }
                                 }
                             }
@@ -96,7 +96,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                                 match reply_sender.send(reply) {
                                     Ok(_) => {}
                                     Err(err) => {
-                                        log::error!("Unhandled: {:?}", err);
+                                        log::error!("Unhandled: {err:?}");
                                     }
                                 }
                             },
@@ -152,7 +152,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     async fn stop_workflow(&mut self, wf_id: &edgeless_api::workflow_instance::WorkflowId) {
         let mut workflow = match self.active_workflows.remove(wf_id) {
             None => {
-                log::error!("trying to tear-down a workflow that does not exist: {}", wf_id);
+                log::error!("trying to tear-down a workflow that does not exist: {wf_id}");
                 return;
             }
             Some(val) => val,
@@ -174,8 +174,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             }]
         } else {
             self.active_workflows
-                .iter()
-                .map(|(wf_id, _wf)| edgeless_api::workflow_instance::WorkflowInstance {
+                .keys()
+                .map(|wf_id| edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: wf_id.clone(),
                     //TODO(raphaelhetzel) Replace this with a new representation.
                     node_mapping: Vec::new(),
@@ -204,7 +204,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         capabilities: edgeless_api::node_registration::NodeCapabilities,
         link_providers: Vec<edgeless_api::node_registration::LinkProviderSpecification>,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        log::info!("Node Registration: {}, {}, {}", node_id, agent_url, invocation_url);
+        log::info!("Node Registration: {node_id}, {agent_url}, {invocation_url}");
         if let Some(node) = self.nodes.get(&node_id) {
             if node.agent_url() == agent_url && node.invocation_url() == invocation_url {
                 return Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted);
@@ -224,7 +224,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             capabilities,
             link_providers,
             self.telemetry_provider.clone(),
-            self.cluster_id.clone(),
+            self.cluster_id,
         )
         .await;
 
@@ -252,7 +252,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             }
         }
 
-        for (_, wf) in &mut self.active_workflows {
+        for wf in self.active_workflows.values_mut() {
             wf.add_nodes(vec![n.clone()]).await;
         }
 
@@ -297,7 +297,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 {
                     Ok(_) => {}
                     Err(err) => {
-                        log::error!("Unhandled: {}", err);
+                        log::error!("Unhandled: {err}");
                     }
                 }
             }

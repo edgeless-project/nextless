@@ -118,7 +118,7 @@ impl CoapOrchestrationServer {
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {
-                log::error!("UDP/COAP Send Error: {:?}", err);
+                log::error!("UDP/COAP Send Error: {err:?}");
             }
         }
     }
@@ -170,7 +170,7 @@ impl CoapOrchestrationServer {
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {
-                log::error!("UDP/COAP Send Error: {:?}", err);
+                log::error!("UDP/COAP Send Error: {err:?}");
             }
         }
     }
@@ -189,7 +189,7 @@ impl CoapOrchestrationServer {
                 true,
             );
             if let Err(err) = self.sock.send_to(data, target).await {
-                log::error!("UDP/COAP Send Error: {:?}", err);
+                log::error!("UDP/COAP Send Error: {err:?}");
             }
         }
     }

@@ -393,7 +393,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         // The state_specification configuration should be
         // read from the function annotations.
         log::debug!("state specifications currently forced to NodeLocal");
-        log::info!("{:?}", output_mapping);
+        log::info!("{output_mapping:?}");
 
         self.image_repository.update(image.code.image_hash(), image.code.clone()).await;
 
@@ -430,19 +430,19 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         match response {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    log::warn!("function instance {}:{} creation rejected: {}", wf_id, f_name, error);
-                    Err(format!("function instance creation rejected: {} ", error))
+                    log::warn!("function instance {wf_id}:{f_name} creation rejected: {error}");
+                    Err(format!("function instance creation rejected: {error} "))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(_id) => Ok(()),
             },
-            Err(err) => Err(format!("failed interaction when creating a function instance: {}", err)),
+            Err(err) => Err(format!("failed interaction when creating a function instance: {err}")),
         }
     }
 
     async fn stop_workflow_function_on_node(&mut self, function_id: edgeless_api::function_instance::InstanceId) -> Result<(), String> {
         if let Some(node_api) = self.nodes.get_mut(&function_id.node_id) {
             if let Err(e) = node_api.fn_client().unwrap().stop(function_id).await {
-                Err(format!("Stopping Node Failed: {}", e))
+                Err(format!("Stopping Node Failed: {e}"))
             } else {
                 Ok(())
             }
@@ -478,15 +478,15 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         match response {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    log::warn!("resource start rejected: {}", error);
-                    Err(format!("resource start rejected: {} ", error))
+                    log::warn!("resource start rejected: {error}");
+                    Err(format!("resource start rejected: {error} "))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     log::info!("workflow {} resource {} started with fid {}", wf_id, &r_name, &id);
                     Ok(())
                 }
             },
-            Err(err) => Err(format!("failed interaction when starting a resource: {}", err)),
+            Err(err) => Err(format!("failed interaction when starting a resource: {err}")),
         }
     }
 
@@ -525,7 +525,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             .await
         {
             Ok(_) => Ok(()),
-            Err(err) => Err(format!("failed starting proxy: {}", err)),
+            Err(err) => Err(format!("failed starting proxy: {err}")),
         }
     }
 
@@ -588,7 +588,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     .await
                 {
                     Ok(_) => Ok(()),
-                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
+                    Err(err) => Err(format!("failed interaction when patching component {name_in_workflow}: {err}")),
                 }
             }
             super::ComponentType::Resource => {
@@ -604,7 +604,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     .await
                 {
                     Ok(_) => Ok(()),
-                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
+                    Err(err) => Err(format!("failed interaction when patching component {name_in_workflow}: {err}")),
                 }
             }
             super::ComponentType::SubFlow => {
@@ -620,7 +620,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     .await
                 {
                     Ok(_) => Ok(()),
-                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
+                    Err(err) => Err(format!("failed interaction when patching component {name_in_workflow}: {err}")),
                 }
             }
         }
@@ -648,7 +648,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             .await
         {
             Ok(_) => Ok(()),
-            Err(err) => Err(format!("failed patching proxy {}", err)),
+            Err(err) => Err(format!("failed patching proxy {err}")),
         }
     }
 

@@ -74,7 +74,7 @@ pub fn rust_to_wasm(
     cargo::ops::compile(&ws, &compile_options)?;
 
     let raw_result = build_dir
-        .join(format!("wasm32-unknown-unknown/release/{}.wasm", lib_name))
+        .join(format!("wasm32-unknown-unknown/release/{lib_name}.wasm"))
         .to_str()
         .unwrap()
         .to_string();
@@ -205,7 +205,7 @@ pub fn rust_to_dynlib(
     cargo::ops::compile(&ws, &compile_options)?;
 
     let raw_result = build_dir
-        .join(format!("{}/release/{}.actor", target_tripple, lib_name))
+        .join(format!("{target_tripple}/release/{lib_name}.actor"))
         .to_str()
         .unwrap()
         .to_string();

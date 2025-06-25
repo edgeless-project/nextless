@@ -75,11 +75,11 @@ impl ActiveWorkflow {
         if let Some(component) = self.functions.get(component_name) {
             Some(component as &std::cell::RefCell<dyn LogicalComponent>)
         } else if let Some(compoenent) = self.resources.get(component_name) {
-            return Some(compoenent as &std::cell::RefCell<dyn LogicalComponent>);
+            Some(compoenent as &std::cell::RefCell<dyn LogicalComponent>)
         } else if component_name == "__proxy" {
-            return Some(&self.proxy as &std::cell::RefCell<dyn LogicalComponent>);
+            Some(&self.proxy as &std::cell::RefCell<dyn LogicalComponent>)
         } else {
-            return None;
+            None
         }
     }
 }

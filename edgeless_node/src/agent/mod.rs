@@ -49,7 +49,7 @@ impl Agent {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         for class_type in runners.keys() {
-            log::info!("new runner, class_type: {}", class_type);
+            log::info!("new runner, class_type: {class_type}");
         }
 
         let main_task = Box::pin(async move {
@@ -92,7 +92,7 @@ impl Agent {
         while let Some(req) = receiver.next().await {
             match req {
                 AgentRequest::Spawn(spawn_req) => {
-                    log::debug!("Agent Spawn {:?}", spawn_req);
+                    log::debug!("Agent Spawn {spawn_req:?}");
 
                     // Save function_class for further interaction.
                     // We can assume that the Optional<instance_id> is present.
@@ -109,7 +109,7 @@ impl Agent {
                             match r.start(*spawn_req).await {
                                 Ok(_) => {}
                                 Err(err) => {
-                                    log::error!("Unhandled Start Error: {}", err);
+                                    log::error!("Unhandled Start Error: {err}");
                                     continue;
                                 }
                             }
@@ -121,13 +121,13 @@ impl Agent {
                     }
                 }
                 AgentRequest::Stop(stop_function_id) => {
-                    log::debug!("Agent Stop {:?}", stop_function_id);
+                    log::debug!("Agent Stop {stop_function_id:?}");
 
                     // Get function class by looking it up in the instanceId->functionClass map
                     let function_class: String = match component_id_to_class_map.get(&stop_function_id) {
                         Some(v) => v.clone(),
                         None => {
-                            log::error!("Could not find function_class for instanceId {}", stop_function_id);
+                            log::error!("Could not find function_class for instanceId {stop_function_id}");
                             continue;
                         }
                     };
@@ -140,16 +140,16 @@ impl Agent {
                                 Ok(_) => {
                                     // Successfully stopped - now delete the component_id -> function_class mapping
                                     component_id_to_class_map.remove(&stop_function_id);
-                                    log::info!("Stopped function {} and cleared memory.", stop_function_id);
+                                    log::info!("Stopped function {stop_function_id} and cleared memory.");
                                 }
                                 Err(err) => {
-                                    log::error!("Unhandled Stop Error: {}", err);
+                                    log::error!("Unhandled Stop Error: {err}");
                                     continue;
                                 }
                             }
                         }
                         None => {
-                            log::error!("Could not find runner for {}", function_class);
+                            log::error!("Could not find runner for {function_class}");
                             continue;
                         }
                     }
@@ -157,7 +157,7 @@ impl Agent {
 
                 // PatchRequest contains function_id: ComponentId
                 AgentRequest::Patch(update) => {
-                    log::debug!("Agent UpdatePeers {:?}", update);
+                    log::debug!("Agent UpdatePeers {update:?}");
 
                     // Get function class by looking it up in the instanceId->functionClass map
                     let function_class: String = match component_id_to_class_map.get(&update.function_id) {
@@ -175,18 +175,18 @@ impl Agent {
                             match r.patch(update).await {
                                 Ok(_) => {}
                                 Err(err) => {
-                                    log::error!("Unhandled Patch Error: {}", err);
+                                    log::error!("Unhandled Patch Error: {err}");
                                 }
                             }
                         }
                         None => {
-                            log::error!("Could not find runner for {}", function_class);
+                            log::error!("Could not find runner for {function_class}");
                             continue;
                         }
                     }
                 }
                 AgentRequest::UpdatePeers(request) => {
-                    log::debug!("Agent UpdatePeers {:?}", request);
+                    log::debug!("Agent UpdatePeers {request:?}");
                     match request {
                         UpdatePeersRequest::Add(node_id, invocation_url) => {
                             data_plane_provider

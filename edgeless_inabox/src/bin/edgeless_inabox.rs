@@ -63,22 +63,19 @@ fn main() -> anyhow::Result<()> {
 /// number_of_nodes nodes in the directory. If directory is non-empty, it
 /// fails.
 fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
-    log::info!(
-        "Generating configuration files for Edgeless in a box with {} worker nodes",
-        number_of_nodes
-    );
+    log::info!("Generating configuration files for Edgeless in a box with {number_of_nodes} worker nodes");
 
     // Closure that returns a url with a new port on each call
     let mut port = 7000;
     let mut next_url = || {
         port += 1;
-        format!("http://127.0.0.1:{}", port)
+        format!("http://127.0.0.1:{port}")
     };
 
     let mut udp_port = 7000;
     let mut next_coap_url = || {
         udp_port += 1;
-        format!("coap://127.0.0.1:{}", udp_port)
+        format!("coap://127.0.0.1:{udp_port}")
     };
 
     let controller_url = next_url();
@@ -180,7 +177,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     let mut node_files = vec![];
     for (count, node_conf) in node_confs.into_iter().enumerate() {
         std::fs::write(
-            Path::new(&path).join(format!("node{}.toml", count)),
+            Path::new(&path).join(format!("node{count}.toml")),
             toml::to_string(&node_conf).expect("Wrong"),
         )
         .ok();

@@ -128,11 +128,11 @@ impl OllamaResource {
                                 .await;
                         }
                         Err(err) => {
-                            log::warn!("Error from ollama: {}", err)
+                            log::warn!("Error from ollama: {err}")
                         }
                     },
                     Err(err) => {
-                        log::warn!("Communication error with ollama resource provider: {}", err)
+                        log::warn!("Communication error with ollama resource provider: {err}")
                     }
                 }
             }
@@ -166,7 +166,7 @@ impl OllamaResourceProvider {
         let mut receiver: futures::channel::mpsc::UnboundedReceiver<OllamaCommand> = receiver;
 
         // Create a new instance of the ollama connector.
-        let mut ollama = ollama_rs::Ollama::new_with_history(format!("http://{}", ollama_host), ollama_port, ollama_messages_number_limit);
+        let mut ollama = ollama_rs::Ollama::new_with_history(format!("http://{ollama_host}"), ollama_port, ollama_messages_number_limit);
 
         let _handle = tokio::spawn(async move {
             let mut targets: std::collections::HashMap<

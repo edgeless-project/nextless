@@ -61,8 +61,8 @@ impl OrchestratorAPIServer {
         Box::pin(async move {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&orchestrator_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start OrchestratorAPIServer GRPC Server at {}", orchestrator_url);
+                if let Ok(host) = format!("{host}:{port}").parse() {
+                    log::info!("Start OrchestratorAPIServer GRPC Server at {orchestrator_url}");
                     match tonic::transport::Server::builder()
                         .add_service(
                             crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)

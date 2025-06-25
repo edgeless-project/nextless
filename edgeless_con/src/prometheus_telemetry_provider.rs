@@ -125,10 +125,7 @@ impl crate::ir::ComponentRuntimeStatistics for PrometheusComponentRuntimeStatist
             format_args!("{}s", period.as_secs())
         );
 
-        let query = format!(
-            "sum(increase(execution_time_seconds_sum{}))/sum(increase(execution_time_seconds_count{}))",
-            selector_time, selector_time
-        );
+        let query = format!("sum(increase(execution_time_seconds_sum{selector_time}))/sum(increase(execution_time_seconds_count{selector_time}))");
 
         single_value_helper(&self.client, query)
     }
@@ -141,10 +138,8 @@ impl crate::ir::ComponentRuntimeStatistics for PrometheusComponentRuntimeStatist
             format_args!("{}s", period.as_secs())
         );
 
-        let query = format!(
-            "(sum(increase(under_soft_limit_total{})) or vector(0))/sum(increase(execution_time_seconds_count{}))",
-            selector_time, selector_time
-        );
+        let query =
+            format!("(sum(increase(under_soft_limit_total{selector_time})) or vector(0))/sum(increase(execution_time_seconds_count{selector_time}))");
 
         single_value_helper(&self.client, query)
     }
@@ -157,10 +152,7 @@ impl crate::ir::ComponentRuntimeStatistics for PrometheusComponentRuntimeStatist
             format_args!("{}s", period.as_secs())
         );
 
-        let query = format!(
-            "(sum(increase(errors_total{})) or vector(0))/sum(increase(execution_time_seconds_count{}))",
-            selector_time, selector_time
-        );
+        let query = format!("(sum(increase(errors_total{selector_time})) or vector(0))/sum(increase(execution_time_seconds_count{selector_time}))");
 
         single_value_helper(&self.client, query)
     }
@@ -241,10 +233,8 @@ impl crate::ir::PortStatistics for PrometheusPortStatistics {
     fn message_size_mean_bytes(&self, period: std::time::Duration) -> Option<f64> {
         let selector_and_period = self.selector_and_period(period);
 
-        let query = format!(
-            "sum(increase(message_size_bytes_sum{}))/sum(increase(message_size_bytes_count{}))",
-            selector_and_period, selector_and_period
-        );
+        let query =
+            format!("sum(increase(message_size_bytes_sum{selector_and_period}))/sum(increase(message_size_bytes_count{selector_and_period}))");
 
         single_value_helper(&self.client, query)
     }
@@ -252,10 +242,7 @@ impl crate::ir::PortStatistics for PrometheusPortStatistics {
     fn message_size_mean_byte_by_peer(&self, period: std::time::Duration) -> Vec<(edgeless_api::function_instance::InstanceId, f64)> {
         let selector_and_period = self.selector_and_period(period);
 
-        let query = format!(
-            "increase(message_size_bytes_sum{})/increase(message_size_bytes_count{})",
-            selector_and_period, selector_and_period
-        );
+        let query = format!("increase(message_size_bytes_sum{selector_and_period})/increase(message_size_bytes_count{selector_and_period})");
         let res_f = self.client.query(query).post();
         let res = tokio::runtime::Handle::current().block_on(res_f);
         if let Ok(res) = res {
@@ -309,6 +296,6 @@ fn single_value_helper(client: &prometheus_http_query::Client, query: String) ->
             return Some(val.first()?.sample().value());
         }
     }
-    log::debug!("Prometheus Quert Failed: {}", query);
+    log::debug!("Prometheus Quert Failed: {query}");
     None
 }

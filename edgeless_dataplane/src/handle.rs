@@ -179,7 +179,7 @@ impl DataplaneHandle {
                         context,
                     };
                 }
-                log::error!("Unprocesses other message {:?}", message);
+                log::error!("Unprocesses other message {message:?}");
             }
         }
     }
@@ -189,15 +189,11 @@ impl DataplaneHandle {
         new_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
         new_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
     ) {
-        log::debug!("Got Update: Outputs: {:?}; Inputs: {:?}", new_output_mapping, new_input_mapping);
+        log::debug!("Got Update: Outputs: {new_output_mapping:?}; Inputs: {new_input_mapping:?}");
         let ((removed_inputs, removed_outputs), (added_inputs, added_outputs)) =
             self.alias_mapping.update(new_input_mapping, new_output_mapping).await;
         log::debug!(
-            "Update Processed: RemovedI: {:?}; RemovedO: {:?}; AddedI: {:?}, AddedO: {:?}",
-            removed_inputs,
-            removed_outputs,
-            added_inputs,
-            added_outputs
+            "Update Processed: RemovedI: {removed_inputs:?}; RemovedO: {removed_outputs:?}; AddedI: {added_inputs:?}, AddedO: {added_outputs:?}"
         );
 
         for (added_i_id, i) in added_inputs {
@@ -240,7 +236,7 @@ impl DataplaneHandle {
     }
 
     pub async fn send_alias(&mut self, target: String, msg: &[u8], context: opentelemetry::Context) -> anyhow::Result<()> {
-        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("send_{}", target), &context);
+        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("send_{target}"), &context);
         let context = opentelemetry::Context::current_with_span(call_handler_span);
         if target == "self" {
             self.send_inner(
@@ -284,7 +280,7 @@ impl DataplaneHandle {
     }
 
     pub async fn call_alias(&mut self, alias: String, msg: &[u8], context: opentelemetry::Context) -> CallRet {
-        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("call_{}", alias), &context);
+        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("call_{alias}"), &context);
         let context = opentelemetry::Context::current_with_span(call_handler_span);
         if alias == "self" {
             self.call_raw(self.slf, edgeless_api::function_instance::PortId("INTERNAL".to_string()), msg, context)
@@ -304,28 +300,26 @@ impl DataplaneHandle {
                         return self.call_raw(*instance_id, port_id.clone(), msg, context).await;
                     } else {
                         // return Err(GuestAPIError::UnknownAlias);
-                        return CallRet::Err;
+                        CallRet::Err
                     }
                 }
                 edgeless_api::common::Output::All(_ids) => {
                     // TODO(raphaelhetzel) introduce new error for this
                     // return Err(GuestAPIError::UnknownAlias);
-                    return CallRet::Err;
+                    CallRet::Err
                 }
-                edgeless_api::common::Output::Link(_) => {
-                    return CallRet::Err;
-                }
+                edgeless_api::common::Output::Link(_) => CallRet::Err,
             }
         } else {
             log::warn!("Unknown alias.");
             // Err(GuestAPIError::UnknownAlias)
-            return CallRet::Err;
+            CallRet::Err
         }
     }
 
     pub async fn send_to_link(&mut self, link_id: &edgeless_api::link::LinkInstanceId, msg: Vec<u8>) {
         if let Some(link) = self.links.lock().await.get(link_id) {
-            link.lock().await.handle(self.slf.clone(), msg).await;
+            link.lock().await.handle(self.slf, msg).await;
         } else {
             log::info!("Link not found: {}", link_id.0);
         }
@@ -470,7 +464,7 @@ impl DataplaneProvider {
 
         if let Some(invocation_url_coap) = invocation_url_coap {
             let (_, coap_ip, coap_port) = edgeless_api::util::parse_http_host(&invocation_url_coap.clone()).unwrap();
-            log::info!("Start COAP Invocation Server {}:{}", coap_ip, port);
+            log::info!("Start COAP Invocation Server {coap_ip}:{port}");
 
             let _coap_server = tokio::spawn(edgeless_api::coap_impl::invocation::CoapInvocationServer::run(
                 clone_provider.lock().await.incomming_api().await,
@@ -512,7 +506,7 @@ impl DataplaneProvider {
     }
 
     pub async fn add_peer(&mut self, peer: EdgelessDataplanePeerSettings) {
-        log::debug!("add_peer {:?}", peer);
+        log::debug!("add_peer {peer:?}");
         self.remote_provider
             .lock()
             .await
@@ -521,7 +515,7 @@ impl DataplaneProvider {
     }
 
     pub async fn del_peer(&mut self, node_id: uuid::Uuid) {
-        log::debug!("del_peer {:?}", node_id);
+        log::debug!("del_peer {node_id:?}");
         self.remote_provider.lock().await.del_peer(node_id).await;
     }
 

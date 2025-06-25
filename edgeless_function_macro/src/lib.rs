@@ -43,7 +43,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let type_ident = quote::format_ident!("{}", type_name);
         types.entry(type_ident.clone()).and_modify(|(input, _output)| *input = true).or_insert((true, false));
 
-        let feature = format!("input_{}", key);
+        let feature = format!("input_{key}");
 
         match val.method {
             PortMethod::CAST => {
@@ -123,7 +123,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 .and_modify(|(_input, output)| *output = true)
                 .or_insert((false, true));
 
-            let feature = format!("output_{}", output_id);
+            let feature = format!("output_{output_id}");
 
             match output_spec.method {
                 PortMethod::CAST => {

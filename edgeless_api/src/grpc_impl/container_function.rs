@@ -36,8 +36,8 @@ impl GuestAPIFunctionServer {
         Box::pin(async move {
             let workflow_api = workflow_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&container_function_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start ContainerFunctionAPI GRPC Server at {}", container_function_url);
+                if let Ok(host) = format!("{host}:{port}").parse() {
+                    log::info!("Start ContainerFunctionAPI GRPC Server at {container_function_url}");
 
                     match tonic::transport::Server::builder()
                         .add_service(

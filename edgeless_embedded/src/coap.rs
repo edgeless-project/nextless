@@ -68,14 +68,14 @@ impl CoapMultiplexer {
                     let (data_len, sender) = match res {
                         Ok(ret) => ret,
                         Err(err) => {
-                            log::error!("UDP/COAP Receive Error: {:?}", err);
+                            log::error!("UDP/COAP Receive Error: {err:?}");
                             continue;
                         }
                     };
                     let (message, token) = match edgeless_api_core::coap_mapping::CoapDecoder::decode(&rx_buffer[..data_len]) {
                         Ok(ret) => ret,
                         Err(err) => {
-                            log::error!("UDP/COAP Decode Error: {:?}", err);
+                            log::error!("UDP/COAP Decode Error: {err:?}");
                             continue;
                         }
                     };
@@ -263,7 +263,7 @@ impl CoapMultiplexer {
     }
 
     async fn incoming_peer_add(&mut self, sender: embassy_net::IpEndpoint, token: u8, node_id: uuid::Uuid, addr: &[u8], port: u16) {
-        log::info!("Got Peer Add {:?}, {}", addr, port);
+        log::info!("Got Peer Add {addr:?}, {port}");
         if self
             .peers
             .insert(
@@ -280,7 +280,7 @@ impl CoapMultiplexer {
         let ((data, sender), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, self.app_buf_tx.as_mut_slice(), true);
         if let Err(err) = self.sock.send_to(data, sender).await {
-            log::error!("UDP/COAP Send Error: {:?}", err);
+            log::error!("UDP/COAP Send Error: {err:?}");
         }
     }
 
@@ -290,17 +290,17 @@ impl CoapMultiplexer {
         let ((data, sender), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, self.app_buf_tx.as_mut_slice(), true);
         if let Err(err) = self.sock.send_to(data, sender).await {
-            log::error!("UDP/COAP Send Error: {:?}", err);
+            log::error!("UDP/COAP Send Error: {err:?}");
         }
     }
 
     async fn incoming_keepalive(&mut self, sender: embassy_net::IpEndpoint, token: u8) {
-        log::info!("KeepAlive: {}", sender);
+        log::info!("KeepAlive: {sender}");
         let ((data, sender), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, self.app_buf_tx.as_mut_slice(), true);
         log::info!("KeepAlive 2");
         if let Err(err) = self.sock.send_to(data, sender).await {
-            log::error!("keepalive UDP/COAP send error: {:?}", err);
+            log::error!("keepalive UDP/COAP send error: {err:?}");
         } else {
             log::info!("Sent Keepalive response");
         }
@@ -315,7 +315,7 @@ impl CoapMultiplexer {
                 _ => self.token + 1,
             };
             if let Err(err) = self.sock.send_to(data, *endpoint).await {
-                log::error!("UDP/COAP Send Error: {:?}", err);
+                log::error!("UDP/COAP Send Error: {err:?}");
             }
             // we don't wait for a reply here.
         }
@@ -342,7 +342,7 @@ impl CoapMultiplexer {
             _ => self.token + 1,
         };
         if let Err(err) = self.sock.send_to(data, endpoint).await {
-            log::error!("UDP/COAP Send Error: {:?}", err);
+            log::error!("UDP/COAP Send Error: {err:?}");
         } else {
             self.waiting_for_reply = Some((used_token, reply_channel))
         }
@@ -365,7 +365,7 @@ impl CoapMultiplexer {
                 _ => self.token + 1,
             };
             if let Err(err) = self.sock.send_to(data, endpoint).await {
-                log::error!("UDP/COAP Send Error: {:?}", err);
+                log::error!("UDP/COAP Send Error: {err:?}");
             }
         }
     }
@@ -410,7 +410,7 @@ impl CoapMultiplexer {
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {
-                log::error!("UDP/COAP Send Error: {:?}", err);
+                log::error!("UDP/COAP Send Error: {err:?}");
             }
         }
     }

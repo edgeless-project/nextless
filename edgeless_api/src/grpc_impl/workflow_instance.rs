@@ -414,12 +414,12 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
     async fn stop(&self, request_id: tonic::Request<crate::grpc_impl::api::WorkflowId>) -> Result<tonic::Response<()>, tonic::Status> {
         let req = match crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_id(&request_id.into_inner()) {
             Ok(val) => val,
-            Err(err) => return Err(tonic::Status::internal(format!("Internal error when stopping a workflow: {}", err))),
+            Err(err) => return Err(tonic::Status::internal(format!("Internal error when stopping a workflow: {err}"))),
         };
         let ret = self.root_api.lock().await.stop(req).await;
         match ret {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Internal error when stopping a workflow: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Internal error when stopping a workflow: {err}"))),
         }
     }
 
@@ -429,14 +429,14 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
     ) -> Result<tonic::Response<crate::grpc_impl::api::WorkflowInstanceList>, tonic::Status> {
         let req = match crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_id(&request_id.into_inner()) {
             Ok(val) => val,
-            Err(err) => return Err(tonic::Status::internal(format!("Internal error when listing workflows: {}", err))),
+            Err(err) => return Err(tonic::Status::internal(format!("Internal error when listing workflows: {err}"))),
         };
         let ret = self.root_api.lock().await.list(req).await;
         match ret {
             Ok(instances) => Ok(tonic::Response::new(
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_instance_list(&instances),
             )),
-            Err(err) => Err(tonic::Status::internal(format!("Internal error when listing workflows: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Internal error when listing workflows: {err}"))),
         }
     }
 
@@ -445,16 +445,14 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
             Ok(parsed_update) => parsed_update,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when updating the external links of workflow: {}",
-                    err
+                    "Error when updating the external links of workflow: {err}"
                 )));
             }
         };
         match self.root_api.lock().await.patch(parsed_update).await {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::internal(format!(
-                "Error when updating the external links of workflow: {}",
-                err
+                "Error when updating the external links of workflow: {err}"
             ))),
         }
     }

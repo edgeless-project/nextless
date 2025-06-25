@@ -37,9 +37,9 @@ impl elfloader::ElfLoader for ActorLoader {
             let mut prot_flags = rustix::mm::MprotectFlags::READ;
 
             if header.flags().is_execute() {
-                prot_flags = prot_flags | rustix::mm::MprotectFlags::EXEC;
+                prot_flags |= rustix::mm::MprotectFlags::EXEC;
             } else if header.flags().is_write() {
-                prot_flags = prot_flags | rustix::mm::MprotectFlags::WRITE;
+                prot_flags |= rustix::mm::MprotectFlags::WRITE;
             }
             self.sections.push(Section {
                 virt_addr: header.virtual_addr() as usize,
@@ -75,7 +75,7 @@ impl elfloader::ElfLoader for ActorLoader {
                     Ok(())
                 }
                 unknown_rel => {
-                    log::info!("Found unknown Relocation Entry: {:?}", unknown_rel);
+                    log::info!("Found unknown Relocation Entry: {unknown_rel:?}");
                     Ok(())
                 }
             }
@@ -94,13 +94,7 @@ impl elfloader::ElfLoader for ActorLoader {
     }
 
     fn tls(&mut self, tdata_start: elfloader::VAddr, tdata_length: u64, total_size: u64, align: u64) -> Result<(), elfloader::ElfLoaderErr> {
-        log::error!(
-            "Unexpeted/Unimplemented use of Loader TLS. start: {}, len: {}, total: {}, align: {}",
-            tdata_start,
-            tdata_length,
-            total_size,
-            align
-        );
+        log::error!("Unexpeted/Unimplemented use of Loader TLS. start: {tdata_start}, len: {tdata_length}, total: {total_size}, align: {align}");
         Err(elfloader::ElfLoaderErr::UnsupportedAbi)
     }
 }

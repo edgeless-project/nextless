@@ -83,8 +83,8 @@ impl AgentAPIServer {
         Box::pin(async move {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&agent_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start AgentAPI GRPC Server at {}", agent_url);
+                if let Ok(host) = format!("{host}:{port}").parse() {
+                    log::info!("Start AgentAPI GRPC Server at {agent_url}");
 
                     match tonic::transport::Server::builder()
                         .add_service(
@@ -108,7 +108,7 @@ impl AgentAPIServer {
                             log::debug!("Clean Exit");
                         }
                         Err(e) => {
-                            log::error!("GRPC Server Failure: {}", e);
+                            log::error!("GRPC Server Failure: {e}");
                         }
                     }
                 }

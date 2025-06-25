@@ -61,7 +61,7 @@ impl crate::invocation::InvocationAPI for MockDisplay {
     async fn handle(&mut self, event: edgeless_api_core::invocation::Event) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
         if let edgeless_api_core::invocation::EventData::Cast(message) = event.data {
             if let Ok(message) = core::str::from_utf8(&message.0) {
-                log::info!("Display Message: {}", message);
+                log::info!("Display Message: {message}");
             }
         }
 

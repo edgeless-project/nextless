@@ -97,7 +97,7 @@ impl CoapClient {
                 },
                 outgoing = outgoing_receiver.recv().fuse() => {
                     if let Some(outgoing) = outgoing {
-                        log::debug!("COAP: {:?} {:?}", endpoint, outgoing);
+                        log::debug!("COAP: {endpoint:?} {outgoing:?}");
                         sock.send_to(&outgoing, endpoint).await.unwrap();
                     }
                 }
@@ -124,7 +124,7 @@ impl CoapClient {
             let mut buffer = vec![0_u8; 5000];
             let ((packet, _addr), _tail) = encode_request(token, endpoint, &mut buffer);
             if self.outgoing_sender.send(Vec::from(packet)).is_err() {
-                log::info!("Sender could not send on iteration {}", i);
+                log::info!("Sender could not send on iteration {i}");
             }
 
             let res = tokio::time::timeout(core::time::Duration::from_millis(1000), &mut receiver).await;
@@ -134,7 +134,7 @@ impl CoapClient {
                         return val;
                     }
                     Err(e) => {
-                        log::info!("Error in Response: {}", e);
+                        log::info!("Error in Response: {e}");
                     }
                 },
                 Err(_timeout) => {

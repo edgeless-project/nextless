@@ -65,8 +65,8 @@ impl WorkerNode {
             supported_link_types: link_providers.into_iter().map(|p| (p.class, p.provider_id)).collect(),
             is_proxy: true,
             id: node_id,
-            cluster_id: cluster_id,
-            telemetry_provider: telemetry_provider,
+            cluster_id,
+            telemetry_provider,
         }
     }
 

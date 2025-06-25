@@ -57,23 +57,22 @@ impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManag
         let parsed_request = match parse_update_peers_request(&request.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
-                log::error!("Parse UpdatePeersRequest Failed: {}", err);
+                log::error!("Parse UpdatePeersRequest Failed: {err}");
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an UpdatePeersRequest message: {}",
-                    err
+                    "Error when parsing an UpdatePeersRequest message: {err}"
                 )));
             }
         };
         match self.node_management_api.lock().await.update_peers(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when updating peers: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when updating peers: {err}"))),
         }
     }
 
     async fn keep_alive(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::api::HealthStatus>, tonic::Status> {
         match self.node_management_api.lock().await.keep_alive().await {
             Ok(health_status) => Ok(tonic::Response::new(serialize_health_status(&health_status))),
-            Err(err) => Err(tonic::Status::internal(format!("Error during keep alive: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error during keep alive: {err}"))),
         }
     }
 }

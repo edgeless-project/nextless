@@ -33,7 +33,7 @@ impl RedisResource {
 
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
 
-        log::info!("RedisResource created, URL: {}", redis_url);
+        log::info!("RedisResource created, URL: {redis_url}");
 
         let handle = tokio::spawn(async move {
             loop {

@@ -321,15 +321,15 @@ async fn main() -> anyhow::Result<()> {
                             Ok(response) => {
                                 match &response {
                                     SpawnWorkflowResponse::ResponseError(err) => {
-                                        println!("{:?}", err);
+                                        println!("{err:?}");
                                     }
                                     SpawnWorkflowResponse::WorkflowInstance(val) => {
                                         println!("{}", val.workflow_id.workflow_id);
                                     }
                                 }
-                                log::info!("{:?}", response)
+                                log::info!("{response:?}")
                             }
-                            Err(err) => println!("{}", err),
+                            Err(err) => println!("{err}"),
                         }
                     }
                     WorkflowCommands::Stop { id } => {
@@ -339,7 +339,7 @@ async fn main() -> anyhow::Result<()> {
                             .await
                         {
                             Ok(_) => println!("Workflow Stopped"),
-                            Err(err) => println!("{}", err),
+                            Err(err) => println!("{err}"),
                         }
                     }
                     WorkflowCommands::List {} => match con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
@@ -347,11 +347,11 @@ async fn main() -> anyhow::Result<()> {
                             for instance in instances.iter() {
                                 println!("workflow: {}", instance.workflow_id);
                                 for function in instance.node_mapping.iter() {
-                                    println!("\t{:?}", function);
+                                    println!("\t{function:?}");
                                 }
                             }
                         }
-                        Err(err) => println!("{}", err),
+                        Err(err) => println!("{err}"),
                     },
                 }
             }
@@ -384,7 +384,7 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 FunctionCommands::Package { spec_file } => {
-                    log::info!("{:?}", spec_file);
+                    log::info!("{spec_file:?}");
                     let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
 
@@ -399,7 +399,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     };
 
-                    log::info!("{:?}", function_spec);
+                    log::info!("{function_spec:?}");
 
                     let out_file = cargo_project_path
                         .join(format!("{}.tar.gz", function_spec.id))
@@ -418,14 +418,7 @@ async fn main() -> anyhow::Result<()> {
                     payload,
                     target_port,
                 } => {
-                    log::info!(
-                        "invoking function: {} {} {} {} {}",
-                        event_type,
-                        node_id,
-                        function_id,
-                        payload,
-                        target_port
-                    );
+                    log::info!("invoking function: {event_type} {node_id} {function_id} {payload} {target_port}");
                     let mut client = edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&invocation_url).await;
                     let event = edgeless_api::invocation::Event {
                         target: edgeless_api::function_instance::InstanceId {
@@ -473,7 +466,7 @@ async fn main() -> anyhow::Result<()> {
                         .await
                         .expect("failed to get payload");
 
-                    println!("Successfully get function {}", response);
+                    println!("Successfully get function {response}");
                 }
 
                 FunctionCommands::Download { code_file_id } => {
@@ -499,7 +492,7 @@ async fn main() -> anyhow::Result<()> {
                         .await
                         .expect("failed to get header");
                     let status = response.status();
-                    println!("status code {}", status);
+                    println!("status code {status}");
                     let header = response.headers().get("content-disposition").unwrap();
 
                     let header_str = format!("{}{}", "Content-Disposition: ", header.to_str().unwrap());
@@ -508,7 +501,7 @@ async fn main() -> anyhow::Result<()> {
 
                     let downloadfilename = dis.params.get("filename").unwrap();
 
-                    println!("filename:\n{:?}", downloadfilename);
+                    println!("filename:\n{downloadfilename:?}");
 
                     let body = response.bytes().await.expect("failed to download payload");
 
@@ -559,7 +552,7 @@ async fn main() -> anyhow::Result<()> {
                         .expect("failed to get response");
 
                     let json = response.json::<HashMap<String, String>>().await?;
-                    println!("receive code_file_id {:?}", json);
+                    println!("receive code_file_id {json:?}");
 
                     let internal_id = &binary_name;
                     let r = serde_json::json!({
@@ -584,7 +577,7 @@ async fn main() -> anyhow::Result<()> {
                         .text()
                         .await
                         .expect("failed to get body");
-                    println!("post_response body: {:?}", post_response);
+                    println!("post_response body: {post_response:?}");
                 }
             },
             Commands::Description { description_command } => match description_command {

@@ -203,7 +203,7 @@ impl CommonConverters {
             input_mapping: crate_update
                 .input_mapping
                 .iter()
-                .filter_map(|(key, value)| Self::serialize_input(value).and_then(|v| Some((key.0.clone(), v))))
+                .filter_map(|(key, value)| Self::serialize_input(value).map(|v| (key.0.clone(), v)))
                 .collect(),
         }
     }

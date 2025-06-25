@@ -83,12 +83,12 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
         let parsed_request = match parse_boot_data(&boot_data.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
-                return Err(tonic::Status::invalid_argument(format!("Error when parsing a BootData message: {}", err)));
+                return Err(tonic::Status::invalid_argument(format!("Error when parsing a BootData message: {err}")));
             }
         };
         match self.guest_api_function.lock().await.boot(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when booting a function instance: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when booting a function instance: {err}"))),
         }
     }
 
@@ -97,14 +97,13 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an FunctionInstanceInit message: {}",
-                    err
+                    "Error when parsing an FunctionInstanceInit message: {err}"
                 )));
             }
         };
         match self.guest_api_function.lock().await.init(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when initializing a function instance: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when initializing a function instance: {err}"))),
         }
     }
 
@@ -113,14 +112,13 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an InputEventData message: {}",
-                    err
+                    "Error when parsing an InputEventData message: {err}"
                 )));
             }
         };
         match self.guest_api_function.lock().await.cast(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when casting a message: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when casting a message: {err}"))),
         }
     }
 
@@ -132,21 +130,20 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
             Ok(parsed_request) => parsed_request,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an InputEventData message: {}",
-                    err
+                    "Error when parsing an InputEventData message: {err}"
                 )));
             }
         };
         match self.guest_api_function.lock().await.call(parsed_request).await {
             Ok(msg) => Ok(tonic::Response::new(serialize_call_return(&msg))),
-            Err(err) => Err(tonic::Status::internal(format!("Error when calling a function: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when calling a function: {err}"))),
         }
     }
 
     async fn stop(&self, _request: tonic::Request<()>) -> Result<tonic::Response<()>, tonic::Status> {
         match self.guest_api_function.lock().await.stop().await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when stopping a function: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when stopping a function: {err}"))),
         }
     }
 }

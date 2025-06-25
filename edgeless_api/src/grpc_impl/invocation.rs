@@ -138,7 +138,7 @@ impl crate::grpc_impl::api::function_invocation_server::FunctionInvocation for I
         let parsed_request = match InvocationConverters::parse_api_event(&inner_request) {
             Ok(val) => val,
             Err(err) => {
-                log::error!("Parse Request Failed: {}", err);
+                log::error!("Parse Request Failed: {err}");
                 return Err(tonic::Status::invalid_argument("Bad Request"));
             }
         };
@@ -162,8 +162,8 @@ impl InvocationAPIServer {
         Box::pin(async move {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&invocation_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start InvocationAPI GRPC Server at {}", invocation_url);
+                if let Ok(host) = format!("{host}:{port}").parse() {
+                    log::info!("Start InvocationAPI GRPC Server at {invocation_url}");
                     match tonic::transport::Server::builder()
                         .add_service(
                             crate::grpc_impl::api::function_invocation_server::FunctionInvocationServer::new(function_api)

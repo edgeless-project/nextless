@@ -165,7 +165,7 @@ impl EventProcessor for EventLogger {
                 );
             }
             _ => {
-                println!("\x1b[{}m{}\x1b[0m: {:?}", color, f_id, event);
+                println!("\x1b[{color}m{f_id}\x1b[0m: {event:?}");
             }
         }
 

@@ -79,8 +79,8 @@ impl DDAResource {
         let dda_sub_array = match dcs {
             Ok(dda_array) => dda_array,
             Err(err) => {
-                log::error!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
-                panic!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
+                log::error!("Error parsing input dda_com_subscription_mapping JSON: {err}");
+                panic!("Error parsing input dda_com_subscription_mapping JSON: {err}");
                 //eprintln!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
                 //ToDo: After discussion clarify if process exit is the right way to react..
                 //process::exit(1);
@@ -92,8 +92,8 @@ impl DDAResource {
         let dda_pub_array = match dcp {
             Ok(dda_array) => dda_array,
             Err(err) => {
-                log::error!("Error parsing input dda_com_publication_mapping JSON: {}", err);
-                panic!("Error parsing input dda_com_publication_mapping JSON: {}", err);
+                log::error!("Error parsing input dda_com_publication_mapping JSON: {err}");
+                panic!("Error parsing input dda_com_publication_mapping JSON: {err}");
                 //eprintln!("Error parsing input dda_com_publication_mapping JSON: {}", err);
                 //process::exit(1);
             }
@@ -103,13 +103,13 @@ impl DDAResource {
         let mut dda_client = match dda_com::com_service_client::ComServiceClient::connect(dda_url.clone()).await {
             Ok(client) => client,
             Err(err) => {
-                log::error!("Failed to connect to the DDA sidecar: {}", err);
-                panic!("Failed to connect to the DDA sidecar: {}", err);
+                log::error!("Failed to connect to the DDA sidecar: {err}");
+                panic!("Failed to connect to the DDA sidecar: {err}");
             }
         };
 
         //TODO: check if we act really as singleton
-        log::info!("DDA singleton resource created, connected to the DDA sidecar at url={}", dda_url);
+        log::info!("DDA singleton resource created, connected to the DDA sidecar at url={dda_url}");
 
         // subscribe to configured dda topics
         for dda_sub in dda_sub_array {
@@ -143,12 +143,12 @@ impl DDAResource {
 
                                         //TODO: In future, this should be iterated upon since multiple outputs might be mapped
                                         if let Some((target_id, target_port)) = inner.output_mapping.get(&dda_sub.cast_mapping.to_string()) {
-                                            log::info!("target id for data {} from subscription is {}", str, target_id);
+                                            log::info!("target id for data {str} from subscription is {target_id}");
                                             dataplane_handle
                                                 .send(*target_id, target_port.clone(), str.as_bytes(), opentelemetry::Context::new())
                                                 .await;
                                         } else {
-                                            log::info!("target id unknwon for data {} from subscription", str);
+                                            log::info!("target id unknwon for data {str} from subscription");
                                         }
                                     }
                                     Err(_) => {
@@ -199,7 +199,7 @@ impl DDAResource {
                 let msg_obj = match dpmd {
                     Ok(msg) => msg,
                     Err(err) => {
-                        log::error!("Error parsing input dataplane json message: {}", err);
+                        log::error!("Error parsing input dataplane json message: {err}");
                         return; // Add return statement here
                     }
                 };
@@ -232,11 +232,11 @@ impl DDAResource {
                                                 .await;
                                         }
                                     }
-                                    Err(e) => log::error!("gRPC error {}", e),
+                                    Err(e) => log::error!("gRPC error {e}"),
                                 }
                             }
                             Err(status) => {
-                                log::error!("gRPC error {}", status);
+                                log::error!("gRPC error {status}");
                             }
                         }
                     } else {

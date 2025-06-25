@@ -48,8 +48,8 @@ impl WorkflowInstanceAPIServer {
         Box::pin(async move {
             let workflow_api = workflow_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&controller_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start ControllerAPI GRPC Server at {}", controller_url);
+                if let Ok(host) = format!("{host}:{port}").parse() {
+                    log::info!("Start ControllerAPI GRPC Server at {controller_url}");
 
                     match tonic::transport::Server::builder()
                         .add_service(
