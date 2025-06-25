@@ -15,9 +15,10 @@ pub mod transformations;
 pub mod workflow;
 
 pub trait LogicalComponent {
-    fn logical_ports(&mut self) -> &mut LogicalPorts;
+    fn logical_ports(&self) -> &LogicalPorts;
+    fn logical_ports_mut(&mut self) -> &mut LogicalPorts;
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId>;
-    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn MaybePhyiscalInstance>>;
+    fn instances(&self) -> Vec<&std::cell::RefCell<dyn MaybePhyiscalInstance>>;
     fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn MaybePhyiscalInstance>>);
 }
 
@@ -29,7 +30,8 @@ pub enum PhysicalComponentState<C: PhysicalComponent> {
 }
 
 pub trait MaybePhyiscalInstance {
-    fn try_unpack(&mut self) -> Option<&mut dyn PhysicalComponent>;
+    fn try_unpack(&self) -> Option<&dyn PhysicalComponent>;
+    fn try_unpack_mut(&mut self) -> Option<&mut dyn PhysicalComponent>;
     fn id(&self) -> Option<edgeless_api::function_instance::InstanceId>;
 }
 
@@ -37,7 +39,16 @@ impl<C: PhysicalComponent> MaybePhyiscalInstance for PhysicalComponentState<C>
 where
     C: PhysicalComponent,
 {
-    fn try_unpack(&mut self) -> Option<&mut dyn PhysicalComponent> {
+    fn try_unpack(&self) -> Option<&dyn PhysicalComponent> {
+        match self {
+            PhysicalComponentState::Planned => None,
+            PhysicalComponentState::Existing(inner) => Some(inner),
+            PhysicalComponentState::StopPlanned(inner) => Some(inner),
+            PhysicalComponentState::Stopped(inner) => Some(inner),
+        }
+    }
+
+    fn try_unpack_mut(&mut self) -> Option<&mut dyn PhysicalComponent> {
         match self {
             PhysicalComponentState::Planned => None,
             PhysicalComponentState::Existing(inner) => Some(inner),

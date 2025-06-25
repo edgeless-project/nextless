@@ -34,7 +34,7 @@ impl DeadComponentRemoval {
                 edgeless_api::function_instance::MappingNode,
                 std::collections::HashSet<edgeless_api::function_instance::MappingNode>,
             > = f.image.class.inner_structure.clone();
-            let ports = &mut f.logical_ports();
+            let ports = &mut f.logical_ports_mut();
             ports.logical_output_mapping.retain(|output_id, output_spec: &mut LogicalOutput| {
                 assert!(!std::matches!(output_spec, super::super::LogicalOutput::Topic(_)));
                 let this = edgeless_api::function_instance::MappingNode::Port(output_id.clone());
@@ -78,14 +78,14 @@ impl DeadComponentRemoval {
             if let Some(source) = slf.functions.get_mut(target_component_id) {
                 let mut source = source.borrow_mut();
                 let mut remove = false;
-                if let Some(LogicalInput::Direct(sources)) = source.logical_ports().logical_input_mapping.get_mut(target_port_id) {
+                if let Some(LogicalInput::Direct(sources)) = source.logical_ports_mut().logical_input_mapping.get_mut(target_port_id) {
                     sources.retain(|(s_id, s_p_id)| s_id != source_component_id && s_p_id != source_port_id);
                     if sources.is_empty() {
                         remove = true;
                     }
                 }
                 if remove {
-                    source.logical_ports().logical_input_mapping.remove(target_port_id);
+                    source.logical_ports_mut().logical_input_mapping.remove(target_port_id);
                 }
             }
         }
@@ -101,7 +101,7 @@ impl DeadComponentRemoval {
         for (f_id, f) in &mut slf.functions {
             let mut f = f.borrow_mut();
             let class = f.image.class.clone();
-            let f_ports = &mut f.logical_ports();
+            let f_ports = &mut f.logical_ports_mut();
             f_ports.logical_input_mapping.retain(|input_id, input_spec| {
                 if let LogicalInput::Direct(mapped_inputs) = input_spec {
                     let port_method = class.inputs.get(input_id).unwrap().method.clone();
@@ -143,7 +143,7 @@ impl DeadComponentRemoval {
             if let Some(source) = slf.functions.get_mut(source_id) {
                 let mut source = source.borrow_mut();
                 let mut remove = false;
-                if let Some(source_port) = source.logical_ports().logical_output_mapping.get_mut(source_port_id) {
+                if let Some(source_port) = source.logical_ports_mut().logical_output_mapping.get_mut(source_port_id) {
                     match source_port {
                         LogicalOutput::DirectTarget(target_id, target_port_id) => {
                             if target_id == dest_id && target_port_id == dest_port_id {
@@ -166,7 +166,7 @@ impl DeadComponentRemoval {
                     }
                 }
                 if remove {
-                    source.logical_ports().logical_output_mapping.remove(source_port_id);
+                    source.logical_ports_mut().logical_output_mapping.remove(source_port_id);
                 }
             }
         }

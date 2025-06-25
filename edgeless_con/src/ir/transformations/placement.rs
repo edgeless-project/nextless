@@ -3,20 +3,29 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+pub mod candidate_filter;
 mod feasibility;
 mod scoring;
 pub mod strategy;
+
+use crate::ir::transformations::placement::candidate_filter::FilterStrategy;
 
 use super::super::*;
 use scoring::ScoreableRuntime;
 
 pub struct DefaultPlacement<P: strategy::PlacementStrategy> {
     placement_strategy: P,
+    dynamic_colocation_filter: candidate_filter::dynamic_colocation::DynamicColocation,
+    static_colocation_filter: candidate_filter::static_colocation::StaticColocation,
 }
 
 impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
     pub fn new(placement_strategy: P) -> Self {
-        Self { placement_strategy }
+        Self {
+            placement_strategy,
+            dynamic_colocation_filter: candidate_filter::dynamic_colocation::DynamicColocation::new(),
+            static_colocation_filter: candidate_filter::static_colocation::StaticColocation::new(),
+        }
     }
 }
 
@@ -28,7 +37,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
         peer_clusters: &crate::ir::Clusters,
         global_state: &P::GlobalState,
     ) {
-        for (f_id, function) in &mut workflow.functions {
+        for (f_id, function) in &workflow.functions {
             let function = function.borrow_mut();
             for i in &function.instances {
                 let mut i = i.borrow_mut();
@@ -36,7 +45,11 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                     PhysicalComponentState::Planned => {
                         log::info!("Planned : {}", function.instances.len());
                         let candidates = find_candidates_for_actor(&function, nodes);
-                        let dst = self.placement_strategy.select_candidate(candidates, global_state);
+                        let mut filtered = self.dynamic_colocation_filter.filter_candidates(&*function, candidates, workflow);
+                        if filtered.len() > 1 {
+                            filtered = self.static_colocation_filter.filter_candidates(&*function, filtered, workflow);
+                        };
+                        let dst = self.placement_strategy.select_candidate(filtered, global_state);
 
                         if let Some(dst) = dst {
                             *i = PhysicalComponentState::Existing(actor::PhysicalActor {

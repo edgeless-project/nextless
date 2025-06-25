@@ -13,6 +13,7 @@ pub struct LogicalActor {
     pub instances: Vec<std::cell::RefCell<super::PhysicalComponentState<PhysicalActor>>>,
 }
 
+#[derive(Default)]
 pub struct ActorConstraints {
     pub max_instances: Option<usize>,
     pub domain_id_match_any: Option<Vec<edgeless_api::function_instance::NodeId>>,
@@ -22,7 +23,11 @@ pub struct ActorConstraints {
 }
 
 impl super::LogicalComponent for LogicalActor {
-    fn logical_ports(&mut self) -> &mut super::LogicalPorts {
+    fn logical_ports(&self) -> &super::LogicalPorts {
+        &self.logical_ports
+    }
+
+    fn logical_ports_mut(&mut self) -> &mut super::LogicalPorts {
         &mut self.logical_ports
     }
 
@@ -40,7 +45,7 @@ impl super::LogicalComponent for LogicalActor {
         )
     }
 
-    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>> {
+    fn instances(&self) -> Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>> {
         self.instances
             .iter()
             .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)

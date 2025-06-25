@@ -15,7 +15,11 @@ pub struct LogicalResource {
 }
 
 impl super::LogicalComponent for LogicalResource {
-    fn logical_ports(&mut self) -> &mut super::LogicalPorts {
+    fn logical_ports(&self) -> &super::LogicalPorts {
+        &self.logical_ports
+    }
+
+    fn logical_ports_mut(&mut self) -> &mut super::LogicalPorts {
         &mut self.logical_ports
     }
 
@@ -33,7 +37,7 @@ impl super::LogicalComponent for LogicalResource {
         )
     }
 
-    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>> {
+    fn instances(&self) -> Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>> {
         self.instances
             .iter()
             .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)

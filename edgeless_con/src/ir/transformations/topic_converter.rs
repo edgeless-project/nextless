@@ -21,7 +21,7 @@ impl super::StatelessTransformation for TopicConverter {
         for (cid, component) in &mut workflow.components() {
             component
                 .borrow_mut()
-                .logical_ports()
+                .logical_ports_mut()
                 .logical_input_mapping
                 .retain(|port_id, port_mapping| match port_mapping {
                     LogicalInput::Topic(topic) => {
@@ -35,7 +35,7 @@ impl super::StatelessTransformation for TopicConverter {
         // Create Outputs
         for (_cid, component) in &mut workflow.components() {
             let mut component = component.borrow_mut();
-            let output_mapping = &mut component.logical_ports().logical_output_mapping;
+            let output_mapping = &mut component.logical_ports_mut().logical_output_mapping;
 
             *output_mapping = std::mem::take(output_mapping)
                 .into_iter()
