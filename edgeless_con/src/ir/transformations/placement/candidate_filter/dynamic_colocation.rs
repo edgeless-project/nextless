@@ -15,20 +15,25 @@ impl super::FilterStrategy for DynamicColocation {
         let mut node_rates_abs = std::collections::HashMap::<uuid::Uuid, f64>::new();
 
         logical_component.instances().iter().for_each(|i| {
-            if let Some(c) = i.borrow().try_unpack() {
-                if let Some(materialized) = c.materialized_state() {
-                    materialized_instance_count += 1;
-                    for (i_port, input) in &mut materialized.borrow_mut().materialized_ports().materialized_inputs {
-                        if let Some(port_statistics) = &mut input.port_statistics {
-                            for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
-                                *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
+            // The borrow will fail for the instance that should currently be placed.
+            // This is fine as long as we only use this for new functions but might be
+            // probelematic if we use this to check whether the function should be moved.
+            if let Ok(maybe_c) = i.try_borrow() {
+                if let Some(c) = maybe_c.try_unpack() {
+                    if let Some(materialized) = c.materialized_state() {
+                        materialized_instance_count += 1;
+                        for (i_port, input) in &mut materialized.borrow_mut().materialized_ports().materialized_inputs {
+                            if let Some(port_statistics) = &mut input.port_statistics {
+                                for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
+                                    *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
+                                }
                             }
                         }
-                    }
-                    for (o_port, output) in &mut materialized.borrow_mut().materialized_ports().materialized_outputs {
-                        if let Some(port_statistics) = &mut output.port_statistics {
-                            for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
-                                *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
+                        for (o_port, output) in &mut materialized.borrow_mut().materialized_ports().materialized_outputs {
+                            if let Some(port_statistics) = &mut output.port_statistics {
+                                for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
+                                    *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
+                                }
                             }
                         }
                     }
