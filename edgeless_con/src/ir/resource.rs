@@ -3,13 +3,11 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use super::MaybePhyiscalInstance;
-
 pub struct LogicalResource {
     pub(crate) class: String,
     pub(crate) configurations: std::collections::HashMap<String, String>,
 
-    pub(crate) instances: Vec<std::cell::RefCell<super::PhysicalComponentState<PhysicalResource>>>,
+    pub(crate) instances: Vec<std::cell::RefCell<super::PhysicalComponentState>>,
 
     pub(crate) logical_ports: super::LogicalPorts,
 }
@@ -27,26 +25,20 @@ impl super::LogicalComponent for LogicalResource {
         self.instances.iter().filter_map(|i| i.borrow().id()).collect()
     }
 
-    fn split_view(&mut self) -> (&mut super::LogicalPorts, Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>>) {
-        (
-            &mut self.logical_ports,
-            self.instances
-                .iter()
-                .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)
-                .collect(),
-        )
+    fn split_view(&mut self) -> (&mut super::LogicalPorts, Vec<&std::cell::RefCell<super::PhysicalComponentState>>) {
+        (&mut self.logical_ports, self.instances.iter().collect())
     }
 
-    fn instances(&self) -> Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>> {
-        self.instances
-            .iter()
-            .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)
-            .collect()
+    fn instances(&self) -> Vec<&std::cell::RefCell<super::PhysicalComponentState>> {
+        self.instances.iter().collect()
     }
 }
 
 pub struct PhysicalResource {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
+    pub(crate) class: String,
+    pub(crate) component_name: String,
+    pub(crate) configuration: std::collections::HashMap<String, String>,
     pub(crate) desired_mapping: super::PhysicalPorts,
     pub(crate) materialized: Option<std::cell::RefCell<MaterializedResource>>,
     pub(crate) creation_time: std::time::Instant,
@@ -69,6 +61,48 @@ impl super::PhysicalComponent for PhysicalResource {
 
     fn creation_time(&self) -> std::time::Instant {
         self.creation_time
+    }
+
+    fn materialize(&mut self, telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>) -> Vec<super::RequiredChange> {
+        let mut changes = Vec::new();
+        if let Some(materialized) = &self.materialized {
+            let mut materialized = materialized.borrow_mut();
+            if !materialized.mapping.is_current_mapping(&self.desired_mapping) {
+                changes.push(super::RequiredChange::PatchResource {
+                    resource_id: self.id.clone(),
+                    resource_name: self.component_name.clone(),
+                    input_mapping: self.desired_mapping.physical_input_mapping.clone(),
+                    output_mapping: self.desired_mapping.physical_output_mapping.clone(),
+                });
+                materialized.mapping.update(&self.desired_mapping, &self.id, telemetry_provider);
+            }
+        } else {
+            changes.push(super::RequiredChange::StartResource {
+                resource_id: self.id.clone(),
+                resource_name: self.component_name.clone(),
+                class_type: self.class.clone(),
+                input_mapping: self.desired_mapping.physical_input_mapping.clone(),
+                output_mapping: self.desired_mapping.physical_output_mapping.clone(),
+                configuration: self.configuration.clone(),
+            });
+
+            let mut ports = super::MaterializedPorts::default();
+            ports.update(&self.desired_mapping, &self.id, telemetry_provider);
+
+            self.materialized = Some(std::cell::RefCell::new(super::resource::MaterializedResource {
+                mapping: ports,
+                runtime_statistics: telemetry_provider.as_ref().map(|t| t.component_statistics_for(&self.id)),
+            }))
+        }
+        changes
+    }
+
+    fn stop(&mut self) -> Vec<super::RequiredChange> {
+        vec![super::RequiredChange::StopFunction { function_id: self.id }]
+    }
+
+    fn as_actor(&mut self) -> Option<&mut super::actor::PhysicalActor> {
+        None
     }
 }
 

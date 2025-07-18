@@ -3,11 +3,26 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-pub fn feasible_node_runtime_candidates<'b>(actor: &crate::ir::actor::LogicalActor, node: &'b dyn crate::ir::Node) -> Vec<super::Candidate<'b>> {
+use std::str::FromStr;
+
+pub fn feasible_node_runtime_candidates<'b>(
+    actor: &crate::ir::actor::LogicalActor,
+    node: &'b dyn crate::ir::Node,
+    new_instance: bool,
+) -> Vec<super::Candidate<'b>> {
     let mut candidates = Vec::new();
 
     if !node_fulfills_constraints(actor, node) {
         return Vec::new();
+    }
+
+    if let Some(dest_node) = actor.annotations.get("node_id_init_on") {
+        if actor.instances.len() == 1 && new_instance {
+            let dest_uuid = uuid::Uuid::from_str(dest_node).unwrap();
+            if dest_uuid != node.node_id() {
+                return Vec::new();
+            }
+        }
     }
 
     for (_rt_id, rt) in node.available_runtimes() {

@@ -217,9 +217,16 @@ impl crate::ir::PortStatistics for PrometheusPortStatistics {
                     .iter()
                     .filter_map(|i| {
                         Some((
-                            edgeless_api::function_instance::InstanceId {
-                                node_id: uuid::Uuid::parse_str(i.metric().get("source_node_id")?).ok()?,
-                                function_id: uuid::Uuid::parse_str(i.metric().get("source_function_id")?).ok()?,
+                            if let PortDirection::Input = self.direction {
+                                edgeless_api::function_instance::InstanceId {
+                                    node_id: uuid::Uuid::parse_str(i.metric().get("source_node_id")?).ok()?,
+                                    function_id: uuid::Uuid::parse_str(i.metric().get("source_function_id")?).ok()?,
+                                }
+                            } else {
+                                edgeless_api::function_instance::InstanceId {
+                                    node_id: uuid::Uuid::parse_str(i.metric().get("dest_node_id")?).ok()?,
+                                    function_id: uuid::Uuid::parse_str(i.metric().get("dest_function_id")?).ok()?,
+                                }
                             },
                             i.sample().value(),
                         ))

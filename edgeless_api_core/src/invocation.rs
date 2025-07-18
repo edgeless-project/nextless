@@ -52,6 +52,8 @@ pub struct Event {
     pub target_port: super::port::Port<32>,
     #[n(5)]
     pub span_context: SpanContext,
+    #[n(6)]
+    pub source_port: super::port::Port<32>,
 }
 
 #[derive(Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen)]

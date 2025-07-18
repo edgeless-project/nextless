@@ -20,6 +20,7 @@ impl DataPlaneLink for RemoteLink {
         src: &edgeless_api::function_instance::InstanceId,
         stream_id: u64,
         target_port: edgeless_api::function_instance::PortId,
+        source_port: edgeless_api::function_instance::PortId,
         context: opentelemetry::trace::SpanContext,
     ) -> LinkProcessingResult {
         return self
@@ -38,6 +39,7 @@ impl DataPlaneLink for RemoteLink {
                     Message::Err => edgeless_api::invocation::EventData::Err,
                 },
                 target_port,
+                source_port,
                 context,
             })
             .await
@@ -160,6 +162,7 @@ mod test {
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".as_bytes().to_vec()),
             target_port: edgeless_api::function_instance::PortId("test".to_string()),
+            source_port: edgeless_api::function_instance::PortId("test2".to_string()),
             context: opentelemetry::trace::SpanContext::empty_context(),
         })
         .await
@@ -174,6 +177,7 @@ mod test {
                 stream_id: 0,
                 data: edgeless_api::invocation::EventData::Cast("Test".as_bytes().to_vec()),
                 target_port: edgeless_api::function_instance::PortId("test".to_string()),
+                source_port: edgeless_api::function_instance::PortId("test2".to_string()),
                 context: opentelemetry::trace::SpanContext::empty_context(),
             })
             .await
@@ -187,6 +191,7 @@ mod test {
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".as_bytes().to_vec()),
             target_port: edgeless_api::function_instance::PortId("test".to_string()),
+            source_port: edgeless_api::function_instance::PortId("test2".to_string()),
             context: opentelemetry::trace::SpanContext::empty_context(),
         })
         .await
@@ -246,6 +251,7 @@ mod test {
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                edgeless_api::function_instance::PortId("test2".to_string()),
                 opentelemetry::trace::SpanContext::empty_context(),
             )
             .await;
@@ -259,6 +265,7 @@ mod test {
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                edgeless_api::function_instance::PortId("test2".to_string()),
                 opentelemetry::trace::SpanContext::empty_context(),
             )
             .await;
@@ -272,6 +279,7 @@ mod test {
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                edgeless_api::function_instance::PortId("test2".to_string()),
                 opentelemetry::trace::SpanContext::empty_context(),
             )
             .await;
@@ -285,6 +293,7 @@ mod test {
                 &fid_source,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                edgeless_api::function_instance::PortId("test2".to_string()),
                 opentelemetry::trace::SpanContext::empty_context(),
             )
             .await;

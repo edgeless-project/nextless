@@ -213,7 +213,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
-                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port, context: span_context} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port, source_port: _, context: span_context} =  Box::pin(self.data_plane.receive_next()).fuse() => {
                     // let mut context = opentelemetry::Context::new();
                     // context = context.with_remote_span_context(span_context);
                     // context = context.with_value(opentelemetry::KeyValue::new("actor.id", self.instance_id.to_string()));

@@ -21,6 +21,7 @@ impl DataPlaneLink for NodeLocalLink {
         src: &edgeless_api::function_instance::InstanceId,
         stream_id: u64,
         target_port: edgeless_api::function_instance::PortId,
+        source_port: edgeless_api::function_instance::PortId,
         context: opentelemetry::trace::SpanContext,
     ) -> LinkProcessingResult {
         if target.node_id == self.node_id {
@@ -40,6 +41,7 @@ impl DataPlaneLink for NodeLocalLink {
                         Message::Err => edgeless_api::invocation::EventData::Err,
                     },
                     target_port,
+                    source_port,
                     context,
                 })
                 .await
@@ -72,6 +74,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
                     channel_id: event.stream_id,
                     message: msg,
                     target_port: event.target_port.clone(),
+                    source_port: event.source_port.clone(),
                     context: event.context.clone(),
                 })
                 .await
@@ -149,6 +152,7 @@ mod test {
                 &fid_1,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                edgeless_api::function_instance::PortId("test2".to_string()),
                 opentelemetry::trace::SpanContext::empty_context(),
             )
             .as_mut()
@@ -165,6 +169,7 @@ mod test {
                 &fid_1,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
+                edgeless_api::function_instance::PortId("test2".to_string()),
                 opentelemetry::trace::SpanContext::empty_context(),
             )
             .as_mut()

@@ -30,7 +30,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                         let mut instances = components.get(target_component).unwrap().clone();
                         if let Some(id) = instances.pop() {
                             for c_instance in &physical_instances {
-                                if let Some(c_instance) = c_instance.borrow_mut().try_unpack_mut() {
+                                if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
                                     c_instance
                                         .physical_ports()
                                         .physical_output_mapping
@@ -52,7 +52,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                             )
                         }
                         for c_instance in &physical_instances {
-                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack_mut() {
+                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
                                 c_instance
                                     .physical_ports()
                                     .physical_output_mapping
@@ -73,7 +73,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                             )
                         }
                         for c_instance in &physical_instances {
-                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack_mut() {
+                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
                                 c_instance
                                     .physical_ports()
                                     .physical_output_mapping
@@ -87,7 +87,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
 
             for input_id in logical_ports.logical_input_mapping.keys() {
                 for c_instance in &physical_instances {
-                    if let Some(c_instance) = c_instance.borrow_mut().try_unpack_mut() {
+                    if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
                         c_instance
                             .physical_ports()
                             .physical_input_mapping

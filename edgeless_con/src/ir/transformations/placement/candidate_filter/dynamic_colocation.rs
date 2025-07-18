@@ -8,10 +8,9 @@ impl super::FilterStrategy for DynamicColocation {
         &mut self,
         logical_component: &dyn crate::ir::LogicalComponent,
         candidates: Vec<crate::ir::transformations::placement::Candidate<'b>>,
-        workflow: &crate::ir::workflow::ActiveWorkflow,
+        _workflow: &crate::ir::workflow::ActiveWorkflow,
     ) -> Vec<crate::ir::transformations::placement::Candidate<'b>> {
         let mut materialized_instance_count = 0;
-        let mut total_port_rate = 0.0;
         let mut node_rates_abs = std::collections::HashMap::<uuid::Uuid, f64>::new();
 
         logical_component.instances().iter().for_each(|i| {
@@ -19,17 +18,17 @@ impl super::FilterStrategy for DynamicColocation {
             // This is fine as long as we only use this for new functions but might be
             // probelematic if we use this to check whether the function should be moved.
             if let Ok(maybe_c) = i.try_borrow() {
-                if let Some(c) = maybe_c.try_unpack() {
+                if let Some(c) = maybe_c.try_unpack_materialized() {
                     if let Some(materialized) = c.materialized_state() {
                         materialized_instance_count += 1;
-                        for (i_port, input) in &mut materialized.borrow_mut().materialized_ports().materialized_inputs {
+                        for (_i_port, input) in &mut materialized.borrow_mut().materialized_ports().materialized_inputs {
                             if let Some(port_statistics) = &mut input.port_statistics {
                                 for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
                                     *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
                                 }
                             }
                         }
-                        for (o_port, output) in &mut materialized.borrow_mut().materialized_ports().materialized_outputs {
+                        for (_o_port, output) in &mut materialized.borrow_mut().materialized_ports().materialized_outputs {
                             if let Some(port_statistics) = &mut output.port_statistics {
                                 for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
                                     *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
@@ -48,7 +47,7 @@ impl super::FilterStrategy for DynamicColocation {
         // Trying to avoid floating point comparisons by reducing this to integer percentages here.
         // The ceil should collect all low-percentage values into the same category.
         let total_port_rate = node_rates_abs.values().cloned().reduce(|acc, e| acc + e).unwrap_or(0.0);
-        let mut node_rates_abs: Vec<_> = node_rates_abs
+        let node_rates_abs: Vec<_> = node_rates_abs
             .into_iter()
             .map(|(k, v)| {
                 assert!(v > 0.0);
@@ -93,8 +92,8 @@ impl super::FilterStrategy for DynamicColocation {
 
 #[cfg(test)]
 mod test {
-    use super::super::test_helpers::*;
     use super::*;
+    use crate::ir::test::*;
     use crate::ir::transformations::placement::candidate_filter::FilterStrategy;
 
     #[test]
@@ -114,15 +113,16 @@ mod test {
             std::collections::HashMap::new(),
         ));
 
-        let function_under_test = mock_function_under_test(vec![(fut_id, mock_stats)]);
-        let other_function = mock_peer_function(vec![colocated_peer_id]);
+        let function_under_test =
+            crate::ir::transformations::placement::candidate_filter::test_helpers::mock_function_under_test(vec![(fut_id, mock_stats)]);
+        let other_function = crate::ir::transformations::placement::candidate_filter::test_helpers::mock_peer_function(vec![colocated_peer_id]);
 
         let workflow = mock_workflow(std::collections::HashMap::from([
             ("fut".to_string(), function_under_test),
             ("f_other".to_string(), other_function),
         ]));
 
-        let mut fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
 
         let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);

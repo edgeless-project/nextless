@@ -39,6 +39,7 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
                     node_id: edgeless_api::function_instance::NODE_ID_NONE,
                     function_id: edgeless_api::function_instance::FUNCTION_ID_NONE,
                 },
+                source_port: edgeless_api::function_instance::PortId("UNKNOWN".to_string()),
                 target_port: self.target_port.clone(),
                 channel_id: 0,
                 message: crate::core::Message::Cast(msg),
@@ -97,6 +98,7 @@ impl DataplaneHandle {
             loop {
                 if let Some(DataplaneEvent {
                     source_id,
+                    source_port,
                     channel_id,
                     message,
                     target_port,
@@ -119,13 +121,14 @@ impl DataplaneHandle {
                             std::collections::BTreeMap::from([
                                 ("SOURCE_NODE_ID".to_string(), source_id.node_id.to_string()),
                                 ("SOURCE_FUNCTION_ID".to_string(), source_id.function_id.to_string()),
-                                ("SOURCE_PORT".to_string(), "UNKNOWN".to_string()),
+                                ("SOURCE_PORT".to_string(), source_port.0.clone()),
                                 ("DEST_PORT".to_string(), target_port.0.clone()),
                             ]),
                         );
                     }
                     match cloned_sender.send(DataplaneEvent {
                         source_id,
+                        source_port,
                         channel_id,
                         message,
                         target_port,
@@ -162,6 +165,7 @@ impl DataplaneHandle {
             // log::info!("Q: {}", self.receiver.lock().await.len());
             if let Some(DataplaneEvent {
                 source_id,
+                source_port,
                 channel_id,
                 message,
                 target_port: target_channel,
@@ -173,6 +177,7 @@ impl DataplaneHandle {
                 {
                     return DataplaneEvent {
                         source_id,
+                        source_port,
                         channel_id,
                         message,
                         target_port: target_channel,
@@ -243,30 +248,52 @@ impl DataplaneHandle {
                 self.slf,
                 Message::Cast(msg.to_vec()),
                 edgeless_api::function_instance::PortId("INTERNAL".to_string()),
+                edgeless_api::function_instance::PortId("INTERNAL".to_string()),
                 0,
                 context,
             )
             .await;
             Ok(())
-        } else if let Some(target) = self.alias_mapping.get_mapping(&target).await {
-            match target {
+        } else if let Some(target_ouput) = self.alias_mapping.get_mapping(&target).await {
+            match target_ouput {
                 edgeless_api::common::Output::Single(instance_id, port_id) => {
-                    self.send_inner(instance_id, Message::Cast(msg.to_vec()), port_id.clone(), 0, context.clone())
-                        .await;
+                    self.send_inner(
+                        instance_id,
+                        Message::Cast(msg.to_vec()),
+                        port_id.clone(),
+                        edgeless_api::function_instance::PortId(target.clone()),
+                        0,
+                        context.clone(),
+                    )
+                    .await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
                     let id = ids.choose(&mut rand::thread_rng());
                     if let Some((instance_id, port_id)) = id {
-                        self.send_inner(*instance_id, Message::Cast(msg.to_vec()), port_id.clone(), 0, context.clone())
-                            .await;
+                        self.send_inner(
+                            *instance_id,
+                            Message::Cast(msg.to_vec()),
+                            port_id.clone(),
+                            edgeless_api::function_instance::PortId(target.clone()),
+                            0,
+                            context.clone(),
+                        )
+                        .await;
                     } else {
                         return Err(anyhow::anyhow!("Unknown Alias"));
                     }
                 }
                 edgeless_api::common::Output::All(ids) => {
                     for (instance_id, port_id) in ids {
-                        self.send_inner(instance_id, Message::Cast(msg.to_vec()), port_id.clone(), 0, context.clone())
-                            .await;
+                        self.send_inner(
+                            instance_id,
+                            Message::Cast(msg.to_vec()),
+                            port_id.clone(),
+                            edgeless_api::function_instance::PortId(target.clone()),
+                            0,
+                            context.clone(),
+                        )
+                        .await;
                     }
                 }
                 edgeless_api::common::Output::Link(link_id) => {
@@ -335,7 +362,15 @@ impl DataplaneHandle {
     ) {
         let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context("send", &context);
         let context = opentelemetry::Context::current_with_span(call_handler_span);
-        self.send_inner(target, Message::Cast(msg.to_vec()), target_port, 0, context).await;
+        self.send_inner(
+            target,
+            Message::Cast(msg.to_vec()),
+            target_port,
+            edgeless_api::function_instance::PortId("UNKNOWN".to_string()),
+            0,
+            context,
+        )
+        .await;
     }
 
     // Send a `call` event and wait for the return event.
@@ -364,8 +399,15 @@ impl DataplaneHandle {
         self.next_id += 1;
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
-        self.send_inner(target, Message::Call(msg.to_vec()), target_port, channel_id, context.clone())
-            .await;
+        self.send_inner(
+            target,
+            Message::Call(msg.to_vec()),
+            target_port,
+            edgeless_api::function_instance::PortId("UNKNOWN".to_string()),
+            channel_id,
+            context.clone(),
+        )
+        .await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
@@ -385,7 +427,8 @@ impl DataplaneHandle {
                 CallRet::NoReply => Message::CallNoRet,
                 CallRet::Err => Message::Err,
             },
-            edgeless_api::function_instance::PortId("reply".to_string()),
+            edgeless_api::function_instance::PortId("UNKNOWN".to_string()),
+            edgeless_api::function_instance::PortId("UNKNOWN".to_string()),
             channel_id,
             opentelemetry::Context::new(),
         )
@@ -397,6 +440,7 @@ impl DataplaneHandle {
         target: edgeless_api::function_instance::InstanceId,
         msg: Message,
         target_port: edgeless_api::function_instance::PortId,
+        source_port: edgeless_api::function_instance::PortId,
         channel_id: u64,
         context: opentelemetry::Context,
     ) {
@@ -409,6 +453,7 @@ impl DataplaneHandle {
                     &self.slf,
                     channel_id,
                     target_port.clone(),
+                    source_port.clone(),
                     context.span().span_context().clone(),
                 )
                 .await

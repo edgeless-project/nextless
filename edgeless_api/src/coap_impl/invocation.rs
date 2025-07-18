@@ -43,6 +43,7 @@ impl CoapInvocationServer {
                                 edgeless_api_core::invocation::EventData::Err => crate::invocation::EventData::Err,
                             },
                             target_port: crate::function_instance::PortId(String::from_str(invocation_event.target_port.0.as_str()).unwrap()),
+                            source_port: crate::function_instance::PortId(String::from_str(invocation_event.source_port.0.as_str()).unwrap()),
                             context: opentelemetry::trace::SpanContext::new(
                                 opentelemetry::trace::TraceId::from_bytes(invocation_event.span_context.trace_id),
                                 opentelemetry::trace::SpanId::from_bytes(invocation_event.span_context.span_id),
@@ -85,6 +86,7 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
             target: event.target,
             source: event.source,
             target_port: edgeless_api_core::port::Port(heapless::String::from_str(&event.target_port.0).unwrap()),
+            source_port: edgeless_api_core::port::Port(heapless::String::from_str(&event.source_port.0).unwrap()),
             stream_id: event.stream_id,
             data: match &event.data {
                 crate::invocation::EventData::Cast(val) => {

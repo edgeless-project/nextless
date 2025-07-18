@@ -432,6 +432,7 @@ async fn main() -> anyhow::Result<()> {
                             _ => return Err(anyhow::anyhow!("invalid event type: {}", event_type)),
                         },
                         target_port: edgeless_api::function_instance::PortId(target_port),
+                        source_port: edgeless_api::function_instance::PortId("UNKNOWN".to_string()),
                         context: opentelemetry::trace::SpanContext::empty_context(),
                     };
                     match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await {

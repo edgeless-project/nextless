@@ -15,6 +15,7 @@ pub trait DataPlaneLink: Send + Sync {
         src: &edgeless_api::function_instance::InstanceId,
         channel_id: u64,
         target_port: edgeless_api::function_instance::PortId,
+        source_port: edgeless_api::function_instance::PortId,
         context: opentelemetry::trace::SpanContext,
     ) -> LinkProcessingResult;
 }
@@ -50,6 +51,7 @@ impl Message {
 #[derive(Clone, Debug)]
 pub struct DataplaneEvent {
     pub source_id: edgeless_api::function_instance::InstanceId,
+    pub source_port: edgeless_api::function_instance::PortId,
     pub channel_id: u64,
     pub message: Message,
     pub target_port: edgeless_api::function_instance::PortId,

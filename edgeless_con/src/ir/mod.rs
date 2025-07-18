@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-#![allow(unused)]
+// #![allow(unused)]
 
 pub mod actor;
 pub mod link;
@@ -14,92 +14,260 @@ pub mod subflow;
 pub mod transformations;
 pub mod workflow;
 
+#[cfg(test)]
+mod test;
+
 pub trait LogicalComponent {
     fn logical_ports(&self) -> &LogicalPorts;
     fn logical_ports_mut(&mut self) -> &mut LogicalPorts;
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId>;
-    fn instances(&self) -> Vec<&std::cell::RefCell<dyn MaybePhyiscalInstance>>;
-    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn MaybePhyiscalInstance>>);
+    fn instances(&self) -> Vec<&std::cell::RefCell<PhysicalComponentState>>;
+    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<PhysicalComponentState>>);
 }
 
-pub enum PhysicalComponentState<C: PhysicalComponent> {
-    Planned,
-    Existing(C),
-    StopPlanned(C),
-    Stopped(C),
+pub enum PhysicalComponentState {
+    Invalid,
+    Requested,
+    Planned(Box<dyn PhysicalComponent>),
+    Materialized(Box<dyn PhysicalComponent>),
+    MigrationRequested(Box<dyn PhysicalComponent>),
+    MigratingAway {
+        old: Box<dyn PhysicalComponent>,
+        new: edgeless_api::function_instance::InstanceId,
+    },
+    StopPlanned {
+        old: Box<dyn PhysicalComponent>,
+        replacement: Option<edgeless_api::function_instance::InstanceId>,
+    },
+    Stopped {
+        dead_instance: Box<dyn PhysicalComponent>,
+        #[allow(unused)]
+        replacement: Option<edgeless_api::function_instance::InstanceId>,
+    },
+    #[allow(unused)]
+    Dead(Box<dyn PhysicalComponent>),
+    DeadReplaced {
+        old: Box<dyn PhysicalComponent>,
+        #[allow(unused)]
+        replacement: edgeless_api::function_instance::InstanceId,
+    },
+    Lost(Box<dyn PhysicalComponent>),
+    LostReplaced {
+        old: Box<dyn PhysicalComponent>,
+        #[allow(unused)]
+        replacement: edgeless_api::function_instance::InstanceId,
+    },
 }
 
-pub trait MaybePhyiscalInstance {
-    fn try_unpack(&self) -> Option<&dyn PhysicalComponent>;
-    fn try_unpack_mut(&mut self) -> Option<&mut dyn PhysicalComponent>;
-    fn id(&self) -> Option<edgeless_api::function_instance::InstanceId>;
-}
-
-impl<C: PhysicalComponent> MaybePhyiscalInstance for PhysicalComponentState<C>
-where
-    C: PhysicalComponent,
-{
-    fn try_unpack(&self) -> Option<&dyn PhysicalComponent> {
+impl PhysicalComponentState {
+    fn try_unpack_materialized(&self) -> Option<&dyn PhysicalComponent> {
         match self {
-            PhysicalComponentState::Planned => None,
-            PhysicalComponentState::Existing(inner) => Some(inner),
-            PhysicalComponentState::StopPlanned(inner) => Some(inner),
-            PhysicalComponentState::Stopped(inner) => Some(inner),
+            PhysicalComponentState::Invalid => None,
+            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Planned(_) => None,
+            PhysicalComponentState::Materialized(inner) => Some(inner.as_ref()),
+            PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_ref()),
+            PhysicalComponentState::MigratingAway { old, .. } => Some(old.as_ref()),
+            PhysicalComponentState::StopPlanned { old, .. } => Some(old.as_ref()),
+            PhysicalComponentState::Stopped { dead_instance, .. } => Some(dead_instance.as_ref()),
+            PhysicalComponentState::Dead(dead_instance) => Some(dead_instance.as_ref()),
+            PhysicalComponentState::Lost(lost_instance) => Some(lost_instance.as_ref()),
+            PhysicalComponentState::DeadReplaced { old, .. } => Some(old.as_ref()),
+            PhysicalComponentState::LostReplaced { old, .. } => Some(old.as_ref()),
         }
     }
 
-    fn try_unpack_mut(&mut self) -> Option<&mut dyn PhysicalComponent> {
+    fn try_unpack_active(&self) -> Option<&dyn PhysicalComponent> {
         match self {
-            PhysicalComponentState::Planned => None,
-            PhysicalComponentState::Existing(inner) => Some(inner),
-            PhysicalComponentState::StopPlanned(inner) => Some(inner),
-            PhysicalComponentState::Stopped(inner) => Some(inner),
+            PhysicalComponentState::Invalid => None,
+            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Planned(_) => None,
+            PhysicalComponentState::Materialized(inner) => Some(inner.as_ref()),
+            PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_ref()),
+            PhysicalComponentState::MigratingAway { old, .. } => Some(old.as_ref()),
+            PhysicalComponentState::StopPlanned { old, .. } => Some(old.as_ref()),
+            PhysicalComponentState::Stopped { .. } => None,
+            PhysicalComponentState::Dead(_) => None,
+            PhysicalComponentState::Lost(_) => None,
+            PhysicalComponentState::DeadReplaced { .. } => None,
+            PhysicalComponentState::LostReplaced { .. } => None,
+        }
+    }
+
+    fn try_unpack_materialized_mut(&mut self) -> Option<&mut dyn PhysicalComponent> {
+        match self {
+            PhysicalComponentState::Invalid => None,
+            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Planned(_) => None,
+            PhysicalComponentState::Materialized(inner) => Some(inner.as_mut()),
+            PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_mut()),
+            PhysicalComponentState::MigratingAway { old, .. } => Some(old.as_mut()),
+            PhysicalComponentState::StopPlanned { old, .. } => Some(old.as_mut()),
+            PhysicalComponentState::Stopped { dead_instance, .. } => Some(dead_instance.as_mut()),
+            PhysicalComponentState::Dead(dead_instance) => Some(dead_instance.as_mut()),
+            PhysicalComponentState::Lost(lost_instance) => Some(lost_instance.as_mut()),
+            PhysicalComponentState::DeadReplaced { old, .. } => Some(old.as_mut()),
+            PhysicalComponentState::LostReplaced { old, .. } => Some(old.as_mut()),
         }
     }
 
     fn id(&self) -> Option<edgeless_api::function_instance::InstanceId> {
         match self {
-            PhysicalComponentState::Planned => None,
-            PhysicalComponentState::Existing(inner) => Some(inner.id()),
-            PhysicalComponentState::StopPlanned(inner) => Some(inner.id()),
-            PhysicalComponentState::Stopped(inner) => Some(inner.id()),
+            PhysicalComponentState::Invalid => None,
+            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Planned(inner) => Some(inner.id()),
+            PhysicalComponentState::Materialized(inner) => Some(inner.id()),
+            PhysicalComponentState::MigrationRequested(inner) => Some(inner.id()),
+            PhysicalComponentState::MigratingAway { old, .. } => Some(old.id()),
+            PhysicalComponentState::StopPlanned { old, .. } => Some(old.id()),
+            PhysicalComponentState::Stopped { dead_instance, .. } => Some(dead_instance.id()),
+            PhysicalComponentState::Dead(dead_instance) => Some(dead_instance.id()),
+            PhysicalComponentState::Lost(lost_instance) => Some(lost_instance.id()),
+            PhysicalComponentState::DeadReplaced { old, .. } => Some(old.id()),
+            PhysicalComponentState::LostReplaced { old, .. } => Some(old.id()),
         }
+    }
+
+    fn request_new_instance() -> Self {
+        PhysicalComponentState::Requested
+    }
+
+    pub(crate) fn plan_creation(&mut self, instance: Box<dyn PhysicalComponent>) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::Requested => PhysicalComponentState::Planned(instance),
+            _ => {
+                log::error!("Tried to plan creation of component in state other than 'requested'");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+
+    pub(crate) fn mark_materialized(&mut self) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::Planned(inner) => PhysicalComponentState::Materialized(inner),
+            _ => {
+                log::error!("Tried to mark function in state other than 'planned' as materialized");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+
+    pub(crate) fn plan_stop(&mut self) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::Materialized(inner) => PhysicalComponentState::StopPlanned {
+                old: inner,
+                replacement: None,
+            },
+            PhysicalComponentState::MigratingAway { old, new } => PhysicalComponentState::StopPlanned { old, replacement: Some(new) },
+            _ => {
+                log::error!("Tried to request stop of function that is not in a running state.");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+    pub(crate) fn mark_migrating_away(&mut self, new_id: edgeless_api::function_instance::InstanceId) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::Materialized(inner) => PhysicalComponentState::MigratingAway { old: inner, new: new_id },
+            PhysicalComponentState::MigrationRequested(inner) => PhysicalComponentState::MigratingAway { old: inner, new: new_id },
+            _ => {
+                log::error!("Tried to mark function that is not currently running normaly as migrating.");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+
+    fn mark_stopped(&mut self) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::StopPlanned { old, replacement } => PhysicalComponentState::Stopped {
+                dead_instance: old,
+                replacement,
+            },
+            _ => {
+                log::error!("Tried to mark function in wrong state stopped");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+
+    fn mark_lost(&mut self) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::Materialized(inner) => PhysicalComponentState::Lost(inner),
+            _ => {
+                log::error!("Tried to mark non-active function as lost");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+
+    fn mark_lost_replaced(&mut self, replacement: edgeless_api::function_instance::InstanceId) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::Lost(old) => PhysicalComponentState::LostReplaced { old, replacement },
+            _ => {
+                log::error!("Tried to mark function that is not lost as lost_replaced");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+
+    fn mark_dead_replaced(&mut self, replacement: edgeless_api::function_instance::InstanceId) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::Dead(old) => PhysicalComponentState::DeadReplaced { old, replacement },
+            _ => {
+                log::error!("Tried to mark function that is not dead as dead_replaced");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+
+    fn plan_migration(&mut self) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::Materialized(inner) => PhysicalComponentState::MigrationRequested(inner),
+            _ => {
+                log::error!("Tried to migrate function in wrong state");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
+    }
+
+    fn abort_migration(&mut self) {
+        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
+        let new = match old {
+            PhysicalComponentState::MigrationRequested(inner) => PhysicalComponentState::Materialized(inner),
+            _ => {
+                log::error!("Tried to abort migration on a component that is not in the migration state.");
+                old
+            }
+        };
+        let _ = std::mem::replace(self, new);
     }
 }
 
-impl<C: PhysicalComponent> PhysicalComponentState<C> {
-    fn new() -> Self {
-        PhysicalComponentState::Planned
-    }
-
-    fn plan_stop(&mut self) -> Self {
-        let old = std::mem::replace(self, PhysicalComponentState::Planned);
-        match old {
-            PhysicalComponentState::Existing(inner) => PhysicalComponentState::StopPlanned(inner),
-            _ => {
-                log::error!("Tried to mark bad function");
-                old
-            }
-        }
-    }
-
-    fn mark_stopped(&mut self) -> Self {
-        let old = std::mem::replace(self, PhysicalComponentState::Planned);
-        match old {
-            PhysicalComponentState::StopPlanned(inner) => PhysicalComponentState::Stopped(inner),
-            _ => {
-                log::error!("Tried to mark bad function");
-                old
-            }
-        }
-    }
-}
-
-pub trait PhysicalComponent {
+pub trait PhysicalComponent: Send {
     fn id(&self) -> edgeless_api::function_instance::InstanceId;
     fn creation_time(&self) -> std::time::Instant;
     fn physical_ports(&mut self) -> &mut PhysicalPorts;
+    fn materialize(&mut self, telemetry_provider: &Option<Box<dyn TelemetryProvider>>) -> Vec<RequiredChange>;
+    fn stop(&mut self) -> Vec<RequiredChange>;
     fn materialized_state(&self) -> Option<&std::cell::RefCell<dyn MaterializedComponent>>;
+    fn as_actor(&mut self) -> Option<&mut actor::PhysicalActor>;
 }
 
 pub trait MaterializedComponent {
@@ -162,16 +330,21 @@ pub type Runtimes<'a> = std::collections::HashMap<String, Runtime<'a>>;
 pub trait WasmRuntime {
     fn num_cores(&self) -> u32;
     fn cpu_freq_hz(&self) -> f32;
+    #[allow(unused)]
     fn mem_size_bytes(&self) -> u32;
+    #[allow(unused)]
     fn runtime_info(&self) -> Option<Box<dyn WasmRuntimeInfo>>;
 }
 
 pub trait NativeRuntime {
     fn num_cores(&self) -> u32;
     fn cpu_freq_hz(&self) -> f32;
+    #[allow(unused)]
     fn mem_size_bytes(&self) -> u32;
     fn node_architecture(&self) -> NodeArchitecture;
+    #[allow(unused)]
     fn node_sys(&self) -> NodeSys;
+    #[allow(unused)]
     fn runtime_info(&self) -> Option<Box<dyn WasmRuntimeInfo>>;
 }
 
@@ -183,6 +356,7 @@ pub enum NodeArchitecture {
 }
 
 #[derive(PartialEq)]
+#[allow(unused)]
 pub enum NodeSys {
     Linux,
     Darwin,
@@ -197,6 +371,7 @@ pub trait WasmRuntimeInfo {
 pub trait ResourceProvider {
     fn class_type(&self) -> String;
     // TODO(raphael) Update to use Ports.
+    #[allow(unused)]
     fn outputs(&self) -> Vec<String>;
 }
 
@@ -248,12 +423,13 @@ pub struct LogicalPorts {
     pub logical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalInput>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct PhysicalPorts {
     pub physical_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
     pub physical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
 }
 
+#[derive(Default)]
 pub struct MaterializedPorts {
     pub materialized_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, MaterializedOutput>,
     pub materialized_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, MaterializedInput>,
@@ -295,14 +471,51 @@ impl MaterializedPorts {
 
         true
     }
+
+    fn update(
+        &mut self,
+        new: &PhysicalPorts,
+        component_id: &edgeless_api::function_instance::InstanceId,
+        telemetry_provider: &Option<Box<dyn TelemetryProvider>>,
+    ) {
+        self.materialized_inputs = new
+            .physical_input_mapping
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    MaterializedInput {
+                        mapping: v.clone(),
+                        port_statistics: telemetry_provider.as_ref().map(|t| t.input_port_statistics_for(component_id, k)),
+                    },
+                )
+            })
+            .collect();
+        self.materialized_outputs = new
+            .physical_output_mapping
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    MaterializedOutput {
+                        mapping: v.clone(),
+                        port_statistics: telemetry_provider.as_ref().map(|t| t.output_port_statistics_for(component_id, k)),
+                    },
+                )
+            })
+            .collect();
+    }
 }
 
 #[derive(Default)]
+#[allow(unused)]
 pub struct ExternalPorts {
     pub external_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
     pub external_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
 }
 
+#[derive(Default)]
+#[allow(unused)]
 pub struct InternalPorts {
     pub internal_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalOutput>,
     pub internal_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalInput>,
@@ -314,6 +527,7 @@ pub struct MaterializedInput {
 }
 
 impl MaterializedInput {
+    #[allow(unused)]
     fn runtime_statistics(&self) -> Option<&dyn PortStatistics> {
         self.port_statistics.as_deref()
     }
@@ -325,6 +539,7 @@ pub struct MaterializedOutput {
 }
 
 impl MaterializedOutput {
+    #[allow(unused)]
     fn runtime_statistics(&self) -> Option<&dyn PortStatistics> {
         self.port_statistics.as_deref()
     }
@@ -374,6 +589,7 @@ pub enum RequiredChange {
         provider_id: edgeless_api::link::LinkProviderId,
         config: Vec<u8>,
     },
+    #[allow(unused)]
     RemoveLinkFromNode {
         link_id: edgeless_api::link::LinkInstanceId,
         node_id: edgeless_api::function_instance::NodeId,

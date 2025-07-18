@@ -6,6 +6,8 @@ use crate::ir::transformations::{StatefulTransformation, StatelessTransformation
 
 pub struct DefaultOrchestrationPipeline<P: PlacementStrategy> {
     scaler: super::super::transformations::scaler::Scaler,
+    colocation_optimizer: super::super::transformations::colocation_optimizer::ColocationOptimizer,
+    migration_finalizer: super::super::transformations::migration_finalizer::MigrationFinalizer,
     placement: super::super::transformations::placement::DefaultPlacement<P>,
 }
 
@@ -13,6 +15,8 @@ impl<P: PlacementStrategy> DefaultOrchestrationPipeline<P> {
     pub fn new(placement_strategy: P) -> Self {
         DefaultOrchestrationPipeline {
             scaler: super::super::transformations::scaler::Scaler::new(),
+            colocation_optimizer: super::super::transformations::colocation_optimizer::ColocationOptimizer::new(),
+            migration_finalizer: super::super::transformations::migration_finalizer::MigrationFinalizer::new(),
             placement: crate::ir::transformations::placement::DefaultPlacement::new(placement_strategy),
         }
     }
@@ -37,6 +41,8 @@ impl<P: PlacementStrategy> super::TransformationPipeline<P::GlobalState> for Def
         global_state: &P::GlobalState,
     ) {
         self.scaler.apply(workflow, nodes, peer_clusters);
+        self.colocation_optimizer.apply(workflow, nodes, peer_clusters);
+        self.migration_finalizer.apply(workflow, nodes, peer_clusters);
         self.placement.apply(workflow, nodes, peer_clusters, global_state);
     }
 }

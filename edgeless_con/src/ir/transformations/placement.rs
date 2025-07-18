@@ -38,30 +38,56 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
         global_state: &P::GlobalState,
     ) {
         for (f_id, function) in &workflow.functions {
-            let function = function.borrow_mut();
+            let mut function = function.borrow_mut();
+            let mut new_instances = Vec::new();
             for i in &function.instances {
                 let mut i = i.borrow_mut();
-                match &*i {
-                    PhysicalComponentState::Planned => {
-                        log::info!("Planned : {}", function.instances.len());
-                        let candidates = find_candidates_for_actor(&function, nodes);
-                        let mut filtered = self.dynamic_colocation_filter.filter_candidates(&*function, candidates, workflow);
-                        if filtered.len() > 1 {
-                            filtered = self.static_colocation_filter.filter_candidates(&*function, filtered, workflow);
-                        };
-                        let dst = self.placement_strategy.select_candidate(filtered, global_state);
-
-                        if let Some(dst) = dst {
-                            *i = PhysicalComponentState::Existing(actor::PhysicalActor {
-                                id: edgeless_api::function_instance::InstanceId::new(dst.node_id),
-                                runtime_type: dst.runtime.id(),
-                                desired_mapping: PhysicalPorts::default(),
-                                image: None,
-                                materialized: None,
-                                creation_tine: std::time::Instant::now(),
-                            });
+                match &mut *i {
+                    PhysicalComponentState::Requested => {
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &*function, nodes, global_state, true);
+                        if let Some(new_instance) = new_instance {
+                            *i = new_instance;
                         } else {
                             log::info!("Found no viable node for {} in {}", &f_id, workflow.id.workflow_id);
+                        }
+                    }
+                    PhysicalComponentState::MigrationRequested(c) => {
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &*function, nodes, global_state, false);
+                        if let Some(new_instance) = new_instance {
+                            let new_id = new_instance.id().unwrap();
+                            if new_id.node_id == c.id().node_id {
+                                log::info!("Node would be equal.");
+                                i.abort_migration();
+                            } else {
+                                log::info!(
+                                    "Found Replacement node for {} in {}; Will migrate: {} -> {}",
+                                    &f_id,
+                                    workflow.id.workflow_id,
+                                    c.id().node_id,
+                                    new_id.node_id
+                                );
+                                new_instances.push(std::cell::RefCell::new(new_instance));
+                                i.mark_migrating_away(new_id);
+                            }
+                        } else {
+                            log::info!("No Instance Found");
+                            i.abort_migration();
+                        }
+                    }
+                    PhysicalComponentState::Lost(_) => {
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &*function, nodes, global_state, false);
+                        if let Some(new_instance) = new_instance {
+                            let new_id = new_instance.id().unwrap();
+                            new_instances.push(std::cell::RefCell::new(new_instance));
+                            i.mark_lost_replaced(new_id);
+                        }
+                    }
+                    PhysicalComponentState::Dead(_) => {
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &*function, nodes, global_state, false);
+                        if let Some(new_instance) = new_instance {
+                            let new_id = new_instance.id().unwrap();
+                            new_instances.push(std::cell::RefCell::new(new_instance));
+                            i.mark_dead_replaced(new_id);
                         }
                     }
                     _ => {
@@ -69,23 +95,27 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                     }
                 }
             }
+            function.instances.extend(new_instances);
         }
 
-        for resource in workflow.resources.values_mut() {
+        for (resource_id, resource) in &mut workflow.resources {
             let resource = resource.borrow_mut();
 
             for r in &resource.instances {
                 let mut r = r.borrow_mut();
                 match &*r {
-                    PhysicalComponentState::Planned => {
+                    PhysicalComponentState::Requested => {
                         let dst = select_node_for_resource(&resource, nodes);
                         if let Some(dst) = dst {
-                            *r = PhysicalComponentState::Existing(resource::PhysicalResource {
+                            *r = PhysicalComponentState::Materialized(Box::new(resource::PhysicalResource {
                                 id: edgeless_api::function_instance::InstanceId::new(dst),
                                 desired_mapping: PhysicalPorts::default(),
                                 materialized: None,
                                 creation_time: std::time::Instant::now(),
-                            });
+                                class: resource.class.clone(),
+                                component_name: resource_id.clone(),
+                                configuration: resource.configurations.clone(),
+                            }));
                         }
                     }
                     _ => {
@@ -103,15 +133,16 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
             for s in &subflow.instances {
                 let mut s = s.borrow_mut();
                 match &*s {
-                    PhysicalComponentState::Planned => {
+                    PhysicalComponentState::Requested => {
                         let dst = select_cluster_for_subflow(&subflow, peer_clusters);
                         if let Some(dst) = dst {
-                            *s = PhysicalComponentState::Existing(subflow::PhysicalSubFlow {
+                            *s = PhysicalComponentState::Materialized(Box::new(subflow::PhysicalSubFlow {
                                 id: edgeless_api::function_instance::InstanceId::new(dst),
                                 desired_mapping: PhysicalPorts::default(),
                                 materialized: None,
                                 creation_time: std::time::Instant::now(),
-                            });
+                                internal_ports: InternalPorts::default(),
+                            }));
                         }
                     }
                     _ => {
@@ -128,15 +159,16 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
             for p in &proxy.instances {
                 let mut p = p.borrow_mut();
                 match &*p {
-                    PhysicalComponentState::Planned => {
+                    PhysicalComponentState::Requested => {
                         let dst = select_node_for_proxy(&proxy, nodes);
                         if let Some(dst) = dst {
-                            *p = PhysicalComponentState::Existing(proxy::PhyiscalProxy {
+                            *p = PhysicalComponentState::Materialized(Box::new(proxy::PhyiscalProxy {
                                 id: edgeless_api::function_instance::InstanceId::new(dst),
                                 desired_mapping: PhysicalPorts::default(),
                                 materialized: None,
                                 creation_time: std::time::Instant::now(),
-                            });
+                                external_ports: ExternalPorts::default(),
+                            }));
                         }
                     }
                     _ => {
@@ -150,15 +182,53 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
 
 #[derive(Clone)]
 pub struct Candidate<'a> {
-    node_id: edgeless_api::function_instance::NodeId,
-    runtime: crate::ir::Runtime<'a>,
+    pub(crate) node_id: edgeless_api::function_instance::NodeId,
+    pub(crate) runtime: crate::ir::Runtime<'a>,
+}
+impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
+    fn spawn_new(
+        &mut self,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
+        logical_name: String,
+        function: &crate::ir::actor::LogicalActor,
+        nodes: &crate::ir::Nodes,
+        global_state: &P::GlobalState,
+        new_instance: bool,
+    ) -> Option<PhysicalComponentState> {
+        let candidates = find_candidates_for_actor(&function, nodes, new_instance);
+        let mut filtered = self.dynamic_colocation_filter.filter_candidates(&*function, candidates, workflow);
+        if filtered.len() > 1 {
+            filtered = self.static_colocation_filter.filter_candidates(&*function, filtered, workflow);
+        };
+        let dst = self.placement_strategy.select_candidate(filtered, global_state);
+
+        if let Some(dst) = dst {
+            let new_id = edgeless_api::function_instance::InstanceId::new(dst.node_id);
+            let new_instance = actor::PhysicalActor {
+                id: new_id,
+                runtime_type: dst.runtime.id(),
+                desired_mapping: PhysicalPorts::default(),
+                image: function.image.clone(),
+                materialized: None,
+                creation_time: std::time::Instant::now(),
+                component_name: logical_name,
+                annotations: function.annotations.clone(),
+            };
+
+            let mut new_component_state = PhysicalComponentState::request_new_instance();
+            new_component_state.plan_creation(Box::new(new_instance));
+            Some(new_component_state)
+        } else {
+            None
+        }
+    }
 }
 
-fn find_candidates_for_actor<'b>(actor: &actor::LogicalActor, nodes: &'b crate::ir::Nodes) -> Vec<Candidate<'b>> {
+fn find_candidates_for_actor<'b>(actor: &actor::LogicalActor, nodes: &'b crate::ir::Nodes, new_instance: bool) -> Vec<Candidate<'b>> {
     let mut candiates = Vec::new();
 
     for node in nodes.values() {
-        let mut node_cadidates = feasibility::feasible_node_runtime_candidates(actor, *node);
+        let mut node_cadidates = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance);
 
         node_cadidates.sort_by(|a, b| a.runtime.efficiency_score().total_cmp(&b.runtime.efficiency_score()));
         if let Some(c) = node_cadidates.pop() {

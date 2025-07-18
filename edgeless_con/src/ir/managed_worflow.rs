@@ -112,289 +112,24 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
             }
         }
 
-        for (f_name, function) in &self.wf.functions {
+        for (_c_name, function) in self.wf.components() {
             let function = function.borrow_mut();
-            for i in function.instances.iter() {
+            for i in function.instances().iter() {
                 let mut current = i.borrow_mut();
                 match &mut *current {
-                    super::PhysicalComponentState::Existing(current) => {
-                        if let Some(materialized) = &current.materialized {
-                            let mut materialized = materialized.borrow_mut();
-                            if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
-                                log::info!(
-                                    "Patch: New: O {:?}, i {:?}",
-                                    current.desired_mapping.physical_output_mapping,
-                                    current.desired_mapping.physical_input_mapping
-                                );
-                                changes.push(super::RequiredChange::PatchFunction {
-                                    function_id: current.id,
-                                    function_name: f_name.clone(),
-                                    input_mapping: current.desired_mapping.physical_input_mapping.clone(),
-                                    output_mapping: current.desired_mapping.physical_output_mapping.clone(),
-                                });
-                                materialized.mapping = super::MaterializedPorts {
-                                    materialized_inputs: current
-                                        .desired_mapping
-                                        .physical_input_mapping
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            (
-                                                k.clone(),
-                                                super::MaterializedInput {
-                                                    mapping: v.clone(),
-                                                    port_statistics: self
-                                                        .telemetry_provider
-                                                        .as_ref()
-                                                        .map(|t| t.input_port_statistics_for(&current.id, k)),
-                                                },
-                                            )
-                                        })
-                                        .collect(),
-                                    materialized_outputs: current
-                                        .desired_mapping
-                                        .physical_output_mapping
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            (
-                                                k.clone(),
-                                                super::MaterializedOutput {
-                                                    mapping: v.clone(),
-                                                    port_statistics: self
-                                                        .telemetry_provider
-                                                        .as_ref()
-                                                        .map(|t| t.output_port_statistics_for(&current.id, k)),
-                                                },
-                                            )
-                                        })
-                                        .collect(),
-                                };
-                            }
-                        } else {
-                            changes.push(super::RequiredChange::StartFunction {
-                                function_id: current.id,
-                                function_name: f_name.clone(),
-                                image: if let Some(custom_image) = &current.image {
-                                    custom_image.clone()
-                                } else {
-                                    function.image.clone()
-                                },
-                                input_mapping: current.desired_mapping.physical_input_mapping.clone(),
-                                output_mapping: current.desired_mapping.physical_output_mapping.clone(),
-                                annotations: function.annotations.clone(),
-                            });
-                            current.materialized = Some(std::cell::RefCell::new(super::actor::MaterializedActor {
-                                mapping: super::MaterializedPorts {
-                                    materialized_inputs: current
-                                        .desired_mapping
-                                        .physical_input_mapping
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            (
-                                                k.clone(),
-                                                super::MaterializedInput {
-                                                    mapping: v.clone(),
-                                                    port_statistics: self
-                                                        .telemetry_provider
-                                                        .as_ref()
-                                                        .map(|t| t.input_port_statistics_for(&current.id, k)),
-                                                },
-                                            )
-                                        })
-                                        .collect(),
-                                    materialized_outputs: current
-                                        .desired_mapping
-                                        .physical_output_mapping
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            (
-                                                k.clone(),
-                                                super::MaterializedOutput {
-                                                    mapping: v.clone(),
-                                                    port_statistics: self
-                                                        .telemetry_provider
-                                                        .as_ref()
-                                                        .map(|t| t.output_port_statistics_for(&current.id, k)),
-                                                },
-                                            )
-                                        })
-                                        .collect(),
-                                },
-                                runtime_statistics: self.telemetry_provider.as_ref().map(|t| t.component_statistics_for(&current.id)),
-                            }))
-                        }
+                    super::PhysicalComponentState::Planned(planned_instance) => {
+                        changes.extend(planned_instance.materialize(&self.telemetry_provider));
+                        current.mark_materialized();
                     }
-                    _ => {
-                        log::warn!("Cannot materialize invalid physical instance.")
+                    super::PhysicalComponentState::Materialized(maybe_dirty_instance) => {
+                        changes.extend(maybe_dirty_instance.materialize(&self.telemetry_provider));
                     }
-                }
-            }
-        }
-
-        for (r_name, resource) in &mut self.wf.resources {
-            let resource = resource.borrow_mut();
-            for i in &resource.instances {
-                let mut current = i.borrow_mut();
-                match &mut *current {
-                    super::PhysicalComponentState::Existing(current) => {
-                        if let Some(materialized) = &current.materialized {
-                            let materialized = materialized.borrow_mut();
-                            if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
-                                changes.push(super::RequiredChange::PatchResource {
-                                    resource_id: current.id,
-                                    resource_name: r_name.clone(),
-                                    input_mapping: current.desired_mapping.physical_input_mapping.clone(),
-                                    output_mapping: current.desired_mapping.physical_output_mapping.clone(),
-                                });
-                            }
-                        } else {
-                            changes.push(super::RequiredChange::StartResource {
-                                resource_id: current.id,
-                                resource_name: r_name.clone(),
-                                class_type: resource.class.clone(),
-                                input_mapping: current.desired_mapping.physical_input_mapping.clone(),
-                                output_mapping: current.desired_mapping.physical_output_mapping.clone(),
-                                configuration: resource.configurations.clone(),
-                            });
-                            current.materialized = Some(std::cell::RefCell::new(super::resource::MaterializedResource {
-                                mapping: super::MaterializedPorts {
-                                    materialized_inputs: current
-                                        .desired_mapping
-                                        .physical_input_mapping
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            (
-                                                k.clone(),
-                                                super::MaterializedInput {
-                                                    mapping: v.clone(),
-                                                    port_statistics: self
-                                                        .telemetry_provider
-                                                        .as_ref()
-                                                        .map(|t| t.input_port_statistics_for(&current.id, k)),
-                                                },
-                                            )
-                                        })
-                                        .collect(),
-                                    materialized_outputs: current
-                                        .desired_mapping
-                                        .physical_output_mapping
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            (
-                                                k.clone(),
-                                                super::MaterializedOutput {
-                                                    mapping: v.clone(),
-                                                    port_statistics: self
-                                                        .telemetry_provider
-                                                        .as_ref()
-                                                        .map(|t| t.output_port_statistics_for(&current.id, k)),
-                                                },
-                                            )
-                                        })
-                                        .collect(),
-                                },
-                                runtime_statistics: self.telemetry_provider.as_ref().map(|t| t.component_statistics_for(&current.id)),
-                            }))
-                        }
-                    }
-                    super::PhysicalComponentState::StopPlanned(c) => {
-                        changes.push(super::RequiredChange::StopFunction { function_id: c.id });
+                    super::PhysicalComponentState::StopPlanned { old, .. } => {
+                        changes.extend(old.stop());
                         current.mark_stopped();
                     }
-                    super::PhysicalComponentState::Stopped(_) => {
-                        //NOOP
-                    }
-                    super::PhysicalComponentState::Planned => {
-                        log::error!("Tried to materialize planned physical instance.")
-                    }
-                }
-            }
-        }
-
-        for subflow in self.wf.subflows.values_mut() {
-            let subflow = subflow.borrow_mut();
-            for i in &subflow.instances {
-                let current = i.borrow_mut();
-                match &*current {
-                    super::PhysicalComponentState::Existing(current) => {
-                        if let Some(materialized) = &current.materialized {
-                            let materialized = materialized.borrow_mut();
-                            if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
-                                changes.push(super::RequiredChange::PatchSubflow {
-                                    subflow_id: current.id,
-                                    input_mapping: current.desired_mapping.physical_input_mapping.clone(),
-                                    output_mapping: current.desired_mapping.physical_output_mapping.clone(),
-                                });
-                            }
-                        } else {
-                            changes.push(super::RequiredChange::CreateSubflow {
-                                subflow_id: current.id,
-                                spawn_req: edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                                    workflow_functions: Vec::new(),
-                                    workflow_resources: Vec::new(),
-                                    workflow_ingress_proxies: current
-                                        .desired_mapping
-                                        .physical_input_mapping
-                                        .iter()
-                                        .map(|(id, physical_port)| edgeless_api::workflow_instance::WorkflowIngressProxy {
-                                            id: id.0.clone(),
-                                            inner_output: subflow.logical_ports.logical_output_mapping.get(id).unwrap().clone(),
-                                            external_input: physical_port.clone(),
-                                        })
-                                        .collect(),
-                                    workflow_egress_proxies: current
-                                        .desired_mapping
-                                        .physical_output_mapping
-                                        .iter()
-                                        .map(|(id, physical_port)| edgeless_api::workflow_instance::WorkflowEgressProxy {
-                                            id: id.0.clone(),
-                                            inner_input: match subflow.logical_ports.logical_input_mapping.get(id).unwrap().clone() {
-                                                super::LogicalInput::Direct(vec) => edgeless_api::workflow_instance::PortMapping::AnyOfTargets(vec),
-                                                super::LogicalInput::Topic(topic) => edgeless_api::workflow_instance::PortMapping::Topic(topic),
-                                            },
-                                            external_output: physical_port.clone(),
-                                        })
-                                        .collect(),
-                                    annotations: std::collections::HashMap::new(),
-                                },
-                            });
-                        }
-                    }
                     _ => {
-                        panic!("Tried to materialize invalid physical instance.")
-                    }
-                }
-            }
-        }
-
-        {
-            let prx = self.wf.proxy.borrow_mut();
-            for i in &prx.instances {
-                let current = i.borrow_mut();
-                match &*current {
-                    super::PhysicalComponentState::Existing(current) => {
-                        if let Some(materialized) = &current.materialized {
-                            let materialized = materialized.borrow_mut();
-                            if !materialized.mapping.is_current_mapping(&current.desired_mapping) {
-                                changes.push(super::RequiredChange::PatchProxy {
-                                    proxy_id: current.id,
-                                    internal_inputs: current.desired_mapping.physical_input_mapping.clone(),
-                                    internal_outputs: current.desired_mapping.physical_output_mapping.clone(),
-                                    external_inputs: prx.external_ports.external_input_mapping.clone(),
-                                    external_outputs: prx.external_ports.external_output_mapping.clone(),
-                                })
-                            } else {
-                                changes.push(super::RequiredChange::CrateProxy {
-                                    proxy_id: current.id,
-                                    internal_inputs: current.desired_mapping.physical_input_mapping.clone(),
-                                    internal_outputs: current.desired_mapping.physical_output_mapping.clone(),
-                                    external_inputs: prx.external_ports.external_input_mapping.clone(),
-                                    external_outputs: prx.external_ports.external_output_mapping.clone(),
-                                });
-                            }
-                        }
-                    }
-                    _ => {
-                        panic!("Tried to materialize invalid physical instance.")
+                        // NOOP
                     }
                 }
             }
@@ -405,26 +140,16 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
 
     fn remove_nodes(&mut self, node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>) -> bool {
         let mut changed = false;
-        for function in self.wf.functions.values_mut() {
-            let mut function = function.borrow_mut();
-            let before = function.instances.len();
-            function.instances.retain(|instance| match &*instance.borrow() {
-                super::PhysicalComponentState::Existing(instance) => !node_ids.contains(&instance.id.node_id),
-                _ => true,
-            });
-            if before != function.instances.len() {
-                changed = true;
-            }
-        }
-        for resource in self.wf.resources.values_mut() {
-            let mut resource = resource.borrow_mut();
-            let before = resource.instances.len();
-            resource.instances.retain(|instance| match &*instance.borrow() {
-                super::PhysicalComponentState::Existing(instance) => !node_ids.contains(&instance.id.node_id),
-                _ => true,
-            });
-            if before != resource.instances.len() {
-                changed = true;
+        for (_, component_state) in self.wf.components() {
+            let component_state = component_state.borrow();
+            for instance in &mut component_state.instances() {
+                let mut instance = instance.borrow_mut();
+                if let super::PhysicalComponentState::Materialized(component_instance) = &*instance {
+                    if node_ids.contains(&component_instance.id().node_id) {
+                        instance.mark_lost();
+                        changed = true;
+                    }
+                }
             }
         }
         changed

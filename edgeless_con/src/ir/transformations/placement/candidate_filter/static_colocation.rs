@@ -17,7 +17,7 @@ impl super::FilterStrategy for StaticColocation {
         let mut logical_peers = std::collections::HashMap::<String, u64>::new();
 
         {
-            for (i_port, input) in &logical_component.logical_ports().logical_input_mapping {
+            for (_i_port, input) in &logical_component.logical_ports().logical_input_mapping {
                 match input {
                     crate::ir::LogicalInput::Direct(items) => {
                         for (item_id, _) in items {
@@ -30,18 +30,18 @@ impl super::FilterStrategy for StaticColocation {
                 }
             }
 
-            for (o_port, output) in &logical_component.logical_ports().logical_output_mapping {
+            for (_o_port, output) in &logical_component.logical_ports().logical_output_mapping {
                 match output {
-                    edgeless_api::workflow_instance::PortMapping::DirectTarget(logical_id, port_id) => {
+                    edgeless_api::workflow_instance::PortMapping::DirectTarget(logical_id, _port_id) => {
                         *logical_peers.entry(logical_id.clone()).or_insert(0) += 1;
                     }
                     edgeless_api::workflow_instance::PortMapping::AnyOfTargets(items) => {
-                        for (logical_id, port_id) in items {
+                        for (logical_id, _port_id) in items {
                             *logical_peers.entry(logical_id.clone()).or_insert(0) += 1;
                         }
                     }
                     edgeless_api::workflow_instance::PortMapping::AllOfTargets(items) => {
-                        for (logical_id, port_id) in items {
+                        for (logical_id, _port_id) in items {
                             *logical_peers.entry(logical_id.clone()).or_insert(0) += 1;
                         }
                     }
@@ -100,8 +100,9 @@ impl super::FilterStrategy for StaticColocation {
 
 #[cfg(test)]
 mod test {
-    use super::super::test_helpers::*;
     use super::*;
+    use crate::ir::test::*;
+    use crate::ir::transformations::placement::candidate_filter::test_helpers::{mock_function_under_test, mock_peer_function};
     use crate::ir::transformations::placement::candidate_filter::FilterStrategy;
 
     #[test]
@@ -120,7 +121,7 @@ mod test {
             ("f_other".to_string(), other_function),
         ]));
 
-        let mut fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
 
         let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);
@@ -144,7 +145,7 @@ mod test {
             ("f_other".to_string(), other_function),
         ]));
 
-        let mut fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
 
         let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 2);
@@ -173,7 +174,7 @@ mod test {
             ("f_other".to_string(), other_function),
         ]));
 
-        let mut fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
 
         let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);
@@ -185,7 +186,7 @@ mod test {
         let mut colocation_filter = StaticColocation::new();
         let runtime = MockWasmRuntime {};
 
-        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime);
+        let (_node_ids, candidates) = mock_nodes_and_candidates(3, &runtime);
 
         let function_under_test = mock_function_under_test(vec![]);
         let other_function = mock_peer_function(vec![
@@ -199,7 +200,7 @@ mod test {
             ("f_other".to_string(), other_function),
         ]));
 
-        let mut fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
 
         let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates.clone(), &workflow);
         assert_eq!(filtered.len(), 3);

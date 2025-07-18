@@ -97,6 +97,7 @@ impl EmbeddedDataplaneHandle {
             target,
             source: slf,
             target_port,
+            source_port: edgeless_api_core::port::Port("UNKNOWN".try_into().map_err(|_| DataplaneError::Internal)?),
             stream_id: 0,
             data: edgeless_api_core::invocation::EventData::Cast(edgeless_api_core::invocation::DataBuffer(
                 heapless::Vec::<u8, 1500>::from_slice(msg).map_err(|_| DataplaneError::BadParameter)?,
@@ -121,7 +122,8 @@ impl EmbeddedDataplaneHandle {
         let event = edgeless_api_core::invocation::Event {
             target,
             source: slf,
-            target_port: edgeless_api_core::port::Port("reply".try_into().map_err(|_| DataplaneError::Internal)?),
+            target_port: edgeless_api_core::port::Port("UNKNOWN".try_into().map_err(|_| DataplaneError::Internal)?),
+            source_port: edgeless_api_core::port::Port("UNKNOWN".try_into().map_err(|_| DataplaneError::Internal)?),
             stream_id: target_channel,
             data: match msg {
                 CallRet::Reply(msg) => edgeless_api_core::invocation::EventData::CallRet(edgeless_api_core::invocation::DataBuffer(msg)),

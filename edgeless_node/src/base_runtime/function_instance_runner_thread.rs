@@ -212,7 +212,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
                         self.stop()
                     },
                     // Receive a normal event from the dataplane and invoke the function instance
-                    edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port, context: span_context} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                    edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port, source_port: _, context: span_context} =  Box::pin(self.data_plane.receive_next()).fuse() => {
                         self.process_message(
                             source_id,
                             channel_id,

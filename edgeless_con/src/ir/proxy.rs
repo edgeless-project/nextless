@@ -3,14 +3,14 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use super::MaybePhyiscalInstance;
+// use super::MaybePhyiscalInstance;
 
 pub struct LogicalProxy {
     pub logical_ports: super::LogicalPorts,
 
     pub external_ports: super::ExternalPorts,
 
-    pub instances: Vec<std::cell::RefCell<super::PhysicalComponentState<PhyiscalProxy>>>,
+    pub instances: Vec<std::cell::RefCell<super::PhysicalComponentState>>,
 }
 
 impl super::LogicalComponent for LogicalProxy {
@@ -26,26 +26,26 @@ impl super::LogicalComponent for LogicalProxy {
         self.instances.iter().filter_map(|i| i.borrow().id()).collect()
     }
 
-    fn split_view(&mut self) -> (&mut super::LogicalPorts, Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>>) {
+    fn split_view(&mut self) -> (&mut super::LogicalPorts, Vec<&std::cell::RefCell<super::PhysicalComponentState>>) {
         (
             &mut self.logical_ports,
             self.instances
                 .iter()
-                .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)
+                // .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)
                 .collect(),
         )
     }
 
-    fn instances(&self) -> Vec<&std::cell::RefCell<dyn super::MaybePhyiscalInstance>> {
+    fn instances(&self) -> Vec<&std::cell::RefCell<super::PhysicalComponentState>> {
         self.instances
             .iter()
-            .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)
             .collect()
     }
 }
 
 pub struct PhyiscalProxy {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
+    pub(crate) external_ports: super::ExternalPorts,
     pub(crate) desired_mapping: super::PhysicalPorts,
     pub(crate) materialized: Option<std::cell::RefCell<MaterializedProxy>>,
     pub(crate) creation_time: std::time::Instant,
@@ -68,6 +68,39 @@ impl super::PhysicalComponent for PhyiscalProxy {
 
     fn creation_time(&self) -> std::time::Instant {
         self.creation_time
+    }
+
+    fn materialize(&mut self, _telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>) -> Vec<super::RequiredChange> {
+        let mut changes = Vec::new();
+        if let Some(materialized) = &self.materialized {
+            let materialized = materialized.borrow_mut();
+            if !materialized.mapping.is_current_mapping(&self.desired_mapping) {
+                changes.push(super::RequiredChange::PatchProxy {
+                    proxy_id: self.id,
+                    internal_inputs: self.desired_mapping.physical_input_mapping.clone(),
+                    internal_outputs: self.desired_mapping.physical_output_mapping.clone(),
+                    external_inputs: self.external_ports.external_input_mapping.clone(),
+                    external_outputs: self.external_ports.external_output_mapping.clone(),
+                })
+            } else {
+                changes.push(super::RequiredChange::CrateProxy {
+                    proxy_id: self.id,
+                    internal_inputs: self.desired_mapping.physical_input_mapping.clone(),
+                    internal_outputs: self.desired_mapping.physical_output_mapping.clone(),
+                    external_inputs: self.external_ports.external_input_mapping.clone(),
+                    external_outputs: self.external_ports.external_output_mapping.clone(),
+                });
+            }
+        }
+        changes
+    }
+
+    fn stop(&mut self) -> Vec<super::RequiredChange> {
+        vec![super::RequiredChange::StopFunction { function_id: self.id }]
+    }
+
+    fn as_actor(&mut self) -> Option<&mut super::actor::PhysicalActor> {
+        None
     }
 }
 

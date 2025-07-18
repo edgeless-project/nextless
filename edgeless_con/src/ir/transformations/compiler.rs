@@ -39,8 +39,9 @@ impl super::StatefulTransformation<CompilerStore> for Compiler {
                 continue;
             }
             for instance in &function.instances {
-                if let super::super::PhysicalComponentState::Existing(instance) = &mut *instance.borrow_mut() {
-                    if instance.image.is_none() {
+                if let super::super::PhysicalComponentState::Planned(instance) = &mut *instance.borrow_mut() {
+                    let instance = instance.as_actor().unwrap();
+                    if instance.image.id.format == "RUST" {
                         let image_ident = actor::ActorImageIdent {
                             class_id: function.image.class.id.clone(),
                             format: match instance.runtime_type.as_str() {
@@ -52,7 +53,7 @@ impl super::StatefulTransformation<CompilerStore> for Compiler {
                         };
 
                         match store.inner.blocking_lock().images.entry(image_ident.clone()) {
-                            std::collections::hash_map::Entry::Occupied(occupied_entry) => instance.image = Some(occupied_entry.get().clone()),
+                            std::collections::hash_map::Entry::Occupied(occupied_entry) => instance.image = occupied_entry.get().clone(),
                             std::collections::hash_map::Entry::Vacant(vacant_entry) => {
                                 let image_result = match instance.runtime_type.as_str() {
                                     "WASM_BASE" => compile_wasm(&function, image_ident),
@@ -62,7 +63,7 @@ impl super::StatefulTransformation<CompilerStore> for Compiler {
                                 };
 
                                 if let Ok(image) = image_result {
-                                    instance.image = Some(image.clone());
+                                    instance.image = image.clone();
                                     vacant_entry.insert(image);
                                 } else {
                                     log::error!("Failed Compiling Image");
