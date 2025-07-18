@@ -1,51 +1,51 @@
 name: Edgeless Commit Checks
 on:
-  push:
+    push:
 jobs:
-  check:
-    runs-on:
-      - ubuntu-latest
-    container:
-      image: ghcr.io/edgeless-project/ci-image:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.github_token }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Linter
-        run: cargo fmt --check
-      - name: Clippy
-        run: cargo clippy --no-deps
-      - name: Tests
-        run: cargo test -- --test-threads=1
-  build:
-    runs-on:
-      - ubuntu-latest
-    container:
-      image: ghcr.io/edgeless-project/ci-image:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.github_token }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build x64 Release
-        run: cargo build --release
-  # https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/ci.yml
-  build-esp32:
-    runs-on:
-      - ubuntu-latest
-    env:
-      SSID: SSID
-      PASSWORD: PASSWORD
-    steps:
-      - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          ldproxy: false
-          version: 1.85.0.0
-      - name: Build ES32-S3 Release
-        working-directory: ./edgeless_embedded_esp32
-        run: cargo build --release --target=xtensa-esp32s3-none-elf --features=wasm,psram
-      - name: Build ES32 Release
-        working-directory: ./edgeless_embedded_esp32
-        run: cargo build --release --target=xtensa-esp32-none-elf --features=tum_node_2_13
+    check:
+        runs-on:
+            - ubuntu-latest
+        container:
+            image: ghcr.io/edgeless-project/ci-image:latest
+            credentials:
+                username: ${{ github.actor }}
+                password: ${{ secrets.github_token }}
+        steps:
+            - uses: actions/checkout@v4
+            - name: Linter
+              run: cargo fmt --check
+            - name: Clippy
+              run: cargo clippy --no-deps
+            - name: Tests
+              run: cargo test -- --test-threads=1
+    build:
+        runs-on:
+            - ubuntu-latest
+        container:
+            image: ghcr.io/edgeless-project/ci-image:latest
+            credentials:
+                username: ${{ github.actor }}
+                password: ${{ secrets.github_token }}
+        steps:
+            - uses: actions/checkout@v4
+            - name: Build x64 Release
+              run: cargo build --release
+    # https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/ci.yml
+    build-esp32:
+        runs-on:
+            - ubuntu-latest
+        env:
+            SSID: SSID
+            PASSWORD: PASSWORD
+        steps:
+            - uses: actions/checkout@v4
+            - uses: esp-rs/xtensa-toolchain@v1.5
+              with:
+                  ldproxy: false
+                  version: 1.88.0.0
+            - name: Build ES32-S3 Release
+              working-directory: ./edgeless_embedded_esp32
+              run: cargo build --release --target=xtensa-esp32s3-none-elf --features=wasm,psram
+            - name: Build ES32 Release
+              working-directory: ./edgeless_embedded_esp32
+              run: cargo build --release --target=xtensa-esp32-none-elf --features=tum_node_2_13
