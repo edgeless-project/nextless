@@ -18,10 +18,10 @@ impl super::StatelessTransformation for ColocationOptimizer {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         'each_component: for (_c_id, c) in workflow.components() {
             let component = c.borrow_mut();
-            let port_weights = dynamic_port_weight(&*component).unwrap_or(vec![]);
-            log::info!("Migration State1: {:?}", port_weights);
+            let port_weights = dynamic_port_weight(&*component).unwrap_or_default();
+            log::info!("Migration State1: {port_weights:?}");
 
-            if port_weights.len() == 0 {
+            if port_weights.is_empty() {
                 continue 'each_component;
             }
 
@@ -49,7 +49,7 @@ impl super::StatelessTransformation for ColocationOptimizer {
                         let port_link_costs: std::collections::HashMap<edgeless_api::function_instance::PortId, u8> =
                             dynamic_port_link_cost(ci.as_mut()).unwrap().into_iter().collect();
 
-                        log::info!("Migration State2: {:?}, {:?}", port_weights, port_link_costs);
+                        log::info!("Migration State2: {port_weights:?}, {port_link_costs:?}");
                         // Migrate if one port is more than REQUIRED_WEIGHT_DELTA percent more frequent than the following port
                         // AND the link of the frequent port is more than REQUIRED_LINK_COST_DEKTA expensive than the less frequent port.
                         for i in 0..port_weights.len() - 1 {
@@ -215,7 +215,7 @@ fn all_traffic_local(component_instance: &mut dyn crate::ir::PhysicalComponent) 
     let mut materialized_state = component_instance.materialized_state().unwrap().borrow_mut();
     let p = materialized_state.materialized_ports();
 
-    for (_i_id, input) in &p.materialized_inputs {
+    for input in p.materialized_inputs.values() {
         for (peer_id, _rate) in input.port_statistics.as_ref().unwrap().message_rate_abs_by_peer(Duration::from_secs(60)) {
             if peer_id.node_id != component_instance.id().node_id {
                 return false;

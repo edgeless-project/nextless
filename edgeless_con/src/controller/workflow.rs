@@ -125,10 +125,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             match tokio::time::timeout(tokio::time::Duration::from_secs(1), self.receiver.recv()).await {
                 Ok(management_event) => {
                     let event = management_event.ok_or(WorkflowError::InputClosed)?;
-                    let is_stop = match &event {
-                        WorkflowManagementEvent::Stop => true,
-                        _ => false,
-                    };
+                    let is_stop = matches!(&event, WorkflowManagementEvent::Stop);
                     self.handle_management_event(event).await?;
                     if is_stop {
                         return Ok(());

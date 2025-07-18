@@ -17,7 +17,7 @@ impl super::FilterStrategy for StaticColocation {
         let mut logical_peers = std::collections::HashMap::<String, u64>::new();
 
         {
-            for (_i_port, input) in &logical_component.logical_ports().logical_input_mapping {
+            for input in logical_component.logical_ports().logical_input_mapping.values() {
                 match input {
                     crate::ir::LogicalInput::Direct(items) => {
                         for (item_id, _) in items {
@@ -30,7 +30,7 @@ impl super::FilterStrategy for StaticColocation {
                 }
             }
 
-            for (_o_port, output) in &logical_component.logical_ports().logical_output_mapping {
+            for output in logical_component.logical_ports().logical_output_mapping.values() {
                 match output {
                     edgeless_api::workflow_instance::PortMapping::DirectTarget(logical_id, _port_id) => {
                         *logical_peers.entry(logical_id.clone()).or_insert(0) += 1;

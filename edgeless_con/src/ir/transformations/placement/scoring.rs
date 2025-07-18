@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 pub trait ScoreableRuntime {
+    #[allow(unused)]
     fn load_score(&self) -> f32;
     fn efficiency_score(&self) -> f32;
     fn capacity_score(&self) -> f64;

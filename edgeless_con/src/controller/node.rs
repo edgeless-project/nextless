@@ -16,6 +16,7 @@ pub struct WorkerNode {
     supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
     // This should probably be based on link types and is a placeholder
     is_proxy: bool,
+    #[allow(unused)]
     telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
     id: edgeless_api::function_instance::NodeId,
     cluster_id: edgeless_api::function_instance::NodeId,
@@ -32,6 +33,7 @@ pub enum NodeError {
 pub type NodeResult = Result<(), NodeError>;
 
 impl WorkerNode {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         node_id: uuid::Uuid,
         agent_url: String,

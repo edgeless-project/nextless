@@ -52,6 +52,7 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
 /// The main handle representing an element (identified by a `InstanceId`) across the dataplane.
 /// The dataplane might require multiple links which are processed in a chain-like fashion.
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct DataplaneHandle {
     alias_mapping: crate::alias_mapping::AliasMapping,
     slf: edgeless_api::function_instance::InstanceId,

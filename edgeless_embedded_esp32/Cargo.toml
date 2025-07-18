@@ -8,7 +8,7 @@ version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>>"]
 edition = "2021"
 resolver = "2"
-rust-version = "1.73"
+rust-version = "1.88"
 
 [profile.dev.package.esp-wifi]
 opt-level = 3

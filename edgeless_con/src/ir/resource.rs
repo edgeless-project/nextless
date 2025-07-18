@@ -69,7 +69,7 @@ impl super::PhysicalComponent for PhysicalResource {
             let mut materialized = materialized.borrow_mut();
             if !materialized.mapping.is_current_mapping(&self.desired_mapping) {
                 changes.push(super::RequiredChange::PatchResource {
-                    resource_id: self.id.clone(),
+                    resource_id: self.id,
                     resource_name: self.component_name.clone(),
                     input_mapping: self.desired_mapping.physical_input_mapping.clone(),
                     output_mapping: self.desired_mapping.physical_output_mapping.clone(),
@@ -78,7 +78,7 @@ impl super::PhysicalComponent for PhysicalResource {
             }
         } else {
             changes.push(super::RequiredChange::StartResource {
-                resource_id: self.id.clone(),
+                resource_id: self.id,
                 resource_name: self.component_name.clone(),
                 class_type: self.class.clone(),
                 input_mapping: self.desired_mapping.physical_input_mapping.clone(),

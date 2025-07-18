@@ -103,7 +103,7 @@ impl super::PhysicalComponent for PhysicalActor {
                 runtime_statistics: telemetry_provider.as_ref().map(|t| t.component_statistics_for(&self.id)),
             }))
         }
-        return changes;
+        changes
     }
 
     fn as_actor(&mut self) -> Option<&mut self::PhysicalActor> {

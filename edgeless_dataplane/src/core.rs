@@ -7,6 +7,7 @@ pub use edgeless_api::invocation::LinkProcessingResult;
 /// Trait that needs to be implemented by each link that is added to a dataplane chain.
 /// Link instances are commonly created by a LinkProvider (which is not a trait yet).
 #[async_trait::async_trait]
+#[allow(clippy::too_many_arguments)]
 pub trait DataPlaneLink: Send + Sync {
     async fn handle_send(
         &mut self,

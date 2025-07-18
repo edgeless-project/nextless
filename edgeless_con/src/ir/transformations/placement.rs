@@ -44,7 +44,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                 let mut i = i.borrow_mut();
                 match &mut *i {
                     PhysicalComponentState::Requested => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &*function, nodes, global_state, true);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, true);
                         if let Some(new_instance) = new_instance {
                             *i = new_instance;
                         } else {
@@ -52,7 +52,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                         }
                     }
                     PhysicalComponentState::MigrationRequested(c) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &*function, nodes, global_state, false);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false);
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             if new_id.node_id == c.id().node_id {
@@ -75,7 +75,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                         }
                     }
                     PhysicalComponentState::Lost(_) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &*function, nodes, global_state, false);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false);
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             new_instances.push(std::cell::RefCell::new(new_instance));
@@ -83,7 +83,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                         }
                     }
                     PhysicalComponentState::Dead(_) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &*function, nodes, global_state, false);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false);
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             new_instances.push(std::cell::RefCell::new(new_instance));
@@ -195,10 +195,10 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         global_state: &P::GlobalState,
         new_instance: bool,
     ) -> Option<PhysicalComponentState> {
-        let candidates = find_candidates_for_actor(&function, nodes, new_instance);
-        let mut filtered = self.dynamic_colocation_filter.filter_candidates(&*function, candidates, workflow);
+        let candidates = find_candidates_for_actor(function, nodes, new_instance);
+        let mut filtered = self.dynamic_colocation_filter.filter_candidates(function, candidates, workflow);
         if filtered.len() > 1 {
-            filtered = self.static_colocation_filter.filter_candidates(&*function, filtered, workflow);
+            filtered = self.static_colocation_filter.filter_candidates(function, filtered, workflow);
         };
         let dst = self.placement_strategy.select_candidate(filtered, global_state);
 

@@ -37,9 +37,7 @@ impl super::LogicalComponent for LogicalProxy {
     }
 
     fn instances(&self) -> Vec<&std::cell::RefCell<super::PhysicalComponentState>> {
-        self.instances
-            .iter()
-            .collect()
+        self.instances.iter().collect()
     }
 }
 

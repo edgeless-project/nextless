@@ -6,7 +6,7 @@ name = "edgeless_node"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.88"
 
 [lib]
 name = "edgeless_node"

@@ -21,14 +21,14 @@ impl super::FilterStrategy for DynamicColocation {
                 if let Some(c) = maybe_c.try_unpack_materialized() {
                     if let Some(materialized) = c.materialized_state() {
                         materialized_instance_count += 1;
-                        for (_i_port, input) in &mut materialized.borrow_mut().materialized_ports().materialized_inputs {
+                        for input in materialized.borrow_mut().materialized_ports().materialized_inputs.values_mut() {
                             if let Some(port_statistics) = &mut input.port_statistics {
                                 for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
                                     *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
                                 }
                             }
                         }
-                        for (_o_port, output) in &mut materialized.borrow_mut().materialized_ports().materialized_outputs {
+                        for output in materialized.borrow_mut().materialized_ports().materialized_outputs.values_mut() {
                             if let Some(port_statistics) = &mut output.port_statistics {
                                 for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
                                     *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;

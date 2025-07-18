@@ -32,7 +32,7 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
         peer_clusters: &crate::ir::Clusters,
         global_state: &DefaultTransformationPipelineState<P::GlobalState>,
     ) {
-        self.logical_pipeline.apply_all(workflow, nodes, peer_clusters, &mut ());
+        self.logical_pipeline.apply_all(workflow, nodes, peer_clusters, &());
         self.orchestration
             .apply_all(workflow, nodes, peer_clusters, &global_state.placement_strategy_state);
         self.physical_pipeline
