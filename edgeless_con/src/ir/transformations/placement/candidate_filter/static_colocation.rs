@@ -14,55 +14,24 @@ impl super::FilterStrategy for StaticColocation {
             return vec![];
         }
 
-        let mut logical_peers = std::collections::HashMap::<String, u64>::new();
-
-        {
-            for input in logical_component.logical_ports().logical_input_mapping.values() {
-                match input {
-                    crate::ir::LogicalInput::Direct(items) => {
-                        for (item_id, _) in items {
-                            *logical_peers.entry(item_id.clone()).or_insert(0) += 1;
-                        }
-                    }
-                    crate::ir::LogicalInput::Topic(_) => {
-                        log::warn!("Topic Port occured after logical phase.")
-                    }
-                }
-            }
-
-            for output in logical_component.logical_ports().logical_output_mapping.values() {
-                match output {
-                    edgeless_api::workflow_instance::PortMapping::DirectTarget(logical_id, _port_id) => {
-                        *logical_peers.entry(logical_id.clone()).or_insert(0) += 1;
-                    }
-                    edgeless_api::workflow_instance::PortMapping::AnyOfTargets(items) => {
-                        for (logical_id, _port_id) in items {
-                            *logical_peers.entry(logical_id.clone()).or_insert(0) += 1;
-                        }
-                    }
-                    edgeless_api::workflow_instance::PortMapping::AllOfTargets(items) => {
-                        for (logical_id, _port_id) in items {
-                            *logical_peers.entry(logical_id.clone()).or_insert(0) += 1;
-                        }
-                    }
-                    edgeless_api::workflow_instance::PortMapping::Topic(_) => {
-                        log::warn!("Topic Port occured after logical phase.")
-                    }
-                }
-            }
-        }
+        let port_weights = crate::ir::support::logical_port_scoring::port_weights(logical_component);
+        let logical_peer_weights: std::collections::HashMap<_, _> =
+            crate::ir::support::logical_port_scoring::peer_weights(logical_component, port_weights)
+                .into_iter()
+                .map(|(peer, score)| (peer, score as u64))
+                .collect();
 
         let mut physical_peers = std::collections::HashMap::<edgeless_api::function_instance::NodeId, u64>::new();
 
         for (c_id, c) in workflow.components() {
-            let logical_link_count = if let Some(link) = logical_peers.get(c_id) {
+            let logical_peer_weight = if let Some(link) = logical_peer_weights.get(c_id) {
                 link
             } else {
                 continue;
             };
 
             for instance_id in c.borrow_mut().instance_ids() {
-                *physical_peers.entry(instance_id.node_id).or_insert(0) += logical_link_count;
+                *physical_peers.entry(instance_id.node_id).or_insert(0) += logical_peer_weight;
             }
         }
 

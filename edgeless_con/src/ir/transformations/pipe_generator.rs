@@ -38,7 +38,7 @@ impl super::StatefulTransformation<PipeGeneratorState> for PipeGenerator {
         _peer_clusters: &crate::ir::Clusters,
         global_state: &PipeGeneratorState,
     ) {
-        if workflow.original_request.annotations.get("DISABLE_MULTICAST").is_some() {
+        if workflow.original_request.annotations.contains_key("DISABLE_MULTICAST") {
             return;
         }
 

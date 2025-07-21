@@ -11,6 +11,7 @@ pub mod pipeline;
 pub mod proxy;
 pub mod resource;
 pub mod subflow;
+pub mod support;
 pub mod transformations;
 pub mod workflow;
 
