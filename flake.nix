@@ -1,6 +1,15 @@
 {
   description = "A basic flake for the EU EDGELESS project's MVP";
 
+  nixConfig = {
+    extra-substituters = [
+      "https://edgeless.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "edgeless.cachix.org-1:CpGxIJOpDU+VmvGJSnSPCTFZ1rytGUFc/x7Op9T8t0I="
+    ];
+  };
+
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
@@ -136,8 +145,8 @@
             ]))
           ];
           shellHook = ''
-            rustup install stable
-            espup install
+            # rustup install stable
+            # espup install
             source ~/export-esp.sh
           '';
         };
