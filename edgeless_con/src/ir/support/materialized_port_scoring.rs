@@ -156,7 +156,7 @@ pub fn trafic_locality(component_instance: &dyn crate::ir::PhysicalComponent, pe
             total_rate += rate;
             if peer_id.node_id == component_instance.id().node_id {
                 local_rate += rate;
-            } 
+            }
         }
     }
 
@@ -165,7 +165,7 @@ pub fn trafic_locality(component_instance: &dyn crate::ir::PhysicalComponent, pe
             total_rate += rate;
             if peer_id.node_id == component_instance.id().node_id {
                 local_rate += rate;
-            } 
+            }
         }
     }
 
