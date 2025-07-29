@@ -45,7 +45,6 @@ impl DeadComponentRemoval {
                                 if ports.logical_input_mapping.contains_key(port) {
                                     return true;
                                 }
-                                log::info!("Not an Active Input");
                             }
                             edgeless_api::function_instance::MappingNode::SideEffect => {
                                 return true;
@@ -54,6 +53,7 @@ impl DeadComponentRemoval {
                     }
                 }
 
+                log::info!("Optimizer wants to remove output: {}", output_id.0);
                 let mut to_remove = match output_spec {
                     LogicalOutput::DirectTarget(target_node_id, target_port_id) => {
                         vec![((target_node_id.clone(), target_port_id.clone()), (f_id.clone(), output_id.clone()))]
@@ -121,6 +121,8 @@ impl DeadComponentRemoval {
                                 }
                             }
                         }
+
+                        log::info!("Optimizer wants to remove input: {}", input_id.0);
 
                         output_links_to_remove.append(
                             &mut mapped_inputs

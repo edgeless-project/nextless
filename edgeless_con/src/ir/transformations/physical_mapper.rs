@@ -30,7 +30,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                         let mut instances = components.get(target_component).unwrap().clone();
                         if let Some(id) = instances.pop() {
                             for c_instance in &physical_instances {
-                                if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
+                                if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
                                     c_instance
                                         .physical_ports()
                                         .physical_output_mapping

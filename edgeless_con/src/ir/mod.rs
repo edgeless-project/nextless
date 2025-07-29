@@ -82,11 +82,28 @@ impl PhysicalComponentState {
         match self {
             PhysicalComponentState::Invalid => None,
             PhysicalComponentState::Requested => None,
-            PhysicalComponentState::Planned(_) => None,
+            PhysicalComponentState::Planned(inner) => Some(inner.as_ref()),
             PhysicalComponentState::Materialized(inner) => Some(inner.as_ref()),
             PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_ref()),
             PhysicalComponentState::MigratingAway { old, .. } => Some(old.as_ref()),
             PhysicalComponentState::StopPlanned { old, .. } => Some(old.as_ref()),
+            PhysicalComponentState::Stopped { .. } => None,
+            PhysicalComponentState::Dead(_) => None,
+            PhysicalComponentState::Lost(_) => None,
+            PhysicalComponentState::DeadReplaced { .. } => None,
+            PhysicalComponentState::LostReplaced { .. } => None,
+        }
+    }
+
+    fn try_unpack_active_mut(&mut self) -> Option<&mut dyn PhysicalComponent> {
+        match self {
+            PhysicalComponentState::Invalid => None,
+            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Planned(inner) => Some(inner.as_mut()),
+            PhysicalComponentState::Materialized(inner) => Some(inner.as_mut()),
+            PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_mut()),
+            PhysicalComponentState::MigratingAway { old, .. } => Some(old.as_mut()),
+            PhysicalComponentState::StopPlanned { old, .. } => Some(old.as_mut()),
             PhysicalComponentState::Stopped { .. } => None,
             PhysicalComponentState::Dead(_) => None,
             PhysicalComponentState::Lost(_) => None,
@@ -424,7 +441,7 @@ pub struct LogicalPorts {
     pub logical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalInput>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct PhysicalPorts {
     pub physical_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
     pub physical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
@@ -537,6 +554,12 @@ impl MaterializedInput {
 pub struct MaterializedOutput {
     pub(crate) mapping: edgeless_api::common::Output,
     port_statistics: Option<Box<dyn PortStatistics>>,
+}
+
+impl std::fmt::Debug for MaterializedOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.mapping.fmt(f)
+    }
 }
 
 impl MaterializedOutput {
