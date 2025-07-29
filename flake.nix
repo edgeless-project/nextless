@@ -4,9 +4,11 @@
   nixConfig = {
     extra-substituters = [
       "https://edgeless.cachix.org"
+      "https://nix-community.cachix.org"
     ];
     extra-trusted-public-keys = [
       "edgeless.cachix.org-1:CpGxIJOpDU+VmvGJSnSPCTFZ1rytGUFc/x7Op9T8t0I="
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
     ];
   };
 
