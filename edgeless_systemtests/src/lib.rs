@@ -55,6 +55,7 @@ mod tests {
                     },
                     wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
                     container_runtime: None,
+                    native_runtime: None,
                     resources: Some(edgeless_node::EdgelessNodeResourceSettings {
                         http_ingress_url: None,
                         http_ingress_provider: None,

@@ -25,6 +25,8 @@ pub struct EdgelessNodeSettings {
     pub wasm_runtime: Option<EdgelessNodeWasmRuntimeSettings>,
     /// Container run-time settings.  Disabled if not present.
     pub container_runtime: Option<EdgelessNodeContainerRuntimeSettings>,
+    /// Native runtime settings. Disabled if not present.
+    pub native_runtime: Option<NativeRuntimeSettings>,
     /// Resource settings.
     pub resources: Option<EdgelessNodeResourceSettings>,
     /// User-specific capabilities.
@@ -34,6 +36,12 @@ pub struct EdgelessNodeSettings {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeWasmRuntimeSettings {
     /// True if WASM is enabled.
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct NativeRuntimeSettings {
+    /// True if the native runtime is enabled.
     pub enabled: bool,
 }
 
@@ -158,6 +166,7 @@ impl EdgelessNodeSettings {
             },
             wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
+            native_runtime: None,
             resources: None,
             user_node_capabilities: None,
         }
@@ -435,6 +444,8 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     log::info!("Starting Edgeless Node");
     log::debug!("Settings: {settings:?}");
 
+    let mut async_tasks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
+
     // Create the state manager.
     let state_manager = Box::new(state_management::StateManager::new().await);
 
@@ -456,76 +467,72 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
 
     // Create the WASM run-time, if needed.
-    let rust_runtime_task = match settings.wasm_runtime {
-        Some(wasm_runtime_settings) => {
-            match wasm_runtime_settings.enabled {
-                true => {
-                    // Create the WebAssembly (Wasmtime) runner.
-                    #[allow(unused_variables)]
-                    #[cfg(feature = "wasmtime")]
-                    {
-                        let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) = base_runtime::runtime::create::<
-                            wasm_runner::function_instance::WASMFunctionInstance,
-                            base_runtime::function_instance_runner::FunctionInstanceRunner<wasm_runner::function_instance::WASMFunctionInstance>,
-                        >(
-                            data_plane.clone(),
-                            state_manager.clone(),
-                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-                                ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
-                                ("NODE_ID".to_string(), settings.general.node_id.to_string()),
-                            ]))),
-                        );
-                        runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
-                        tokio::spawn(async move {
-                            wasmtime_runtime_task_s.run().await;
-                        })
-                    }
+    if let Some(wasm_runtime_settings) = settings.wasm_runtime {
+        if wasm_runtime_settings.enabled {
+            // Create the WebAssembly (Wasmtime) runner.
+            #[allow(unused_variables)]
+            #[cfg(feature = "wasmtime")]
+            {
+                let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) = base_runtime::runtime::create::<
+                    wasm_runner::function_instance::WASMFunctionInstance,
+                    base_runtime::function_instance_runner::FunctionInstanceRunner<wasm_runner::function_instance::WASMFunctionInstance>,
+                >(
+                    data_plane.clone(),
+                    state_manager.clone(),
+                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                        ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+                        ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
+                        ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                    ]))),
+                );
+                runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
+                async_tasks.push(tokio::spawn(async move {
+                    wasmtime_runtime_task_s.run().await;
+                }));
+            }
 
-                    // Create the WebAssembly (Wasmi) runner.
-                    #[allow(unused_variables)]
-                    #[cfg(feature = "wasmi")]
-                    {
-                        let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<
-                            wasm_runner::function_instance::WASMFunctionInstance,
-                            base_runtime::function_instance_runner::FunctionInstanceRunner<wasm_runner::function_instance::WASMFunctionInstance>,
-                        >(
-                            data_plane.clone(),
-                            state_manager.clone(),
-                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-                                ("WASM_RUNTIME".to_string(), "wasmi".to_string()),
-                                ("NODE_ID".to_string(), settings.general.node_id.to_string()),
-                            ]))),
-                        );
-                        runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
-                        tokio::spawn(async move {
-                            wasmi_runtime_task_s.run().await;
-                        })
-                    }
-                }
-                false => tokio::spawn(async {}),
+            // Create the WebAssembly (Wasmi) runner.
+            #[allow(unused_variables)]
+            #[cfg(feature = "wasmi")]
+            {
+                let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<
+                    wasm_runner::function_instance::WASMFunctionInstance,
+                    base_runtime::function_instance_runner::FunctionInstanceRunner<wasm_runner::function_instance::WASMFunctionInstance>,
+                >(
+                    data_plane.clone(),
+                    state_manager.clone(),
+                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                        ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+                        ("WASM_RUNTIME".to_string(), "wasmi".to_string()),
+                        ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                    ]))),
+                );
+                runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
+                async_tasks.push(tokio::spawn(async move {
+                    wasmi_runtime_task_s.run().await;
+                }));
             }
         }
-        None => tokio::spawn(async {}),
     };
 
-    let native_runtime_task = {
-        let (native_runtime_client, mut native_runtime_task) = base_runtime::runtime::create::<
-            native_runner::NativeFunctionInstance,
-            base_runtime::function_instance_runner_thread::FunctionInstanceRunner<native_runner::NativeFunctionInstance>,
-        >(
-            data_plane.clone(),
-            state_manager.clone(),
-            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                ("FUNCTION_TYPE".to_string(), "NATIVE_BASE".to_string()),
-                ("NODE_ID".to_string(), settings.general.node_id.to_string()),
-            ]))),
-        );
-        runners.insert("NATIVE_BASE".to_string(), Box::new(native_runtime_client.clone()));
-        tokio::spawn(async move {
-            native_runtime_task.run().await;
-        })
+    if let Some(native_runtime_settings) = settings.native_runtime {
+        if native_runtime_settings.enabled {
+            let (native_runtime_client, mut native_runtime_task) = base_runtime::runtime::create::<
+                native_runner::NativeFunctionInstance,
+                base_runtime::function_instance_runner_thread::FunctionInstanceRunner<native_runner::NativeFunctionInstance>,
+            >(
+                data_plane.clone(),
+                state_manager.clone(),
+                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                    ("FUNCTION_TYPE".to_string(), "NATIVE_BASE".to_string()),
+                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                ]))),
+            );
+            runners.insert("NATIVE_BASE".to_string(), Box::new(native_runtime_client.clone()));
+            async_tasks.push(tokio::spawn(async move {
+                native_runtime_task.run().await;
+            }));
+        }
     };
 
     // Create the resources.
@@ -543,14 +550,14 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     // Create the agent.
     let runtimes = runners.keys().map(|x| x.to_string()).collect::<Vec<String>>();
     let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id, data_plane.clone(), proxy_manager);
-    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
+    async_tasks.push(tokio::task::spawn(agent_task));
 
-    // Wait for all the tasks to complete.
-    let _ = futures::join!(
-        rust_runtime_task,
-        native_runtime_task,
-        agent_task,
-        agent_api_server,
+    let cloned_agent_url = settings.general.agent_url.clone();
+    async_tasks.push(tokio::task::spawn(async move {
+        edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), cloned_agent_url).await
+    }));
+
+    async_tasks.push(tokio::task::spawn(async move {
         register_node(
             settings.general,
             get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
@@ -560,9 +567,13 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                 .await
                 .into_iter()
                 .map(|(class, id)| edgeless_api::node_registration::LinkProviderSpecification { provider_id: id, class })
-                .collect()
+                .collect(),
         )
-    );
+        .await
+    }));
+
+    // Wait for all the tasks to complete.
+    let _ = futures::future::join_all(async_tasks).await;
 }
 
 pub fn edgeless_node_default_conf() -> String {
