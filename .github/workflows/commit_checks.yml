@@ -60,6 +60,7 @@ jobs:
             - uses: cachix/cachix-action@v15
               with:
                   name: edgeless
+                  extraPullNames: nix-community
                   authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
             - run: nix build .#nextless_cli .#nextless_controller .#nextless_node
     build-nix-arm64:
@@ -73,5 +74,6 @@ jobs:
             - uses: cachix/cachix-action@v15
               with:
                   name: edgeless
+                  extraPullNames: nix-community
                   authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
             - run: nix build .#nextless_cli .#nextless_controller .#nextless_node
