@@ -279,7 +279,7 @@ async fn main() -> anyhow::Result<()> {
                                                     )
                                                 })
                                                 .collect(),
-                                            annotations: func_spec.annotations,
+                                            annotations: func_spec.annotations.into_iter().collect(),
                                         }
                                     })
                                     .collect(),

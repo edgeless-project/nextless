@@ -6,9 +6,9 @@ pub struct EdgelessActorGen<PortType> {
     pub id: String,
     #[serde(rename = "function_type")]
     pub klass: crate::actor_class::EdgelessActorClass,
-    pub outputs: std::collections::HashMap<String, PortType>,
-    pub inputs: std::collections::HashMap<String, PortType>,
-    pub annotations: std::collections::HashMap<String, String>,
+    pub outputs: starlark::collections::SmallMap<String, PortType>,
+    pub inputs: starlark::collections::SmallMap<String, PortType>,
+    pub annotations: starlark::collections::SmallMap<String, String>,
 }
 
 pub type EdgelessActor = EdgelessActorGen<crate::port::Port>;
@@ -65,8 +65,12 @@ impl starlark::values::Freeze for EdgelessActor {
 }
 
 unsafe impl<'v> starlark::values::Trace<'v> for EdgelessActor {
-    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {
-        todo!()
+    fn trace(&mut self, tracer: &starlark::values::Tracer<'v>) {
+        self.id.trace(tracer);
+        self.klass.trace(tracer);
+        self.outputs.trace(tracer);
+        self.inputs.trace(tracer);
+        self.annotations.trace(tracer);
     }
 }
 

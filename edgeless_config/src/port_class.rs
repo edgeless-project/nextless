@@ -13,7 +13,17 @@ pub enum Direction {
     Input,
 }
 
-#[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    allocative::Allocative,
+    starlark::any::ProvidesStaticType,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+    starlark::values::Trace,
+)]
 pub struct PortSpec {
     #[serde(skip_serializing)]
     pub id: String,

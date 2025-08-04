@@ -1,6 +1,16 @@
 #![allow(clippy::needless_lifetimes)]
 
-#[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    allocative::Allocative,
+    starlark::any::ProvidesStaticType,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+    starlark::values::Trace,
+)]
 pub enum Mapping {
     Unmapped,
     Direct(DirectTarget),
@@ -20,7 +30,7 @@ impl std::fmt::Display for Mapping {
     }
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, allocative::Allocative, Clone)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, allocative::Allocative, Clone, starlark::values::Trace)]
 pub struct DirectTarget {
     pub target_component: String,
     pub port: String,
@@ -132,8 +142,11 @@ impl starlark::values::Freeze for Port {
 }
 
 unsafe impl<'v> starlark::values::Trace<'v> for Port {
-    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {
-        todo!()
+    fn trace(&mut self, tracer: &starlark::values::Tracer<'v>) {
+        self.component_id.trace(tracer);
+        self.port_id.trace(tracer);
+        self.mapping.borrow_mut().trace(tracer);
+        self.klass.trace(tracer);
     }
 }
 

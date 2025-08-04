@@ -3,7 +3,17 @@
 
 use starlark::values::list::UnpackList;
 
-#[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    allocative::Allocative,
+    starlark::any::ProvidesStaticType,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+    starlark::values::Trace,
+)]
 pub struct EdgelessActorClass {
     pub id: String,
     pub version: String,
