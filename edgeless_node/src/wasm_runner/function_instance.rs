@@ -354,6 +354,11 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 })
             })
             .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
+        linker
+            .func_wrap_async("env", "eval_timestamp_ns", |_store, ()| {
+                Box::new(async move { std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos() as u64 })
+            })
+            .map_err(crate::base_runtime::FunctionInstanceError::Internal)?;
         let instance = linker.instantiate_async(&mut store, &module).await.unwrap();
 
         Ok(Box::new(Self {

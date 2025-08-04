@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
+[workspace]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
+
+[package]
+name = "basic_forwarder"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+
+[lib]
+name = "basic_forwarder"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
+edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
+edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
+log = "0.4"
+
+[patch."https://github.com/edgeless-project/nextless.git"]
+edgeless_function = { path = "/home/hetzel/code/edgeless_mvp/edgeless_function" }
+edgeless_function_core = { path = "/home/hetzel/code/edgeless_mvp/edgeless_function_core" }
+edgeless_actor_abi = { path = "/home/hetzel/code/edgeless_mvp/edgeless_actor_abi" }
+
+[features]
+
+input_in = []
+output_out = []
