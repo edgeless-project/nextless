@@ -29,11 +29,6 @@ edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.g
 edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
 log = "0.4"
 
-[patch."https://github.com/edgeless-project/nextless.git"]
-edgeless_function = { path = "/home/hetzel/code/edgeless_mvp/edgeless_function" }
-edgeless_function_core = { path = "/home/hetzel/code/edgeless_mvp/edgeless_function_core" }
-edgeless_actor_abi = { path = "/home/hetzel/code/edgeless_mvp/edgeless_actor_abi" }
-
 [features]
 
 input_input1 = []
