@@ -19,6 +19,7 @@ members = [
     "edgeless_build",
     "edgeless_function_core",
     "edgeless_function_macro",
+    "edgeless_function_types",
     "edgeless_config",
     "edgeless_link_multicast",
     # "edgeless_function_gpu",
