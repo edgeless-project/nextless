@@ -3,7 +3,7 @@
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct NumberedTestMessage {
-    pub seqeunce_number: u64,
+    pub sequence_number: u64,
     pub payload: String,
 }
 
@@ -16,7 +16,7 @@ pub struct EncryptedNumberedTestMessage {
 impl<'a> edgeless_function_core::Serialize<'a> for NumberedTestMessage {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = Vec::with_capacity(self.payload.len() + 8);
-        out.extend_from_slice(&self.seqeunce_number.to_be_bytes());
+        out.extend_from_slice(&self.sequence_number.to_be_bytes());
         out.extend_from_slice(&(self.payload.len() as u64).to_be_bytes());
         out.extend_from_slice(&self.payload.as_bytes());
         out
@@ -35,7 +35,7 @@ impl<'a> edgeless_function_core::Deserialize<'a> for NumberedTestMessage {
 
         let payload = String::from_utf8(payload).unwrap();
         Self {
-            seqeunce_number: u64::from_be_bytes(raw[0..8].try_into().unwrap()),
+            sequence_number: u64::from_be_bytes(raw[0..8].try_into().unwrap()),
             payload,
         }
     }
@@ -74,7 +74,7 @@ mod test {
     #[test]
     fn numbered_test_message() {
         let m = NumberedTestMessage {
-            seqeunce_number: 1,
+            sequence_number: 1,
             payload: "Test".to_string(),
         };
 
@@ -86,7 +86,7 @@ mod test {
     #[test]
     fn emty_numbered_test_message() {
         let m = NumberedTestMessage {
-            seqeunce_number: 1,
+            sequence_number: 1,
             payload: "".to_string(),
         };
 
