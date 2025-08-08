@@ -1,3 +1,5 @@
+use minicbor::CborLen;
+
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 #[derive(Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen)]
@@ -34,7 +36,7 @@ impl<'b, C> minicbor::Decode<'b, C> for DataBuffer {
 
 impl<C> minicbor::CborLen<C> for DataBuffer {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        self.0.as_slice().cbor_len(ctx)
+        minicbor::bytes::cbor_len(&self.0.as_slice(), ctx)
     }
 }
 
@@ -71,4 +73,22 @@ pub enum LinkProcessingResult {
     FINAL,
     PROCESSED,
     PASSED,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn empty_buffer_cbor_len() {
+        let b = DataBuffer(heapless::Vec::new());
+        // byte string tag + zero len in the same byte
+        assert_eq!(minicbor::len(&b), 1);
+    }
+
+    #[test]
+    fn full_buffer_cbor_len() {
+        let b = DataBuffer(heapless::Vec::from_slice(&[100u8; 1500]).unwrap());
+        // byte string tag + 16 bit len + payload
+        assert_eq!(minicbor::len(&b), 1503);
+    }
 }

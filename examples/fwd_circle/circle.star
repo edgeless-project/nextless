@@ -10,7 +10,7 @@ harness = edgeless_actor(
     annotations = {
         "max_instances": "1",
         "node_id_match_any": harness_id(),
-        "init-payload": inter_message_delay_ms()
+        "init-payload": ",".join([inter_message_delay_ms(), "1000"])
     }
 )
 
@@ -24,14 +24,14 @@ forwarders = [edgeless_actor(
     }
 ) for id in range(1, N+1) ]
 
-harness.start >> getattr(forwarders[0], "in")
+harness.start >> forwarders[0].data_in
 
-[getattr(forwarders[i], "out") >> getattr(forwarders[i+1], "in") for i in range(0, N - 1)]
+[forwarders[i].data_out >> forwarders[i+1].data_in for i in range(0, N - 1)]
 
-forwarders[N-1].out >> harness.end
+forwarders[N-1].data_out >> harness.end
 
 wf = edgeless_workflow(
-    "circle_10",
+    "circle_".format(N),
     forwarders + [harness],
     annotations = {}
 )

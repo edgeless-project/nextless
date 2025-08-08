@@ -19,17 +19,22 @@ static FAKE_DELAY_MS: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
 edgeless_function::generate!(BasicForwarder);
 
 impl BasicForwarderAPI<'_> for BasicForwarder {
-    type TEST_ID = String;
+    type EFT_EVAL_NUMBERED_TEST_MESSAGE = edgeless_function_types::eval::NumberedTestMessage;
 
-    fn handle_cast_in(_src: InstanceId, test_msg: Self::TEST_ID) {
+    fn handle_cast_data_in(_src: InstanceId, test_msg: Self::EFT_EVAL_NUMBERED_TEST_MESSAGE) {
         let delay = *FAKE_DELAY_MS.get().unwrap();
-        log::info!("Forwarder Got Message: {}. Delay: {}.", test_msg, delay);
+        log::info!(
+            "Forwarder Got Message: ID: {}. Payload Size: {}. Delay: {}.",
+            test_msg.sequence_number,
+            test_msg.payload.len(),
+            delay
+        );
 
         if delay > 0 {
             fake_work(delay);
         }
 
-        cast_out(&test_msg);
+        cast_data_out(&test_msg);
     }
 
     fn handle_internal(_data: &[u8]) {

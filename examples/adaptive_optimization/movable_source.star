@@ -17,9 +17,8 @@ source = edgeless_actor(
     id = "unbalanced_source",
     klass = UnbalancedSource,
     annotations = {
-        # "node_id_match_any": "{},{}".format(id_str(1), id_str(2)),
-        # "node_id_init_on": id_str(1),
-        "node_id_match_any": id_str(1),
+        "node_id_match_any": "{},{}".format(id_str(1), id_str(2)),
+        "node_id_init_on": id_str(1),
         "max_instances": "1",
     }
 )
@@ -28,8 +27,8 @@ frequent = edgeless_actor(
     id = "frequent_dest",
     klass = BasicConsumer,
     annotations = {
-        "node_id_match_any": "{},{}".format(id_str(1), id_str(2)),
-        "node_id_init_on": id_str(2),
+        "node_id_match_any": id_str(2),
+        "max_instances": "1",
     }
 )
 
@@ -37,12 +36,13 @@ infrequent = edgeless_actor(
     id = "infrequent_dest",
     klass = BasicConsumer,
     annotations = {
-        "node_id_init_on": id_str(1),
+        "node_id_match_any": id_str(1),
+        "max_instances": "1",
     }
 )
 
-source.frequent >> frequent.input_1
-source.infrequent >> infrequent.input_1
+source.frequent >> frequent.data_in
+source.infrequent >> infrequent.data_in
 
 wf = edgeless_workflow(
     "adaptive_move",

@@ -4,29 +4,29 @@ use edgeless_function::*;
 
 struct BasicConsumer;
 
-extern "C" {
-    fn eval_sleep(delay_ms: u64);
-}
-
 edgeless_function::generate!(BasicConsumer);
 
 impl BasicConsumerAPI<'_> for BasicConsumer {
-    type TEST = String;
+    type EFT_EVAL_NUMBERED_TEST_MESSAGE = edgeless_function_types::eval::NumberedTestMessage;
 
-    fn handle_cast_input_1(_src: InstanceId, test_msg: String) {
-        log::info!("Consumer Got Message: {}", test_msg);
+    fn handle_cast_data_in(_src: InstanceId, test_msg: Self::EFT_EVAL_NUMBERED_TEST_MESSAGE) {
+        log::info!(
+            "Consumer Got Message. Sequence Number: {}. Payload Size: {}.",
+            test_msg.sequence_number,
+            test_msg.payload.len()
+        );
     }
 
     fn handle_internal(_data: &[u8]) {
-        log::info!("Mock Consumer Internal Called");
+        log::info!("Consumer handle_internal called.");
     }
 
     fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
-        log::info!("Mock Consumer Started.");
+        log::info!("Consumer started.");
     }
 
     fn handle_stop() {
-        log::info!("Mock Consumer Stopped");
+        log::info!("Consumer stopped.");
     }
 }

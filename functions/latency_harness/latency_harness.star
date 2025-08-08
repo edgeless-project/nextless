@@ -2,10 +2,10 @@ LatencyHarness = edgeless_actor_class(
     id = "latency_harness",
     version = "0.1",
     outputs = [
-        cast_output("start", "test_id")
+        cast_output("start", "eft_eval_numbered_test_message")
     ],
     inputs = [
-        cast_input("end", "test_id")
+        cast_input("end", "eft_eval_numbered_test_message")
     ],
     inner_structure = [
        source("start"),

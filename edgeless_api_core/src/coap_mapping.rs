@@ -15,7 +15,7 @@ impl COAPEncoder {
         token: u8,
         out_buf: &mut [u8],
     ) -> ((&mut [u8], Endpoint), &mut [u8]) {
-        let mut buffer = [0_u8; 1024];
+        let mut buffer = [0u8; 2048];
         // let new_event: crate::invocation::Event<&minicbor::bytes::ByteSlice> = crate::invocation::Event::<&minicbor::bytes::ByteSlice> {
         //     target: event.target,
         //     source: event.source,

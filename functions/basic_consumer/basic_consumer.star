@@ -2,9 +2,9 @@ BasicConsumer = edgeless_actor_class(
     id = "basic_consumer",
     version = "0.1",
     outputs = [],
-    inputs = [cast_input("input_1", "test")],
+    inputs = [cast_input("data_in", "eft_eval_numbered_test_message")],
     inner_structure = [
-        sink("input_1")
+        sink("data_in")
     ],
     code = file("basic_consumer.tar.gz"),
     code_type = "RUST"

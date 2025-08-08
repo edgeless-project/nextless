@@ -13,17 +13,21 @@ codegen-units = 1
 strip = true
 
 [package]
-name = "unbalanced_source"
+name = "encryptor"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
 
 [lib]
-name = "unbalanced_source"
+name = "encryptor"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
+aes-gcm = { version = "=0.11.0-rc.0", default-features = false, features = [
+    "aes",
+    "alloc",
+] }
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
 edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
@@ -32,5 +36,5 @@ log = "0.4"
 
 [features]
 
-output_frequent = []
-output_infrequent = []
+input_data_in = []
+output_data_out = []

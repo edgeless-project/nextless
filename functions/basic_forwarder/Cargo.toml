@@ -27,9 +27,10 @@ crate-type = ["cdylib"]
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
 edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
+edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types" }
 log = "0.4"
 
 [features]
 
-input_in = []
-output_out = []
+input_data_in = []
+output_data_out = []
