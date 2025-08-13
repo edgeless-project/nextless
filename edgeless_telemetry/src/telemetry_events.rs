@@ -211,6 +211,7 @@ impl TelemetryProcessor {
 
                 let inner = TelemetryProcessorInner {
                     processing_chain: vec![
+                        Box::new(super::file_logger::FileLogger::new()),
                         Box::new(EventLogger::default()),
                         Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
                     ],

@@ -7,7 +7,7 @@ harness = edgeless_actor(
     klass = LatencyHarness,
     annotations = {
         "max_instances": "1",
-        "init-payload": ",".join(["100", "1000"])
+        "init-payload": ",".join(["100", "1000", "1000"])
     }
 )
 

@@ -14,6 +14,9 @@ impl super::StatelessTransformation for DeadComponentRemoval {
             changed = false;
             changed = Self::remove_unused_inputs(workflow) || changed;
             changed = Self::remove_unused_outputs(workflow) || changed;
+            if changed {
+                Self::remove_unused_functions(workflow);
+            }
         }
     }
 }
@@ -174,5 +177,11 @@ impl DeadComponentRemoval {
         }
 
         changed
+    }
+
+    fn remove_unused_functions(slf: &mut workflow::ActiveWorkflow) {
+        slf.functions.retain(|_f_id, f_spec| {
+            !f_spec.borrow().logical_ports.logical_input_mapping.is_empty() || !f_spec.borrow().logical_ports.logical_output_mapping.is_empty()
+        });
     }
 }

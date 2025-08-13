@@ -1,7 +1,6 @@
-use minicbor::CborLen;
-
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
+
 #[derive(Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen)]
 pub enum EventData {
     #[n(0)]
@@ -36,7 +35,7 @@ impl<'b, C> minicbor::Decode<'b, C> for DataBuffer {
 
 impl<C> minicbor::CborLen<C> for DataBuffer {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        minicbor::bytes::cbor_len(&self.0.as_slice(), ctx)
+        minicbor::bytes::cbor_len(self.0.as_slice(), ctx)
     }
 }
 

@@ -17,7 +17,16 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
         let components = workflow
             .components()
             .into_iter()
-            .map(|(id, spec)| (id.to_string(), spec.borrow_mut().instance_ids()))
+            .map(|(id, spec)| {
+                (
+                    id.to_string(),
+                    spec.borrow_mut()
+                        .instances()
+                        .iter()
+                        .filter_map(|i| i.borrow_mut().try_unpack_active().map(|i| i.id()))
+                        .collect(),
+                )
+            })
             .collect::<std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>>();
 
         for component_id in components.keys() {
@@ -28,7 +37,18 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                 match output {
                     LogicalOutput::DirectTarget(target_component, target_port_id) => {
                         let mut instances = components.get(target_component).unwrap().clone();
-                        if let Some(id) = instances.pop() {
+
+                        if instances.len() > 1 {
+                            log::info!("Temporarily breaking single target assumption!");
+                            for c_instance in &physical_instances {
+                                if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
+                                    c_instance.physical_ports().physical_output_mapping.insert(
+                                        output_id.clone(),
+                                        PhysicalOutput::Any(instances.iter().map(|i| (*i, target_port_id.clone())).collect()),
+                                    );
+                                }
+                            }
+                        } else if let Some(id) = instances.pop() {
                             for c_instance in &physical_instances {
                                 if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
                                     c_instance

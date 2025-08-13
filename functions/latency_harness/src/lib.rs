@@ -14,6 +14,7 @@ fn get_timestamp() -> u64 {
 struct Configuration {
     iter_message_delay_ms: u64,
     payload_size: u64,
+    num_iterations: u64,
 }
 
 static STATE: std::sync::OnceLock<std::sync::Mutex<HarnessState>> = std::sync::OnceLock::new();
@@ -50,7 +51,9 @@ impl LatencyHarnessAPI<'_> for LatencyHarness {
         });
         state.start_times.insert(iteration_id, start);
 
-        delayed_cast(configuration.iter_message_delay_ms, "self", &[]);
+        if configuration.num_iterations == 0 || state.next_iteration_id < configuration.num_iterations {
+            delayed_cast(configuration.iter_message_delay_ms, "self", &[]);
+        }
     }
 
     fn handle_cast_end(_src: InstanceId, payload: Self::EFT_EVAL_NUMBERED_TEST_MESSAGE) {
@@ -72,18 +75,23 @@ impl LatencyHarnessAPI<'_> for LatencyHarness {
 
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
-        let (delay_ms, payload_size) = if let Some(payload) = payload {
+        let (delay_ms, payload_size, num_iterations) = if let Some(payload) = payload {
             let payload_str = String::from_utf8(payload.to_vec()).unwrap();
             let configuration: Vec<_> = payload_str.split(",").collect();
-            assert!(configuration.len() == 2);
-            (configuration[0].parse::<u64>().unwrap(), configuration[1].parse::<u64>().unwrap())
+            assert!(configuration.len() == 3);
+            (
+                configuration[0].parse::<u64>().unwrap(),
+                configuration[1].parse::<u64>().unwrap(),
+                configuration[1].parse::<u64>().unwrap(),
+            )
         } else {
-            (100, 1000)
+            (100, 1000, 0)
         };
         CONFIGURATION
             .set(Configuration {
                 iter_message_delay_ms: delay_ms,
                 payload_size: payload_size,
+                num_iterations,
             })
             .unwrap();
         STATE

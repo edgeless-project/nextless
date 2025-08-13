@@ -10,7 +10,7 @@ harness = edgeless_actor(
     annotations = {
         "max_instances": "1",
         "node_id_match_any": harness_id(),
-        "init-payload": ",".join([inter_message_delay_ms(), "1000"])
+        "init-payload": ",".join([inter_message_delay_ms(), "1000", "0"])
     }
 )
 

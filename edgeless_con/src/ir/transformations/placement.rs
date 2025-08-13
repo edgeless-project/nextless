@@ -48,7 +48,11 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                         if let Some(new_instance) = new_instance {
                             *i = new_instance;
                         } else {
-                            log::info!("Found no viable node for {} in {}", &f_id, workflow.id.workflow_id);
+                            log::info!(
+                                "Placement;Requested Instance: Found no viable node for {} in {}",
+                                &f_id,
+                                workflow.id.workflow_id
+                            );
                         }
                     }
                     PhysicalComponentState::MigrationRequested(c) => {
@@ -56,13 +60,19 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             if new_id.node_id == c.id().node_id {
-                                log::info!("Node would be equal.");
+                                log::info!(
+                                    "Placement;MigratingInstance: Node would be equal {}({}). {}",
+                                    f_id,
+                                    c.id(),
+                                    function.instances.len()
+                                );
                                 i.abort_migration();
                             } else {
                                 log::info!(
-                                    "Found Replacement node for {} in {}; Will migrate: {} -> {}",
+                                    "Placement;MigratingInstance: Found Replacement node for {} in {} ({}); Will migrate: {} -> {}",
                                     &f_id,
                                     workflow.id.workflow_id,
+                                    c.id(),
                                     c.id().node_id,
                                     new_id.node_id
                                 );

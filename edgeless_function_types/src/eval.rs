@@ -9,7 +9,7 @@ pub struct NumberedTestMessage {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct EncryptedNumberedTestMessage {
-    pub seqeunce_number: u64,
+    pub sequence_number: u64,
     pub payload: Vec<u8>,
 }
 
@@ -18,7 +18,7 @@ impl<'a> edgeless_function_core::Serialize<'a> for NumberedTestMessage {
         let mut out = Vec::with_capacity(self.payload.len() + 8);
         out.extend_from_slice(&self.sequence_number.to_be_bytes());
         out.extend_from_slice(&(self.payload.len() as u64).to_be_bytes());
-        out.extend_from_slice(&self.payload.as_bytes());
+        out.extend_from_slice(self.payload.as_bytes());
         out
     }
 }
@@ -44,7 +44,7 @@ impl<'a> edgeless_function_core::Deserialize<'a> for NumberedTestMessage {
 impl<'a> edgeless_function_core::Serialize<'a> for EncryptedNumberedTestMessage {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = Vec::with_capacity(self.payload.len() + 8);
-        out.extend_from_slice(&self.seqeunce_number.to_be_bytes());
+        out.extend_from_slice(&self.sequence_number.to_be_bytes());
         out.extend_from_slice(&(self.payload.len() as u64).to_be_bytes());
         out.extend_from_slice(&self.payload);
         out
@@ -60,7 +60,7 @@ impl<'a> edgeless_function_core::Deserialize<'a> for EncryptedNumberedTestMessag
             payload.extend_from_slice(&raw[16..]);
         }
         Self {
-            seqeunce_number: u64::from_be_bytes(raw[0..8].try_into().unwrap()),
+            sequence_number: u64::from_be_bytes(raw[0..8].try_into().unwrap()),
             payload,
         }
     }
@@ -98,7 +98,7 @@ mod test {
     #[test]
     fn encryted_numbered_test_message() {
         let m = EncryptedNumberedTestMessage {
-            seqeunce_number: 1,
+            sequence_number: 1,
             payload: Vec::from([0; 16]),
         };
 
@@ -110,7 +110,7 @@ mod test {
     #[test]
     fn empty_encrypted_numbered_test_message() {
         let m = EncryptedNumberedTestMessage {
-            seqeunce_number: 1,
+            sequence_number: 1,
             payload: Vec::new(),
         };
 
