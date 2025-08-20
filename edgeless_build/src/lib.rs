@@ -168,13 +168,13 @@ pub fn rust_to_dynlib(
         NativeTarget::AMD64 => "amd64-edgeless-none-actor",
     };
 
-    let mut build_config = cargo::core::compiler::BuildConfig::new(
-        &config,
-        None,
-        false,
-        &[format!("{}/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))],
-        cargo::core::compiler::CompileMode::Build,
-    )?;
+    let target_desc = if std::env::var("NO_AES").is_ok() {
+        format!("{}/build_config/aarch64/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))
+    } else {
+        format!("{}/build_config/aarch64_aes/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))
+    };
+
+    let mut build_config = cargo::core::compiler::BuildConfig::new(&config, None, false, &[target_desc], cargo::core::compiler::CompileMode::Build)?;
     build_config.requested_profile = cargo::util::interning::InternedString::new("release");
 
     let feature_settings = cargo::core::resolver::CliFeatures {

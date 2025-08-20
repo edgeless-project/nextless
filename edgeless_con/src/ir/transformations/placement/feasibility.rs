@@ -26,7 +26,7 @@ pub fn feasible_node_runtime_candidates<'b>(
     }
 
     for (_rt_id, rt) in node.available_runtimes() {
-        if runtime_supported(actor.image.id.format.as_str(), &rt) {
+        if runtime_supported(actor.image.id.format.as_str(), &rt, actor.annotations.get("NO_NATIVE").is_some()) {
             candidates.push(super::Candidate {
                 node_id: node.node_id(),
                 runtime: rt.clone(),
@@ -69,9 +69,9 @@ fn node_fulfills_constraints(actor: &crate::ir::actor::LogicalActor, node: &dyn 
     true
 }
 
-fn runtime_supported(code_format: &str, runtime: &crate::ir::Runtime) -> bool {
+fn runtime_supported(code_format: &str, runtime: &crate::ir::Runtime, disable_native: bool) -> bool {
     match runtime {
         super::Runtime::WasmBase(_wasm_runtime) => ["RUST", "RUST_WASM"].contains(&code_format),
-        super::Runtime::NativeBase(_native_runtime) => false, //["RUST"].contains(&code_format),
+        super::Runtime::NativeBase(_native_runtime) => ["RUST"].contains(&code_format) && !disable_native,
     }
 }

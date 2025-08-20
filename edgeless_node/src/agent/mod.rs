@@ -95,7 +95,8 @@ impl Agent {
                     log::debug!("Agent Spawn {spawn_req:?}");
                     let code_size = spawn_req.code.function_class_code.len();
                     let actor_class = spawn_req.code.function_class_id.clone();
-                    log::info!("Actor Size: {code_size}. Class: {actor_class}");
+                    let actor_id = spawn_req.instance_id.function_id;
+                    log::info!("Actor Spawn: ID: {actor_id}, Size: {code_size}. Class: {actor_class}");
 
                     // Save function_class for further interaction.
                     // We can assume that the Optional<instance_id> is present.

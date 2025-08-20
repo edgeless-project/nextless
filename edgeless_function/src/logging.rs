@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+use alloc::string::ToString;
+
 struct Logger;
 
 impl log::Log for Logger {
@@ -8,7 +11,7 @@ impl log::Log for Logger {
         true
     }
 
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(any(feature = "std", feature = "alloc")))]
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
             match record.args().as_str() {
@@ -19,7 +22,7 @@ impl log::Log for Logger {
             }
         }
     }
-    #[cfg(feature = "std")]
+    #[cfg(any(feature = "std", feature = "alloc"))]
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
             super::telemetry_log(rust_to_api(record.level()) as usize, record.target(), &record.args().to_string());

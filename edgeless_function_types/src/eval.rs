@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+
+use alloc::{string::String, vec::Vec};
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct NumberedTestMessage {
     pub sequence_number: u64,

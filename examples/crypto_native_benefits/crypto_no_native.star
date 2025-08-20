@@ -17,6 +17,7 @@ encryptor = edgeless_actor(
     klass = Encryptor,
     annotations = {
         "max_instances": "1",
+        "NO_NATIVE": "true",
     }
 )
 
@@ -25,6 +26,7 @@ decryptor = edgeless_actor(
     klass = Decryptor,
     annotations = {
         "max_instances": "1",
+        "NO_NATIVE": "true",
     }
 )
 
@@ -33,7 +35,7 @@ encryptor.data_out >> decryptor.data_in
 decryptor.data_out >> harness.end
 
 wf = edgeless_workflow(
-    "crypto_allow_native",
+    "crypto_no_native",
     [harness, encryptor, decryptor],
     annotations = {}
 )

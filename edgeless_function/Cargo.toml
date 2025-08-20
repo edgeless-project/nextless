@@ -12,7 +12,7 @@ path = "src/lib.rs"
 
 [features]
 std = []
-# alloc= []
+alloc = []
 default = ["std"]
 
 [dependencies]

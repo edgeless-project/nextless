@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+#![no_std]
+extern crate alloc;
+use alloc::string::String;
+
 use aes_gcm::{aead::Aead, KeyInit};
 use edgeless_function::*;
 
