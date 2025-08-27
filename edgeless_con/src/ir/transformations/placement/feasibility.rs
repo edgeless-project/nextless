@@ -26,7 +26,7 @@ pub fn feasible_node_runtime_candidates<'b>(
     }
 
     for (_rt_id, rt) in node.available_runtimes() {
-        if runtime_supported(actor.image.id.format.as_str(), &rt, actor.annotations.get("NO_NATIVE").is_some()) {
+        if runtime_supported(actor.image.id.format.as_str(), &rt, actor.annotations.contains_key("NO_NATIVE")) {
             candidates.push(super::Candidate {
                 node_id: node.node_id(),
                 runtime: rt.clone(),

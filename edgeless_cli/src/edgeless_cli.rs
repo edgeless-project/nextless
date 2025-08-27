@@ -379,8 +379,15 @@ async fn main() -> anyhow::Result<()> {
                         .unwrap()
                         .to_string();
 
-                    let compiled = edgeless_build::rust_to_wasm(cargo_project_path.to_str().unwrap().to_string(), vec![], true, true)?;
-                    std::fs::copy(compiled, out_file).unwrap();
+                    let mut port_features: Vec<_> = function_spec.inputs.keys().map(|i| format!("input_{i}")).collect();
+                    port_features.append(&mut function_spec.outputs.keys().map(|o| format!("output_{o}")).collect());
+
+                    match edgeless_build::wasm::rust_to_wasm(cargo_project_path.to_str().unwrap().to_string(), port_features, true, false) {
+                        Ok(result_file) => {
+                            std::fs::copy(result_file, out_file).unwrap();
+                        }
+                        Err(e) => panic!("{}", e.to_string()),
+                    }
                 }
 
                 FunctionCommands::Package { spec_file } => {
@@ -392,7 +399,10 @@ async fn main() -> anyhow::Result<()> {
                         serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap()
                     } else {
                         match edgeless_config::load(spec_file_path).unwrap() {
-                            edgeless_config::LoadResult::ActorClass(a) => a,
+                            edgeless_config::LoadResult::ActorClass(a) => {
+                                std::fs::write(cargo_project_path.join("function.json"), serde_json::to_vec(&a).unwrap()).unwrap();
+                                a
+                            }
                             _ => {
                                 panic!("Can't Spawn Function as Workflow");
                             }
@@ -407,7 +417,7 @@ async fn main() -> anyhow::Result<()> {
                         .unwrap()
                         .to_string();
 
-                    let packaged = edgeless_build::package_rust(cargo_project_path.to_str().unwrap().to_string())?;
+                    let packaged = edgeless_build::rust::package_rust(cargo_project_path.to_str().unwrap().to_string())?;
                     std::fs::copy(packaged, out_file).unwrap();
                 }
                 FunctionCommands::Invoke {

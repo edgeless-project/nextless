@@ -39,34 +39,38 @@ impl super::StatefulTransformation<CompilerStore> for Compiler {
                 continue;
             }
             for instance in &function.instances {
-                if let super::super::PhysicalComponentState::Planned(instance) = &mut *instance.borrow_mut() {
-                    let instance = instance.as_actor().unwrap();
-                    if instance.image.id.format == "RUST" {
+                let mut instance = instance.borrow_mut();
+                if let super::super::PhysicalComponentState::Planned(component) = &mut *instance {
+                    let actor_instance = component.as_actor().unwrap();
+                    if actor_instance.image.id.format == "RUST" {
                         let image_ident = actor::ActorImageIdent {
                             class_id: function.image.class.id.clone(),
-                            format: match instance.runtime_type.as_str() {
+                            format: match actor_instance.runtime_type.as_str() {
                                 "WASM_BASE" => "RUST_WASM".to_string(),
-                                _ => instance.runtime_type.clone(),
+                                _ => actor_instance.runtime_type.clone(),
                             },
                             enabled_inputs: function.enabled_inputs().iter().cloned().collect(),
                             enabled_outputs: function.enabled_outputs().iter().cloned().collect(),
                         };
 
                         match store.inner.blocking_lock().images.entry(image_ident.clone()) {
-                            std::collections::hash_map::Entry::Occupied(occupied_entry) => instance.image = occupied_entry.get().clone(),
+                            std::collections::hash_map::Entry::Occupied(occupied_entry) => actor_instance.image = occupied_entry.get().clone(),
                             std::collections::hash_map::Entry::Vacant(vacant_entry) => {
-                                let image_result = match instance.runtime_type.as_str() {
+                                let image_result = match actor_instance.runtime_type.as_str() {
                                     "WASM_BASE" => compile_wasm(&function, image_ident),
                                     // TODO: The Architecture needs to be part of the ident.
-                                    "NATIVE_BASE" => compile_native(&function, image_ident, *nodes.get(&instance.id.node_id).unwrap()),
+                                    "NATIVE_BASE" => compile_native(&function, image_ident, *nodes.get(&actor_instance.id.node_id).unwrap()),
                                     _ => continue,
                                 };
 
-                                if let Ok(image) = image_result {
-                                    instance.image = image.clone();
-                                    vacant_entry.insert(image);
-                                } else {
-                                    log::error!("Failed Compiling Image");
+                                match image_result {
+                                    Ok(image) => {
+                                        actor_instance.image = image.clone();
+                                        vacant_entry.insert(image);
+                                    }
+                                    Err(e) => {
+                                        log::warn!("Failed Compiling Image:\n{e}");
+                                    }
                                 }
                             }
                         }
@@ -80,9 +84,9 @@ impl super::StatefulTransformation<CompilerStore> for Compiler {
 fn compile_wasm(actor: &crate::ir::actor::LogicalActor, image_ident: actor::ActorImageIdent) -> Result<actor::ActorImage, anyhow::Error> {
     let enabled_features = port_features_for(&image_ident);
 
-    let rust_dir = edgeless_build::unpack_rust_package(&actor.image.code).unwrap();
-    let wasm_file = edgeless_build::rust_to_wasm(rust_dir, enabled_features, true, false).unwrap();
-    let wasm_code = std::fs::read(wasm_file).unwrap();
+    let rust_dir = edgeless_build::rust::unpack_rust_package(&actor.image.code)?;
+    let wasm_file = edgeless_build::wasm::rust_to_wasm(rust_dir, enabled_features, true, false)?;
+    let wasm_code = std::fs::read(wasm_file).map_err(|e| anyhow::anyhow!("Cold not read wasm file: {}", e))?;
 
     Ok(actor::ActorImage {
         class: actor.image.class.clone(),
@@ -99,21 +103,23 @@ fn compile_native(
     let enabled_features = port_features_for(&image_ident);
 
     let rts = node.available_runtimes();
-    let rt = rts.get("NATIVE_BASE").ok_or(anyhow::anyhow!("Called native build function on "))?;
+    let rt = rts
+        .get("NATIVE_BASE")
+        .ok_or(anyhow::anyhow!("Called native build function on node without native runtime"))?;
 
     let target = if let Runtime::NativeBase(rt) = rt {
         if rt.node_architecture() == crate::ir::NodeArchitecture::Arm64 {
-            edgeless_build::NativeTarget::AARCH64
+            edgeless_build::native::NativeTarget::AARCH64
         } else {
-            edgeless_build::NativeTarget::AMD64
+            edgeless_build::native::NativeTarget::AMD64
         }
     } else {
-        return Err(anyhow::anyhow!("Unsupported Target"));
+        return Err(anyhow::anyhow!("Native Build: Unsupported Target"));
     };
 
-    let rust_dir = edgeless_build::unpack_rust_package(&actor.image.code).unwrap();
-    let so_file = edgeless_build::rust_to_dynlib(rust_dir, enabled_features, true, false, target).unwrap();
-    let so_code = std::fs::read(so_file).unwrap();
+    let rust_dir = edgeless_build::rust::unpack_rust_package(&actor.image.code)?;
+    let so_file = edgeless_build::native::rust_to_dynlib(rust_dir, enabled_features, true, false, target)?;
+    let so_code = std::fs::read(so_file).map_err(|e| anyhow::anyhow!("Cold not read wasm file: {}", e))?;
 
     Ok(actor::ActorImage {
         class: actor.image.class.clone(),
