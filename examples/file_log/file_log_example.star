@@ -14,7 +14,9 @@ logger = edgeless_resource(
 generator = edgeless_actor(
     id = "my-message-generator",
     klass = MessageGenerator,
-    annotations = {}
+    annotations = {
+        "init-payload": "message=hello world,period=1000"
+    }
 )
 
 generator.message >> logger.line

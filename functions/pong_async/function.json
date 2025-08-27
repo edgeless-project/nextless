@@ -1,1 +1,0 @@
-{"id":"pong_async","version":"0.1","inputs":{"ping":{"method":"CAST","data_type":"edgeless.example.Ping"}},"outputs":{"pong":{"method":"CAST","data_type":"edgeless.example.Pong"}},"inner_structure":[{"source":{"type":"PORT","port_id":"ping"},"dests":[{"type":"PORT","port_id":"pong"}]}],"path":"/app/functions/pong_async/pong_async.tar.gz","code_type":"RUST"}

@@ -17,6 +17,7 @@ name = "unbalanced_source"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
+include = ["src/**/*", "function.json", "*.star"]
 
 [lib]
 name = "unbalanced_source"

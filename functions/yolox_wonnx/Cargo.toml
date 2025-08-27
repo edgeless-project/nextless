@@ -17,6 +17,7 @@ name = "yolox_example"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
+include = ["src/**/*", "data/**/*", "function.json", "*.star"]
 
 [lib]
 name = "yolox_example"

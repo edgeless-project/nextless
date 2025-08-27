@@ -17,6 +17,7 @@ name = "message_generator"
 version = "0.1.0"
 authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
 edition = "2021"
+include = ["src/**/*", "function.json", "*.star"]
 
 [lib]
 name = "message_generator"

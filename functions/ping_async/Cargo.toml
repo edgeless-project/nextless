@@ -17,6 +17,7 @@ name = "ping_async"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
+include = ["src/**/*", "function.json", "*.star"]
 
 [lib]
 name = "ping_async"
@@ -26,8 +27,6 @@ crate-type = ["cdylib"]
 [dependencies]
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
-# serde = {version="1", features=["derive"] }
-# serde_json = "1"
 log = "0.4"
 
 [features]

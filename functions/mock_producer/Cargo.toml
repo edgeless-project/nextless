@@ -17,6 +17,7 @@ name = "mock_producer"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
+include = ["src/**/*", "function.json", "*.star"]
 
 [lib]
 name = "mock_producer"

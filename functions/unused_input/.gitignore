@@ -1,2 +1,4 @@
 /Cargo.lock
 /src/padding.dat
+/target
+/function.json

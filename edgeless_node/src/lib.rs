@@ -96,24 +96,6 @@ pub struct EdgelessNodeResourceSettings {
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
     pub redis_provider: Option<String>,
-    /// The URL of DDA used by this node, used for communication via the DDA resources
-    pub dda_url: Option<String>,
-    /// If not empty, a DDA resource with that name is created.
-    pub dda_provider: Option<String>,
-    /// The ollama resource provider settings.
-    pub ollama_provider: Option<OllamaProviderSettings>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct OllamaProviderSettings {
-    /// The address of the ollama server.
-    pub host: String,
-    /// The port of the ollama server.
-    pub port: u16,
-    /// The maximum number of messages in the history of the ollama resource.
-    pub messages_number_limit: u16,
-    /// If not empty, an ollama resource provider with that name is created.
-    pub provider: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -377,66 +359,7 @@ async fn fill_resources(
                 });
             }
         }
-
-        if let (Some(dda_url), Some(provider_id)) = (&settings.dda_url, &settings.dda_provider) {
-            if !dda_url.is_empty() && !provider_id.is_empty() {
-                log::info!("Creating resource '{provider_id}' at {dda_url}");
-                let class_type = "dda".to_string();
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::dda::DDAResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
-                                .await,
-                        ),
-                    },
-                );
-
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id: provider_id.clone(),
-                    class_type,
-                    outputs: vec!["new_request".to_string()],
-                });
-            }
-        }
-
-        if let Some(settings) = &settings.ollama_provider {
-            if !settings.host.is_empty() && !settings.provider.is_empty() {
-                log::info!(
-                    "Creating resource '{}' towards {}:{} (limit to {} messages per chat)",
-                    settings.provider,
-                    settings.host,
-                    settings.port,
-                    settings.messages_number_limit
-                );
-                let class_type = "ollama".to_string();
-                ret.insert(
-                    settings.provider.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::ollama::OllamaResourceProvider::new(
-                                data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                                &settings.host,
-                                settings.port,
-                                settings.messages_number_limit,
-                            )
-                            .await,
-                        ),
-                    },
-                );
-
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id: settings.provider.clone(),
-                    class_type,
-                    outputs: vec!["out".to_string()],
-                });
-            }
-        }
     }
-
     ret
 }
 
@@ -605,14 +528,6 @@ http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
 file_log_provider = "file-log-1"
 redis_provider = "redis-1"
-dda_url = "http://127.0.0.1:10000"
-dda_provider = "dda-1"
-
-[resources.ollama_provider]
-host = "localhost"
-port = 11434
-messages_number_limit = 30
-provider = "ollama-1"
 
 [user_node_capabilities]
 "##,
