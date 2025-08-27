@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-
+#[cfg(not(feature = "std"))]
 use alloc::{string::String, vec::Vec};
 
 #[derive(Debug, PartialEq, Eq)]
