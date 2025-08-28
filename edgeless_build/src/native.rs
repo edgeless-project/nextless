@@ -47,7 +47,7 @@ pub fn rust_to_dynlib(
         target_tripple.to_string(),
         "".to_string(),
         ".actor".to_string(),
-        vec![],
+        vec!["compiler_builtins".to_string(), "core".to_string(), "alloc".to_string()],
         build_dir.clone(),
     )
 }
