@@ -82,7 +82,11 @@ fn parse_node_capabilities(api_instance: &crate::grpc_impl::api::NodeCapabilitie
         labels: api_instance.labels.clone(),
         is_tee_running: api_instance.is_tee_running,
         has_tpm: api_instance.has_tpm,
-        runtimes: api_instance.runtimes.clone(),
+        runtimes: api_instance
+            .runtimes
+            .iter()
+            .map(|i| crate::node_registration::RuntimeType::try_from(i.clone()).unwrap())
+            .collect(),
     }
 }
 
@@ -98,7 +102,7 @@ fn serialize_node_capabilities(req: &crate::node_registration::NodeCapabilities)
         labels: req.labels.clone(),
         is_tee_running: req.is_tee_running,
         has_tpm: req.has_tpm,
-        runtimes: req.runtimes.clone(),
+        runtimes: req.runtimes.iter().map(|i| i.clone().into()).collect(),
     }
 }
 
@@ -253,11 +257,32 @@ impl TryFrom<crate::grpc_impl::api::LinkProviderSpecification> for crate::node_r
     }
 }
 
+impl TryFrom<crate::grpc_impl::api::RuntimeType> for crate::node_registration::RuntimeType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::grpc_impl::api::RuntimeType) -> Result<Self, Self::Error> {
+        Ok(crate::node_registration::RuntimeType {
+            base_type: value.base_type,
+            features: value.features,
+        })
+    }
+}
+
+impl From<crate::node_registration::RuntimeType> for crate::grpc_impl::api::RuntimeType {
+    fn from(value: crate::node_registration::RuntimeType) -> Self {
+        Self {
+            base_type: value.base_type,
+            features: value.features,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::node_registration::NodeCapabilities;
     use crate::node_registration::ResourceProviderSpecification;
+    use crate::node_registration::RuntimeType;
     use crate::node_registration::UpdateNodeRequest;
     use crate::node_registration::UpdateNodeResponse;
 
@@ -284,7 +309,10 @@ mod test {
                     labels: vec!["red".to_string(), "powerful".to_string()],
                     is_tee_running: true,
                     has_tpm: true,
-                    runtimes: vec!["RUST_WASM".to_string()],
+                    runtimes: vec![RuntimeType {
+                        base_type: "WASM".to_string(),
+                        features: Vec::new(),
+                    }],
                 },
                 vec![],
             ),

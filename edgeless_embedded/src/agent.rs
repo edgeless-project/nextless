@@ -216,7 +216,11 @@ impl EmbeddedAgent {
             agent_url: url.clone(),
             invocation_url: url,
             resources,
-            runtimes: heapless::Vec::from_slice(&[heapless::String::from_str("RUST_WASM").unwrap()]).unwrap(),
+            runtimes: heapless::Vec::from_slice(&[edgeless_api_core::node_registration::EncodedRuntimeType {
+                base_type: heapless::String::from_str("WASM").unwrap(),
+                features: heapless::Vec::new(),
+            }])
+            .unwrap(),
         };
 
         loop {

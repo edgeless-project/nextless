@@ -5,6 +5,8 @@
 
 use std::str::FromStr;
 
+use crate::ir::ImplicitFeature;
+
 pub fn feasible_node_runtime_candidates<'b>(
     actor: &crate::ir::actor::LogicalActor,
     node: &'b dyn crate::ir::Node,
@@ -26,10 +28,15 @@ pub fn feasible_node_runtime_candidates<'b>(
     }
 
     for (_rt_id, rt) in node.available_runtimes() {
-        if runtime_supported(actor.image.id.format.as_str(), &rt, actor.annotations.contains_key("NO_NATIVE")) {
+        if let Some(features) = runtime_supported(
+            &actor.image.main_image.behavior_image_id.dialect_type,
+            &rt,
+            actor.annotations.contains_key("NO_NATIVE"),
+        ) {
             candidates.push(super::Candidate {
                 node_id: node.node_id(),
                 runtime: rt.clone(),
+                runtime_features: features,
             });
         }
     }
@@ -69,9 +76,88 @@ fn node_fulfills_constraints(actor: &crate::ir::actor::LogicalActor, node: &dyn 
     true
 }
 
-fn runtime_supported(code_format: &str, runtime: &crate::ir::Runtime, disable_native: bool) -> bool {
+fn runtime_supported(
+    source_format: &crate::ir::actor::DialectType,
+    runtime: &crate::ir::Runtime,
+    disable_native: bool,
+) -> Option<std::collections::BTreeSet<crate::ir::DialectFeature>> {
     match runtime {
-        super::Runtime::WasmBase(_wasm_runtime) => ["RUST", "RUST_WASM"].contains(&code_format),
-        super::Runtime::NativeBase(_native_runtime) => ["RUST"].contains(&code_format) && !disable_native,
+        super::Runtime::WasmBase(_wasm_runtime, _features) => {
+            if !["RUST", "WASM"].contains(&source_format.base_type.as_str()) {
+                return None;
+            }
+
+            let mut requires_unsupported_feature = false;
+            let translated_features: std::collections::BTreeSet<_> = source_format
+                .features
+                .iter()
+                .filter_map(|f| match f {
+                    crate::ir::DialectFeature::Rust(rust_dialect_feature) => match rust_dialect_feature {
+                        crate::ir::RustDialectFeatures::Wgpu => Some(crate::ir::DialectFeature::Wasm(crate::ir::WasmRuntimeFeatures::Wgpu)),
+                    },
+                    crate::ir::DialectFeature::Wasm(_) => Some(f.clone()),
+                    _ => {
+                        log::warn!("Tried mapping feature from unsupported runtime.");
+                        requires_unsupported_feature = true;
+                        None
+                    }
+                })
+                .collect();
+
+            if !runtime.features().is_superset(&translated_features) || requires_unsupported_feature {
+                return None;
+            }
+
+            let mut enabled_features = translated_features;
+            for feature in runtime.features() {
+                if feature.enable_implicitly() {
+                    enabled_features.insert(feature.clone());
+                }
+            }
+
+            Some(enabled_features)
+        }
+        super::Runtime::NativeBase(_native_runtime, _features) => {
+            log::info!("WHY NOT NATIVE");
+
+            if !["RUST", "NATIVE"].contains(&source_format.base_type.as_str()) || disable_native {
+                return None;
+            }
+
+            let mut requires_unsupported_feature = false;
+            let translated_features: std::collections::BTreeSet<_> = source_format
+                .features
+                .iter()
+                .filter_map(|f| match f {
+                    crate::ir::DialectFeature::Rust(rust_dialect_feature) => match rust_dialect_feature {
+                        crate::ir::RustDialectFeatures::Wgpu => {
+                            requires_unsupported_feature = true;
+                            None
+                        }
+                    },
+                    crate::ir::DialectFeature::Native(_) => Some(f.clone()),
+                    _ => {
+                        log::warn!("Tried mapping feature from unsupported runtime.");
+                        requires_unsupported_feature = true;
+                        None
+                    }
+                })
+                .collect();
+
+            log::info!("{:?} {:?} {}", runtime.features(), translated_features, requires_unsupported_feature);
+
+            if !runtime.features().is_superset(&translated_features) || requires_unsupported_feature {
+                return None;
+            }
+
+            let mut enabled_features = translated_features;
+            for feature in runtime.features() {
+                if feature.enable_implicitly() {
+                    enabled_features.insert(feature.clone());
+                }
+            }
+
+            Some(enabled_features)
+        }
     }
 }

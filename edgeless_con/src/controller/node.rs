@@ -134,9 +134,45 @@ impl crate::ir::Node for WorkerNode {
         self.capabilities
             .runtimes
             .iter()
-            .filter_map(|id| match id.as_str() {
-                "RUST_WASM" => Some(("RUST_WASM".to_string(), crate::ir::Runtime::WasmBase(self))),
-                "NATIVE_BASE" => Some(("NATIVE_BASE".to_string(), crate::ir::Runtime::NativeBase(self))),
+            .filter_map(|rt| match rt.base_type.as_str() {
+                "WASM" => {
+                    let features = rt
+                        .features
+                        .iter()
+                        .filter_map(|feature| match feature.as_str() {
+                            "WGPU" => Some(crate::ir::WasmRuntimeFeatures::Wgpu),
+                            _ => {
+                                log::warn!("Node announced unknown feature");
+                                None
+                            }
+                        })
+                        .collect();
+
+                    Some(("WASM".to_string(), crate::ir::Runtime::WasmBase(self, features)))
+                }
+                "NATIVE_DYNAMIC" => {
+                    let mut features: std::collections::BTreeSet<crate::ir::NativeRuntimeFeatures> = rt
+                        .features
+                        .iter()
+                        .filter_map(|feature| match feature.as_str() {
+                            "AES" => Some(crate::ir::NativeRuntimeFeatures::Aes),
+                            _ => {
+                                log::warn!("Node announced unknown feature");
+                                None
+                            }
+                        })
+                        .collect();
+
+                    features.insert(match self.capabilities.cpu_arch.as_str() {
+                        "x86_64" => crate::ir::NativeRuntimeFeatures::Amd64,
+                        "aarch64" => crate::ir::NativeRuntimeFeatures::Aarch64,
+                        _ => {
+                            log::info!("Unsupported Arch");
+                            return None;
+                        }
+                    });
+                    Some(("NATIVE_DYNAMIC".to_string(), crate::ir::Runtime::NativeBase(self, features)))
+                }
                 _ => None,
             })
             .collect()
@@ -203,8 +239,8 @@ impl crate::ir::NativeRuntime for WorkerNode {
 
     fn node_architecture(&self) -> crate::ir::NodeArchitecture {
         match self.capabilities.cpu_arch.as_str() {
-            "amd64" => crate::ir::NodeArchitecture::Amd64,
-            "arm64" => crate::ir::NodeArchitecture::Arm64,
+            "x86_64" => crate::ir::NodeArchitecture::Amd64,
+            "aarch64" => crate::ir::NodeArchitecture::Arm64,
             "xtensa" => crate::ir::NodeArchitecture::Xtensa,
             _ => {
                 log::error!("Bad Node Architecture; Defaulting to amd64.");

@@ -26,19 +26,19 @@ impl Default for StateSpecification {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize)]
 pub struct PortDataType(pub String);
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PortId(pub String);
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize)]
 pub enum PortMethod {
     Cast,
     Call,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize)]
 pub struct Port {
     pub id: PortId,
     pub method: PortMethod,
@@ -46,7 +46,7 @@ pub struct Port {
     pub return_data_type: Option<PortDataType>,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize)]
 pub enum MappingNode {
     Port(PortId),
     SideEffect,

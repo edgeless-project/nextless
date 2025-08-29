@@ -275,13 +275,23 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 RequiredChange::StartFunction {
                     function_id,
                     image,
+                    behavior_spec,
                     input_mapping,
                     output_mapping,
                     function_name,
                     annotations,
                 } => {
-                    self.start_workflow_function_on_node(&wf_id, function_name, function_id, image, input_mapping, output_mapping, annotations)
-                        .await
+                    self.start_workflow_function_on_node(
+                        &wf_id,
+                        function_name,
+                        function_id,
+                        image,
+                        behavior_spec,
+                        input_mapping,
+                        output_mapping,
+                        annotations,
+                    )
+                    .await
                 }
                 RequiredChange::StartResource {
                     resource_id,
@@ -381,7 +391,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
         f_name: String,
         function_id: edgeless_api::function_instance::InstanceId,
-        image: super::super::ir::actor::ActorImage,
+        image: super::super::ir::actor::BehaviorImage,
+        behavior_spec: super::super::ir::actor::BehaviorSpec,
         input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalInput>,
         output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalOutput>,
         annotations: std::collections::HashMap<String, String>,
@@ -392,7 +403,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         log::debug!("state specifications currently forced to NodeLocal");
         log::info!("{output_mapping:?}");
 
-        self.image_repository.update(image.code.image_hash(), image.code.clone()).await;
+        self.image_repository.update(image.image.image_hash(), image.image.clone()).await;
 
         let response = self
             .fn_client(&function_id.node_id)
@@ -401,14 +412,13 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             .start(edgeless_api::function_instance::SpawnFunctionRequest {
                 instance_id: function_id,
                 code: edgeless_api::function_instance::FunctionClassSpecification {
-                    function_class_id: image.class.id.id.clone(),
-                    function_class_type: image.id.format.clone(),
-                    function_class_version: image.class.id.version.clone(),
-                    function_class_code: image.code.clone(),
-                    function_class_outputs: image.class.outputs.clone(),
-                    function_class_inputs: image.class.inputs.clone(),
-                    function_class_inner_structure: image
-                        .class
+                    function_class_id: image.behavior_image_id.behavior_id.id.clone(),
+                    function_class_type: image.behavior_image_id.dialect_type.base_type.clone(),
+                    function_class_version: image.behavior_image_id.behavior_id.id.clone(),
+                    function_class_code: image.image.clone(),
+                    function_class_outputs: behavior_spec.output_ports.into_iter().collect(),
+                    function_class_inputs: behavior_spec.input_ports.into_iter().collect(),
+                    function_class_inner_structure: behavior_spec
                         .inner_structure
                         .iter()
                         .map(|(src, dst)| (src.clone(), dst.clone().into_iter().collect()))
@@ -654,15 +664,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         link_id: edgeless_api::link::LinkInstanceId,
         class: edgeless_api::link::LinkType,
     ) -> Result<(), String> {
-        if let Some(lc) = self
-            .global_pipeline_state
-            .physical_pipeline_state
-            .pipe_generator_state
-            .inner
-            .lock()
-            .await
-            .get_mut(&class)
-        {
+        if let Some(lc) = self.global_pipeline_state.pipe_generator_state.inner.lock().await.get_mut(&class) {
             lc.instantiate_control_plane(link_id).await;
         }
         Ok(())

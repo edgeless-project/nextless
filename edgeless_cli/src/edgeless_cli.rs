@@ -16,8 +16,14 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
-    Start { spec_file: String },
-    Stop { id: String },
+    Start {
+        spec_file: String,
+        #[arg(short, long, default_value_t = String::from(""))]
+        extra_images: String,
+    },
+    Stop {
+        id: String,
+    },
     List {},
 }
 
@@ -131,7 +137,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&conf.controller_url).await;
                 let mut con_wf_client = con_client.workflow_instance_api();
                 match workflow_command {
-                    WorkflowCommands::Start { spec_file } => {
+                    WorkflowCommands::Start { spec_file, extra_images } => {
                         log::debug!("Start Workflow");
 
                         let p = std::path::PathBuf::from(spec_file.clone());
@@ -152,112 +158,184 @@ async fn main() -> anyhow::Result<()> {
                                     .into_iter()
                                     .map(|func_spec| {
                                         log::info!("{:?}", func_spec.klass.code.clone());
-                                        let function_class_code = match func_spec.klass.code_type.as_str() {
-                                            "RUST_WASM" => std::fs::read(func_spec.klass.code.unwrap().path).unwrap(),
-                                            "RUST" => std::fs::read(func_spec.klass.code.unwrap().path).unwrap(),
-                                            "CONTAINER" => func_spec.klass.code.unwrap().path.as_bytes().to_vec(),
-                                            _ => panic!("unknown function class type: {}", func_spec.klass.id),
+
+                                        let dialect = match func_spec.klass.code_type.as_str() {
+                                            "WASM_BASE" => edgeless_api::node_registration::RuntimeType {
+                                                base_type: "WASM".to_string(),
+                                                features: Vec::new(),
+                                            },
+                                            "WASM_WGPU" => edgeless_api::node_registration::RuntimeType {
+                                                base_type: "WASM".to_string(),
+                                                features: vec!["WGPU".to_string()],
+                                            },
+                                            "RUST_BASE" => edgeless_api::node_registration::RuntimeType {
+                                                base_type: "RUST".to_string(),
+                                                features: Vec::new(),
+                                            },
+                                            "RUST_WGPU" => edgeless_api::node_registration::RuntimeType {
+                                                base_type: "RUST".to_string(),
+                                                features: vec!["WGPU".to_string()],
+                                            },
+                                            _ => {
+                                                panic!("Unusopported Dialect: {}", func_spec.klass.code_type.as_str())
+                                            }
                                         };
+
+                                        let behavior_id = edgeless_api::behavior::BehaviorId {
+                                            id: func_spec.klass.id,
+                                            version: func_spec.klass.version,
+                                        };
+
+                                        let input_ports: std::collections::BTreeMap<_, _> = func_spec
+                                            .klass
+                                            .inputs
+                                            .iter()
+                                            .map(|(port_id, port_spec)| {
+                                                (
+                                                    edgeless_api::function_instance::PortId(port_id.clone()),
+                                                    edgeless_api::function_instance::Port {
+                                                        id: edgeless_api::function_instance::PortId(port_id.clone()),
+                                                        method: match port_spec.method {
+                                                            edgeless_config::port_class::Method::Call => {
+                                                                edgeless_api::function_instance::PortMethod::Call
+                                                            }
+                                                            edgeless_config::port_class::Method::Cast => {
+                                                                edgeless_api::function_instance::PortMethod::Cast
+                                                            }
+                                                        },
+                                                        data_type: edgeless_api::function_instance::PortDataType(port_spec.data_type.clone()),
+                                                        return_data_type: port_spec
+                                                            .return_data_type
+                                                            .clone()
+                                                            .map(edgeless_api::function_instance::PortDataType),
+                                                    },
+                                                )
+                                            })
+                                            .collect();
+
+                                        let output_ports: std::collections::BTreeMap<_, _> = func_spec
+                                            .klass
+                                            .outputs
+                                            .iter()
+                                            .map(|(port_id, port_spec)| {
+                                                (
+                                                    edgeless_api::function_instance::PortId(port_id.clone()),
+                                                    edgeless_api::function_instance::Port {
+                                                        id: edgeless_api::function_instance::PortId(port_id.clone()),
+                                                        method: match port_spec.method {
+                                                            edgeless_config::port_class::Method::Call => {
+                                                                edgeless_api::function_instance::PortMethod::Call
+                                                            }
+                                                            edgeless_config::port_class::Method::Cast => {
+                                                                edgeless_api::function_instance::PortMethod::Cast
+                                                            }
+                                                        },
+                                                        data_type: edgeless_api::function_instance::PortDataType(port_spec.data_type.clone()),
+                                                        return_data_type: port_spec
+                                                            .return_data_type
+                                                            .clone()
+                                                            .map(edgeless_api::function_instance::PortDataType),
+                                                    },
+                                                )
+                                            })
+                                            .collect();
 
                                         edgeless_api::workflow_instance::WorkflowFunction {
                                             name: func_spec.id,
-                                            function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                                                function_class_id: func_spec.klass.id,
-                                                function_class_type: func_spec.klass.code_type,
-                                                function_class_version: func_spec.klass.version,
-                                                function_class_code,
-                                                function_class_outputs: func_spec
-                                                    .klass
-                                                    .outputs
-                                                    .iter()
-                                                    .map(|(port_id, port_spec)| {
-                                                        (
-                                                            edgeless_api::function_instance::PortId(port_id.clone()),
-                                                            edgeless_api::function_instance::Port {
-                                                                id: edgeless_api::function_instance::PortId(port_id.clone()),
-                                                                method: match port_spec.method {
-                                                                    edgeless_config::port_class::Method::Call => {
-                                                                        edgeless_api::function_instance::PortMethod::Call
-                                                                    }
-                                                                    edgeless_config::port_class::Method::Cast => {
-                                                                        edgeless_api::function_instance::PortMethod::Cast
-                                                                    }
-                                                                },
-                                                                data_type: edgeless_api::function_instance::PortDataType(port_spec.data_type.clone()),
-                                                                return_data_type: port_spec
-                                                                    .return_data_type
-                                                                    .clone()
-                                                                    .map(edgeless_api::function_instance::PortDataType),
-                                                            },
-                                                        )
-                                                    })
-                                                    .collect(),
-                                                function_class_inputs: func_spec
-                                                    .klass
-                                                    .inputs
-                                                    .iter()
-                                                    .map(|(port_id, port_spec)| {
-                                                        (
-                                                            edgeless_api::function_instance::PortId(port_id.clone()),
-                                                            edgeless_api::function_instance::Port {
-                                                                id: edgeless_api::function_instance::PortId(port_id.clone()),
-                                                                method: match port_spec.method {
-                                                                    edgeless_config::port_class::Method::Call => {
-                                                                        edgeless_api::function_instance::PortMethod::Call
-                                                                    }
-                                                                    edgeless_config::port_class::Method::Cast => {
-                                                                        edgeless_api::function_instance::PortMethod::Cast
-                                                                    }
-                                                                },
-                                                                data_type: edgeless_api::function_instance::PortDataType(port_spec.data_type.clone()),
-                                                                return_data_type: port_spec
-                                                                    .return_data_type
-                                                                    .clone()
-                                                                    .map(edgeless_api::function_instance::PortDataType),
-                                                            },
-                                                        )
-                                                    })
-                                                    .collect(),
-                                                function_class_inner_structure: func_spec.klass.inner_structure.iter().fold(
-                                                    std::collections::HashMap::<
-                                                        edgeless_api::function_instance::MappingNode,
-                                                        Vec<edgeless_api::function_instance::MappingNode>,
-                                                    >::new(),
-                                                    |mut acc, mapping| {
-                                                        let key = match &mapping.source {
-                                                            edgeless_config::inner_structure::MappingNode::Port(port_id) => {
-                                                                edgeless_api::function_instance::MappingNode::Port(
-                                                                    edgeless_api::function_instance::PortId(port_id.clone()),
-                                                                )
-                                                            }
-                                                            edgeless_config::inner_structure::MappingNode::SideEffect => {
-                                                                edgeless_api::function_instance::MappingNode::SideEffect
-                                                            }
-                                                        };
+                                            behavior: edgeless_api::behavior::Behavior {
+                                                spec: edgeless_api::behavior::BehaviorSpec {
+                                                    behavior_id: behavior_id.clone(),
+                                                    input_ports: input_ports.clone(),
+                                                    output_ports: output_ports.clone(),
+                                                    inner_structure: func_spec.klass.inner_structure.iter().fold(
+                                                        std::collections::BTreeMap::<
+                                                            edgeless_api::function_instance::MappingNode,
+                                                            Vec<edgeless_api::function_instance::MappingNode>,
+                                                        >::new(),
+                                                        |mut acc, mapping| {
+                                                            let key = match &mapping.source {
+                                                                edgeless_config::inner_structure::MappingNode::Port(port_id) => {
+                                                                    edgeless_api::function_instance::MappingNode::Port(
+                                                                        edgeless_api::function_instance::PortId(port_id.clone()),
+                                                                    )
+                                                                }
+                                                                edgeless_config::inner_structure::MappingNode::SideEffect => {
+                                                                    edgeless_api::function_instance::MappingNode::SideEffect
+                                                                }
+                                                            };
 
-                                                        let data = acc.entry(key).or_default();
+                                                            let data = acc.entry(key).or_default();
 
-                                                        // I don't think there is a better way: https://stackoverflow.com/a/39803426
-                                                        let mut tmp =
-                                                            std::collections::HashSet::<edgeless_api::function_instance::MappingNode>::from_iter(
-                                                                std::mem::take(data),
-                                                            );
+                                                            // I don't think there is a better way: https://stackoverflow.com/a/39803426
+                                                            let mut tmp =
+                                                                std::collections::HashSet::<edgeless_api::function_instance::MappingNode>::from_iter(
+                                                                    std::mem::take(data),
+                                                                );
 
-                                                        tmp.extend(mapping.dests.iter().map(|dest| match dest {
-                                                            edgeless_config::inner_structure::MappingNode::Port(port_id) => {
-                                                                edgeless_api::function_instance::MappingNode::Port(
-                                                                    edgeless_api::function_instance::PortId(port_id.clone()),
-                                                                )
-                                                            }
-                                                            edgeless_config::inner_structure::MappingNode::SideEffect => {
-                                                                edgeless_api::function_instance::MappingNode::SideEffect
-                                                            }
-                                                        }));
+                                                            tmp.extend(mapping.dests.iter().map(|dest| match dest {
+                                                                edgeless_config::inner_structure::MappingNode::Port(port_id) => {
+                                                                    edgeless_api::function_instance::MappingNode::Port(
+                                                                        edgeless_api::function_instance::PortId(port_id.clone()),
+                                                                    )
+                                                                }
+                                                                edgeless_config::inner_structure::MappingNode::SideEffect => {
+                                                                    edgeless_api::function_instance::MappingNode::SideEffect
+                                                                }
+                                                            }));
 
-                                                        *data = tmp.into_iter().collect();
-                                                        acc
+                                                            *data = tmp.into_iter().collect();
+                                                            acc
+                                                        },
+                                                    ),
+                                                },
+                                                main_image: Some(edgeless_api::behavior::BehaviorImage {
+                                                    behavior_image_id: edgeless_api::behavior::BehaviorImageId {
+                                                        behaviour_id: behavior_id.clone(),
+                                                        enabled_ports: edgeless_api::behavior::EnabledPorts {
+                                                            enabled_inputs: input_ports.keys().cloned().collect(),
+                                                            enabled_outputs: output_ports.keys().cloned().collect(),
+                                                        },
+                                                        dialect_type: dialect.clone(),
                                                     },
-                                                ),
+                                                    image: std::fs::read(func_spec.klass.code.clone().unwrap().path).unwrap(),
+                                                }),
+                                                // TODO: Cleanup; This is just a quick and dirty experiment but the whole file needs cleanup...
+                                                extra_images: if ["RUST"].contains(&dialect.base_type.as_str()) {
+                                                    extra_images
+                                                        .split(",")
+                                                        .map(|i| match i {
+                                                            "WASM" => {
+                                                                let rust_file = std::path::PathBuf::from(func_spec.klass.code.clone().unwrap().path);
+                                                                let dir = rust_file.parent().unwrap();
+                                                                let base_name =
+                                                                    rust_file.file_name().unwrap().to_str().unwrap().split(".").next().unwrap();
+
+                                                                let wasm_code_path = dir.join(std::path::PathBuf::from(format!("{base_name}.wasm")));
+                                                                let wasm_code = std::fs::read(wasm_code_path).unwrap();
+
+                                                                edgeless_api::behavior::BehaviorImage {
+                                                                    behavior_image_id: edgeless_api::behavior::BehaviorImageId {
+                                                                        behaviour_id: behavior_id.clone(),
+                                                                        enabled_ports: edgeless_api::behavior::EnabledPorts {
+                                                                            enabled_inputs: input_ports.keys().cloned().collect(),
+                                                                            enabled_outputs: output_ports.keys().cloned().collect(),
+                                                                        },
+                                                                        dialect_type: edgeless_api::node_registration::RuntimeType {
+                                                                            base_type: "WASM".to_string(),
+                                                                            features: dialect.features.clone(),
+                                                                        },
+                                                                    },
+                                                                    image: wasm_code,
+                                                                }
+                                                            }
+                                                            _ => {
+                                                                panic!("Unsupported Extra Dialect")
+                                                            }
+                                                        })
+                                                        .collect()
+                                                } else {
+                                                    Vec::new()
+                                                },
                                             },
                                             output_mapping: func_spec
                                                 .outputs
@@ -648,7 +726,7 @@ fn parse_port_mapping(mapping: &edgeless_config::port::Mapping) -> edgeless_api:
 // ) -> workflow_spec::WorkflowSpecFunctionClass {
 //     workflow_spec::WorkflowSpecFunctionClass {
 //         id: ca.id.clone(),
-//         function_type: "RUST".to_string(),
+//         function_type: "RUST_BASE".to_string(),
 //         version: ca.version,
 //         code: Some(String::from_str(parent.join(std::path::PathBuf::from(format!("{}.tar.gz", ca.id))).to_str().unwrap()).unwrap()),
 //         build: None,

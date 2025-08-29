@@ -330,15 +330,22 @@ pub type Nodes<'a> = std::collections::HashMap<edgeless_api::function_instance::
 
 #[derive(Clone)]
 pub enum Runtime<'a> {
-    WasmBase(&'a dyn WasmRuntime),
-    NativeBase(&'a dyn NativeRuntime),
+    WasmBase(&'a dyn WasmRuntime, std::collections::BTreeSet<WasmRuntimeFeatures>),
+    NativeBase(&'a dyn NativeRuntime, std::collections::BTreeSet<NativeRuntimeFeatures>),
 }
 
 impl Runtime<'_> {
     fn id(&self) -> String {
         match self {
-            Runtime::WasmBase(_) => "WASM_BASE".to_string(),
-            Runtime::NativeBase(_) => "NATIVE_BASE".to_string(),
+            Runtime::WasmBase(_, _) => "WASM".to_string(),
+            Runtime::NativeBase(_, _) => "NATIVE_DYNAMIC".to_string(),
+        }
+    }
+
+    fn features(&self) -> std::collections::BTreeSet<DialectFeature> {
+        match self {
+            Runtime::WasmBase(_, features) => features.iter().map(|f| DialectFeature::Wasm(f.clone())).collect(),
+            Runtime::NativeBase(_, features) => features.iter().map(|f| DialectFeature::Native(f.clone())).collect(),
         }
     }
 }
@@ -354,6 +361,19 @@ pub trait WasmRuntime {
     fn runtime_info(&self) -> Option<Box<dyn WasmRuntimeInfo>>;
 }
 
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+pub enum WasmRuntimeFeatures {
+    Wgpu,
+}
+
+impl ImplicitFeature for WasmRuntimeFeatures {
+    fn enable_implicitly(&self) -> bool {
+        match self {
+            WasmRuntimeFeatures::Wgpu => false,
+        }
+    }
+}
+
 pub trait NativeRuntime {
     fn num_cores(&self) -> u32;
     fn cpu_freq_hz(&self) -> f32;
@@ -364,6 +384,58 @@ pub trait NativeRuntime {
     fn node_sys(&self) -> NodeSys;
     #[allow(unused)]
     fn runtime_info(&self) -> Option<Box<dyn WasmRuntimeInfo>>;
+}
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+pub enum DialectFeature {
+    Rust(RustDialectFeatures),
+    Wasm(WasmRuntimeFeatures),
+    Native(NativeRuntimeFeatures),
+}
+
+impl ImplicitFeature for DialectFeature {
+    fn enable_implicitly(&self) -> bool {
+        match self {
+            DialectFeature::Rust(rust_dialect_features) => rust_dialect_features.enable_implicitly(),
+            DialectFeature::Wasm(wasm_runtime_features) => wasm_runtime_features.enable_implicitly(),
+            DialectFeature::Native(native_runtime_features) => native_runtime_features.enable_implicitly(),
+        }
+    }
+}
+
+pub trait ImplicitFeature {
+    fn enable_implicitly(&self) -> bool;
+}
+
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+pub enum NativeRuntimeFeatures {
+    // We add the architecture as a feature so that we don't have to keep track of it separately.
+    Amd64,
+    Aarch64,
+    // We might still need to introduce a suptype for the native runtime but I did not want to commit to that yet.
+    Aes,
+}
+
+impl ImplicitFeature for NativeRuntimeFeatures {
+    fn enable_implicitly(&self) -> bool {
+        match self {
+            NativeRuntimeFeatures::Amd64 => true,
+            NativeRuntimeFeatures::Aarch64 => true,
+            NativeRuntimeFeatures::Aes => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+pub enum RustDialectFeatures {
+    Wgpu,
+}
+
+impl ImplicitFeature for RustDialectFeatures {
+    fn enable_implicitly(&self) -> bool {
+        match self {
+            RustDialectFeatures::Wgpu => false,
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -575,7 +647,8 @@ pub enum RequiredChange {
     StartFunction {
         function_id: edgeless_api::function_instance::InstanceId,
         function_name: String,
-        image: actor::ActorImage,
+        image: actor::BehaviorImage,
+        behavior_spec: actor::BehaviorSpec,
         input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
         output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
         annotations: std::collections::HashMap<String, String>,

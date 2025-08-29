@@ -53,8 +53,8 @@ mod tests {
                         metrics_url: format!("http://{}:{}", address, next_port()),
                         controller_url: controller_url.to_string(),
                     },
-                    wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
-                    container_runtime: None,
+                    wasmtime_runtime: Some(edgeless_node::EdgelessNodeWasmtimeRuntimeSettings { enabled: true, wgpu: None }),
+                    wasmi_runtime: None,
                     native_runtime: None,
                     resources: Some(edgeless_node::EdgelessNodeResourceSettings {
                         http_ingress_url: None,
@@ -82,7 +82,7 @@ mod tests {
         (client.list(edgeless_api::workflow_instance::WorkflowId::none()).await).unwrap_or_default()
     }
 
-    fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {
+    fn fixture_spec() -> edgeless_api::behavior::Behavior {
         let out_1 = edgeless_api::function_instance::Port {
             id: edgeless_api::function_instance::PortId("out1".to_string()),
             method: edgeless_api::function_instance::PortMethod::Cast,
@@ -118,38 +118,62 @@ mod tests {
             return_data_type: None,
         };
 
-        edgeless_api::function_instance::FunctionClassSpecification {
-            function_class_id: "system_test".to_string(),
-            function_class_type: "RUST_WASM".to_string(),
-            function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("fixtures/system_test.wasm").to_vec(),
-            function_class_outputs: std::collections::HashMap::from([
-                (edgeless_api::function_instance::PortId("out1".to_string()), out_1),
-                (edgeless_api::function_instance::PortId("out2".to_string()), out_2),
-                (edgeless_api::function_instance::PortId("err".to_string()), out_err),
-                (edgeless_api::function_instance::PortId("log".to_string()), out_log),
-            ]),
-            function_class_inputs: std::collections::HashMap::from([(edgeless_api::function_instance::PortId("in1".to_string()), in_1)]),
-            function_class_inner_structure: std::collections::HashMap::from([
-                (
-                    edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("in1".to_string())),
-                    vec![
-                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out1".to_string())),
-                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out2".to_string())),
-                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("err".to_string())),
-                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("log".to_string())),
-                    ],
-                ),
-                (
-                    edgeless_api::function_instance::MappingNode::SideEffect,
-                    vec![
-                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out1".to_string())),
-                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out2".to_string())),
-                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("err".to_string())),
-                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("log".to_string())),
-                    ],
-                ),
-            ]),
+        let behavior_id = edgeless_api::behavior::BehaviorId {
+            id: "system_test".to_string(),
+            version: "0.1".to_string(),
+        };
+
+        edgeless_api::behavior::Behavior {
+            spec: edgeless_api::behavior::BehaviorSpec {
+                behavior_id: behavior_id.clone(),
+                input_ports: std::collections::BTreeMap::from([(edgeless_api::function_instance::PortId("in1".to_string()), in_1)]),
+                output_ports: std::collections::BTreeMap::from([
+                    (edgeless_api::function_instance::PortId("out1".to_string()), out_1),
+                    (edgeless_api::function_instance::PortId("out2".to_string()), out_2),
+                    (edgeless_api::function_instance::PortId("err".to_string()), out_err),
+                    (edgeless_api::function_instance::PortId("log".to_string()), out_log),
+                ]),
+                inner_structure: std::collections::BTreeMap::from([
+                    (
+                        edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("in1".to_string())),
+                        vec![
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out1".to_string())),
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out2".to_string())),
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("err".to_string())),
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("log".to_string())),
+                        ],
+                    ),
+                    (
+                        edgeless_api::function_instance::MappingNode::SideEffect,
+                        vec![
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out1".to_string())),
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out2".to_string())),
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("err".to_string())),
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("log".to_string())),
+                        ],
+                    ),
+                ]),
+            },
+            main_image: Some(edgeless_api::behavior::BehaviorImage {
+                behavior_image_id: edgeless_api::behavior::BehaviorImageId {
+                    behaviour_id: behavior_id.clone(),
+                    enabled_ports: edgeless_api::behavior::EnabledPorts {
+                        enabled_outputs: std::collections::BTreeSet::from([
+                            edgeless_api::function_instance::PortId("out1".to_string()),
+                            edgeless_api::function_instance::PortId("out2".to_string()),
+                            edgeless_api::function_instance::PortId("err".to_string()),
+                            edgeless_api::function_instance::PortId("log".to_string()),
+                        ]),
+                        enabled_inputs: std::collections::BTreeSet::from([edgeless_api::function_instance::PortId("in1".to_string())]),
+                    },
+                    dialect_type: edgeless_api::node_registration::RuntimeType {
+                        base_type: "WASM".to_string(),
+                        features: Vec::new(),
+                    },
+                },
+                image: include_bytes!("fixtures/system_test.wasm").to_vec(),
+            }),
+            extra_images: Vec::new(),
         }
     }
 
@@ -177,7 +201,7 @@ mod tests {
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                     workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f1".to_string(),
-                        function_class_specification: fixture_spec(),
+                        behavior: fixture_spec(),
                         output_mapping: std::collections::HashMap::new(),
                         input_mapping: std::collections::HashMap::new(),
                         annotations: std::collections::HashMap::new(),
@@ -258,7 +282,7 @@ mod tests {
                     workflow_functions: vec![
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f1".to_string(),
-                            function_class_specification: fixture_spec(),
+                            behavior: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([
                                 (
                                     edgeless_api::function_instance::PortId("out1".to_string()),
@@ -287,7 +311,7 @@ mod tests {
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f2".to_string(),
-                            function_class_specification: fixture_spec(),
+                            behavior: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([(
                                 edgeless_api::function_instance::PortId("log".to_string()),
                                 edgeless_api::workflow_instance::PortMapping::DirectTarget(
@@ -300,7 +324,7 @@ mod tests {
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f3".to_string(),
-                            function_class_specification: fixture_spec(),
+                            behavior: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([(
                                 edgeless_api::function_instance::PortId("log".to_string()),
                                 edgeless_api::workflow_instance::PortMapping::DirectTarget(

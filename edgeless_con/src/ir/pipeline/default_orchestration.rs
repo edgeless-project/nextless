@@ -22,13 +22,15 @@ impl<P: PlacementStrategy> DefaultOrchestrationPipeline<P> {
     }
 }
 
-impl<P: PlacementStrategy> super::TransformationPipeline<P::GlobalState> for DefaultOrchestrationPipeline<P> {
+impl<'a, P: PlacementStrategy> super::TransformationPipeline<crate::ir::transformations::placement::PlacementState<'a, P>>
+    for DefaultOrchestrationPipeline<P>
+{
     fn apply_all(
         &mut self,
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &P::GlobalState,
+        global_state: &crate::ir::transformations::placement::PlacementState<P>,
     ) {
         self.apply_dynamic(workflow, nodes, peer_clusters, global_state);
     }
@@ -38,7 +40,7 @@ impl<P: PlacementStrategy> super::TransformationPipeline<P::GlobalState> for Def
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &P::GlobalState,
+        global_state: &crate::ir::transformations::placement::PlacementState<P>,
     ) {
         self.scaler.apply(workflow, nodes, peer_clusters);
         self.colocation_optimizer.apply(workflow, nodes, peer_clusters);

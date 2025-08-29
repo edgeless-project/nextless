@@ -5,7 +5,7 @@ UnusedInput = edgeless_actor_class(
     inputs = [cast_input("data_in", "eft_eval_numbered_test_message"), cast_input("unused_in", "eft_eval_numbered_test_message")],
     inner_structure = [link("data_in", ["data_out"]), link("unused_in", ["data_out"])],
     code = file("unused_input.tar.gz"),
-    code_type = "RUST"
+    code_type = "RUST_BASE"
 )
 
 el_main = UnusedInput

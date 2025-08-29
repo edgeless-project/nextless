@@ -37,7 +37,19 @@ pub struct NodeCapabilities {
     // True if the node has a Trusted Platform Module for authenticated registration.
     pub has_tpm: bool,
     // List of run-times supported by the node.
-    pub runtimes: Vec<String>,
+    pub runtimes: Vec<RuntimeType>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+pub struct RuntimeType {
+    pub base_type: String,
+    pub features: Vec<String>,
+}
+
+impl std::fmt::Display for RuntimeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}[{}]", self.base_type, self.features.join(","))
+    }
 }
 
 impl NodeCapabilities {
@@ -71,7 +83,10 @@ impl NodeCapabilities {
             labels: vec![],
             is_tee_running: false,
             has_tpm: false,
-            runtimes: vec!["RUST_WASM".to_string()],
+            runtimes: vec![RuntimeType {
+                base_type: "WASM".to_string(),
+                features: vec![],
+            }],
         }
     }
 
@@ -100,7 +115,7 @@ impl std::fmt::Display for NodeCapabilities {
                 true => ", TPM",
                 false => "",
             },
-            self.runtimes.join(",")
+            self.runtimes.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(",")
         )
     }
 }

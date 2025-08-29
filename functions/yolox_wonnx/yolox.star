@@ -5,7 +5,7 @@ YoloxNano = edgeless_actor_class(
     inputs = [cast_input("image", "eft_vision_rawimage")],
     inner_structure = [link("image", ["detection", "annotated_image"])],
     code = file("yolox_nano.wasm"),
-    code_type = "RUST_WASM"
+    code_type = "WASM_WGPU"
 )
 
 el_main = YoloxNano

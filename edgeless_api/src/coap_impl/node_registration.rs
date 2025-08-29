@@ -65,7 +65,14 @@ impl NodeRegistrationHelper for super::CoapClient {
                 runtimes: capabilities
                     .runtimes
                     .iter()
-                    .map(|i| heapless::String::<32>::from_str(i.as_str()).unwrap())
+                    .map(|runtime| edgeless_api_core::node_registration::EncodedRuntimeType {
+                        base_type: heapless::String::<32>::from_str(runtime.base_type.as_str()).unwrap(),
+                        features: runtime
+                            .features
+                            .iter()
+                            .map(|feature| heapless::String::<32>::from_str(feature).unwrap())
+                            .collect(),
+                    })
                     .collect(),
             };
 

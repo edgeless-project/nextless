@@ -109,18 +109,7 @@ impl FunctonInstanceConverters {
     }
 
     pub fn parse_port(api_port: &crate::grpc_impl::api::Port) -> anyhow::Result<crate::function_instance::Port> {
-        Ok(crate::function_instance::Port {
-            id: crate::function_instance::PortId(api_port.port_id.clone()),
-            method: match api_port.method {
-                0 => crate::function_instance::PortMethod::Cast,
-                1 => crate::function_instance::PortMethod::Call,
-                _ => {
-                    return Err(anyhow::anyhow!("Unknown Port Method"));
-                }
-            },
-            data_type: crate::function_instance::PortDataType(api_port.data_type.clone()),
-            return_data_type: api_port.return_data_type.clone().map(crate::function_instance::PortDataType),
-        })
+        api_port.clone().try_into()
     }
 
     pub fn serialize_function_class_specification(
@@ -204,15 +193,7 @@ impl FunctonInstanceConverters {
     }
 
     pub fn serialize_port(crate_port: &crate::function_instance::Port) -> crate::grpc_impl::api::Port {
-        crate::grpc_impl::api::Port {
-            port_id: crate_port.id.0.clone(),
-            method: match crate_port.method {
-                crate::function_instance::PortMethod::Cast => 0,
-                crate::function_instance::PortMethod::Call => 1,
-            },
-            data_type: crate_port.data_type.0.clone(),
-            return_data_type: crate_port.return_data_type.as_ref().map(|dt| dt.0.clone()),
-        }
+        crate_port.clone().into()
     }
 }
 
@@ -366,6 +347,53 @@ where
                 "Error when updating the links of a function instance: {err}"
             ))),
         }
+    }
+}
+
+impl From<crate::function_instance::PortId> for super::api::PortId {
+    fn from(val: crate::function_instance::PortId) -> Self {
+        super::api::PortId { id: val.0 }
+    }
+}
+
+impl TryFrom<super::api::PortId> for crate::function_instance::PortId {
+    type Error = anyhow::Error;
+
+    fn try_from(value: super::api::PortId) -> Result<Self, Self::Error> {
+        Ok(Self(value.id))
+    }
+}
+
+impl From<crate::function_instance::Port> for super::api::Port {
+    fn from(val: crate::function_instance::Port) -> Self {
+        crate::grpc_impl::api::Port {
+            port_id: val.id.0,
+            method: match val.method {
+                crate::function_instance::PortMethod::Cast => 0,
+                crate::function_instance::PortMethod::Call => 1,
+            },
+            data_type: val.data_type.0,
+            return_data_type: val.return_data_type.map(|dt| dt.0),
+        }
+    }
+}
+
+impl TryFrom<super::api::Port> for crate::function_instance::Port {
+    type Error = anyhow::Error;
+
+    fn try_from(value: super::api::Port) -> Result<Self, Self::Error> {
+        Ok(crate::function_instance::Port {
+            id: crate::function_instance::PortId(value.port_id),
+            method: match value.method {
+                0 => crate::function_instance::PortMethod::Cast,
+                1 => crate::function_instance::PortMethod::Call,
+                _ => {
+                    return Err(anyhow::anyhow!("Unknown Port Method"));
+                }
+            },
+            data_type: crate::function_instance::PortDataType(value.data_type),
+            return_data_type: value.return_data_type.map(crate::function_instance::PortDataType),
+        })
     }
 }
 

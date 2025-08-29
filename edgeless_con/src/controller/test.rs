@@ -35,7 +35,9 @@ struct MockNode {
 }
 
 impl edgeless_api::agent::AgentAPI for MockNode {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>> {
+    fn function_instance_api(
+        &mut self,
+    ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>> {
         Box::new(MockFunctionInstanceAPI { sender: self.sender.clone() })
     }
 
@@ -48,15 +50,15 @@ impl edgeless_api::agent::AgentAPI for MockNode {
     ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>> {
         Box::new(MockResourceConfigurationAPI { sender: self.sender.clone() })
     }
-    
+
     fn node_management_api(&mut self) -> Box<dyn edgeless_api::node_management::NodeManagementAPI> {
         todo!()
     }
-    
+
     fn link_instance_api(&mut self) -> Box<dyn edgeless_api::link::LinkInstanceAPI> {
         todo!()
     }
-    
+
     fn proxy_instance_api(&mut self) -> Box<dyn edgeless_api::proxy_instance::ProxyInstanceAPI> {
         todo!()
     }
@@ -142,7 +144,7 @@ async fn test_setup() -> (
 ) {
     let (mock_orc_sender, mock_orc_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
     let node_id = uuid::Uuid::new_v4();
-    
+
     let mock_orc = MockNode {
         _node_id: node_id.clone(),
         sender: mock_orc_sender,
@@ -172,7 +174,7 @@ async fn single_function_start_stop() {
 
     let function_class_specification = edgeless_api::function_instance::FunctionClassSpecification {
         function_class_id: "fc1".to_string(),
-        function_class_type: "RUST_WASM".to_string(),
+        function_class_type: "WASM".to_string(),
         function_class_version: "0.1".to_string(),
         function_class_code: vec![],
         function_class_outputs: std::collections::HashMap::new(),
@@ -190,7 +192,7 @@ async fn single_function_start_stop() {
         workflow_resources: vec![],
         annotations: std::collections::HashMap::new(),
         workflow_egress_proxies: vec![],
-        workflow_ingress_proxies: vec![]
+        workflow_ingress_proxies: vec![],
     };
     let response = wf_client.start(start_workflow_request).await.unwrap();
 
@@ -250,7 +252,7 @@ async fn resource_to_function_start_stop() {
                 name: "f1".to_string(),
                 function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                     function_class_id: "fc1".to_string(),
-                    function_class_type: "RUST_WASM".to_string(),
+                    function_class_type: "WASM".to_string(),
                     function_class_version: "0.1".to_string(),
                     function_class_code: vec![],
                     function_class_outputs: std::collections::HashMap::new(),
@@ -383,7 +385,7 @@ async fn function_link_loop_start_stop() {
                     name: "f1".to_string(),
                     function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                         function_class_id: "fc1".to_string(),
-                        function_class_type: "RUST_WASM".to_string(),
+                        function_class_type: "WASM".to_string(),
                         function_class_version: "0.1".to_string(),
                         function_class_code: vec![],
                         function_class_outputs: std::collections::HashMap::from([(
@@ -416,7 +418,7 @@ async fn function_link_loop_start_stop() {
                     name: "f2".to_string(),
                     function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                         function_class_id: "fc2".to_string(),
-                        function_class_type: "RUST_WASM".to_string(),
+                        function_class_type: "WASM".to_string(),
                         function_class_version: "0.1".to_string(),
                         function_class_code: vec![],
                         function_class_outputs: std::collections::HashMap::from([(

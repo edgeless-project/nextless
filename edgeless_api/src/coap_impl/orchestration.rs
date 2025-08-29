@@ -61,7 +61,18 @@ impl CoapOrchestrationServer {
         let key_entry = self.received_tokens.entry(sender.ip());
 
         let mut capabilities = crate::node_registration::NodeCapabilities::empty();
-        capabilities.runtimes = registration.runtimes.iter().map(|i| String::from_str(i.as_str()).unwrap()).collect();
+        capabilities.runtimes = registration
+            .runtimes
+            .iter()
+            .map(|runtime| crate::node_registration::RuntimeType {
+                base_type: String::from_str(runtime.base_type.as_str()).unwrap(),
+                features: runtime
+                    .features
+                    .iter()
+                    .map(|feature| String::from_str(feature.as_str()).unwrap())
+                    .collect(),
+            })
+            .collect();
 
         let registration = crate::node_registration::UpdateNodeRequest::Registration(
             registration.node_id.0,

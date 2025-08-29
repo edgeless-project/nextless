@@ -12,7 +12,7 @@ LatencyHarness = edgeless_actor_class(
        sink("end")
     ],
     code = file("latency_harness.tar.gz"),
-    code_type = "RUST"
+    code_type = "RUST_BASE"
 )
 
 el_main = LatencyHarness

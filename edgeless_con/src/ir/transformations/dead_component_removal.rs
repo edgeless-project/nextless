@@ -33,10 +33,8 @@ impl DeadComponentRemoval {
 
         for (f_id, f) in &mut slf.functions {
             let mut f = f.borrow_mut();
-            let inner: std::collections::HashMap<
-                edgeless_api::function_instance::MappingNode,
-                std::collections::HashSet<edgeless_api::function_instance::MappingNode>,
-            > = f.image.class.inner_structure.clone();
+            let inner: std::collections::BTreeMap<edgeless_api::function_instance::MappingNode, Vec<edgeless_api::function_instance::MappingNode>> =
+                f.image.spec.inner_structure.clone();
             let ports = &mut f.logical_ports_mut();
             ports.logical_output_mapping.retain(|output_id, output_spec: &mut LogicalOutput| {
                 assert!(!std::matches!(output_spec, super::super::LogicalOutput::Topic(_)));
@@ -103,14 +101,15 @@ impl DeadComponentRemoval {
 
         for (f_id, f) in &mut slf.functions {
             let mut f = f.borrow_mut();
-            let class = f.image.class.clone();
+            let behavior = f.image.clone();
             let f_ports = &mut f.logical_ports_mut();
             f_ports.logical_input_mapping.retain(|input_id, input_spec| {
                 if let LogicalInput::Direct(mapped_inputs) = input_spec {
-                    let port_method = class.inputs.get(input_id).unwrap().method.clone();
+                    let port_method = behavior.spec.input_ports.get(input_id).unwrap().method.clone();
                     // We only need to worry about removing casts as calls will always be usefull
                     if port_method == edgeless_api::function_instance::PortMethod::Cast {
-                        let inner_for_this = class
+                        let inner_for_this = behavior
+                            .spec
                             .inner_structure
                             .get(&edgeless_api::function_instance::MappingNode::Port(input_id.clone()));
                         if let Some(inner_targets) = inner_for_this {

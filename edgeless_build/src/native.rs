@@ -8,9 +8,15 @@
 
 use super::BuildError;
 
+#[derive(PartialEq, Eq)]
 pub enum NativeTarget {
     AARCH64,
     AMD64,
+}
+
+#[derive(PartialEq, Eq)]
+pub enum NativeFeature {
+    Aes,
 }
 
 pub fn rust_to_dynlib(
@@ -19,6 +25,7 @@ pub fn rust_to_dynlib(
     enable_default_features: bool,
     enable_all_features: bool,
     target: NativeTarget,
+    features: Vec<NativeFeature>,
 ) -> Result<String, BuildError> {
     let cargo_project_path = std::fs::canonicalize(std::path::PathBuf::from(function_source_dir.clone())).map_err(|e| BuildError::Package {
         msg: format!("Bad Path: {function_source_dir}."),
@@ -27,15 +34,22 @@ pub fn rust_to_dynlib(
 
     let build_dir = std::env::temp_dir().join(format!("edgeless-{}", uuid::Uuid::new_v4()));
 
-    let target_tripple = match target {
-        NativeTarget::AARCH64 => "aarch64-edgeless-none-actor",
-        NativeTarget::AMD64 => "amd64-edgeless-none-actor",
-    };
-
-    let target_desc = if std::env::var("NO_AES").is_ok() {
-        format!("{}/build_config/aarch64/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))
-    } else {
-        format!("{}/build_config/aarch64_aes/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))
+    let (target_tripple, target_desc) = match target {
+        NativeTarget::AARCH64 => {
+            let build_config = if features.contains(&NativeFeature::Aes) {
+                format!("{}/build_config/aarch64/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))
+            } else {
+                format!("{}/build_config/aarch64_aes/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))
+            };
+            ("aarch64-edgeless-none-actor", build_config)
+        }
+        NativeTarget::AMD64 => {
+            // "amd64-edgeless-none-actor",
+            return Err(BuildError::Toolchain {
+                msg: "Native AMD64 Currently Unimplemented".to_string(),
+                source: None,
+            });
+        }
     };
 
     crate::rust::build_rust(

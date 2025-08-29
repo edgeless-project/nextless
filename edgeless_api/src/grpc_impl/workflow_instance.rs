@@ -17,12 +17,7 @@ impl WorkflowInstanceConverters {
     ) -> anyhow::Result<crate::workflow_instance::WorkflowFunction> {
         Ok(crate::workflow_instance::WorkflowFunction {
             name: api_function.name.clone(),
-            function_class_specification: crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_function_class_specification(
-                match &api_function.class_spec.as_ref() {
-                    Some(val) => val,
-                    None => return Err(anyhow::anyhow!("Missing Workflow FunctionClass")),
-                },
-            )?,
+            behavior: api_function.behavior.clone().ok_or(anyhow::anyhow!("Missing Behavior"))?.try_into()?,
             output_mapping: api_function
                 .output_mapping
                 .iter()
@@ -171,11 +166,7 @@ impl WorkflowInstanceConverters {
         crate::grpc_impl::api::WorkflowFunction {
             name: crate_function.name.clone(),
             annotations: crate_function.annotations.clone(),
-            class_spec: Some(
-                crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_function_class_specification(
-                    &crate_function.function_class_specification,
-                ),
-            ),
+            behavior: Some(crate_function.behavior.clone().into()),
             output_mapping: crate_function
                 .output_mapping
                 .iter()
@@ -460,10 +451,17 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::collections::HashMap;
 
     use super::*;
-    use crate::function_instance::FunctionClassSpecification;
+    use crate::behavior::Behavior;
+    use crate::behavior::BehaviorId;
+    use crate::behavior::BehaviorImageId;
+    use crate::behavior::BehaviorSpec;
+    use crate::behavior::EnabledPorts;
+    use crate::function_instance::PortId;
+    use crate::node_registration::RuntimeType;
     use crate::workflow_instance::SpawnWorkflowRequest;
     use crate::workflow_instance::SpawnWorkflowResponse;
     use crate::workflow_instance::WorkflowFunction;
@@ -506,33 +504,53 @@ mod tests {
 
         let messages = vec![WorkflowFunction {
             name: "f1".to_string(),
-            function_class_specification: FunctionClassSpecification {
-                function_class_id: "my_fun_class".to_string(),
-                function_class_type: "my_fun_class_type".to_string(),
-                function_class_version: "0.0.1".to_string(),
-                function_class_code: "byte-code".to_string().as_bytes().to_vec(),
-                function_class_outputs: HashMap::from([
-                    (crate::function_instance::PortId("out1".to_string()), out_prt_spec_1.clone()),
-                    (crate::function_instance::PortId("out2".to_string()), out_port_spec_2.clone()),
-                ]),
-                function_class_inputs: HashMap::from([
-                    (crate::function_instance::PortId("in1".to_string()), in_port_spec_1.clone()),
-                    (crate::function_instance::PortId("in2".to_string()), in_port_spec_2.clone()),
-                ]),
-                function_class_inner_structure: HashMap::from([
-                    (
-                        crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in1".to_string())),
-                        vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
-                            "out1".to_string(),
-                        ))],
-                    ),
-                    (
-                        crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in2".to_string())),
-                        vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
-                            "out2".to_string(),
-                        ))],
-                    ),
-                ]),
+            behavior: Behavior {
+                spec: BehaviorSpec {
+                    behavior_id: BehaviorId {
+                        id: "my_fun_class".to_string(),
+                        version: "0.0.1".to_string(),
+                    },
+                    input_ports: BTreeMap::from([
+                        (crate::function_instance::PortId("in1".to_string()), in_port_spec_1.clone()),
+                        (crate::function_instance::PortId("in2".to_string()), in_port_spec_2.clone()),
+                    ]),
+                    output_ports: BTreeMap::from([
+                        (crate::function_instance::PortId("out1".to_string()), out_prt_spec_1.clone()),
+                        (crate::function_instance::PortId("out2".to_string()), out_port_spec_2.clone()),
+                    ]),
+                    inner_structure: BTreeMap::from([
+                        (
+                            crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in1".to_string())),
+                            vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
+                                "out1".to_string(),
+                            ))],
+                        ),
+                        (
+                            crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in2".to_string())),
+                            vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
+                                "out2".to_string(),
+                            ))],
+                        ),
+                    ]),
+                },
+                main_image: Some(crate::behavior::BehaviorImage {
+                    behavior_image_id: BehaviorImageId {
+                        behaviour_id: BehaviorId {
+                            id: "my_fun_class".to_string(),
+                            version: "0.0.1".to_string(),
+                        },
+                        enabled_ports: EnabledPorts {
+                            enabled_inputs: std::collections::BTreeSet::from([PortId("in1".to_string()), PortId("in2".to_string())]),
+                            enabled_outputs: std::collections::BTreeSet::from([PortId("out1".to_string()), PortId("out2".to_string())]),
+                        },
+                        dialect_type: RuntimeType {
+                            base_type: "RUST".to_string(),
+                            features: Vec::new(),
+                        },
+                    },
+                    image: "byte-code".to_string().as_bytes().to_vec(),
+                }),
+                extra_images: Vec::new(),
             },
             output_mapping: HashMap::from([
                 (
@@ -604,33 +622,53 @@ mod tests {
         let messages = vec![SpawnWorkflowRequest {
             workflow_functions: vec![WorkflowFunction {
                 name: "f1".to_string(),
-                function_class_specification: FunctionClassSpecification {
-                    function_class_id: "my_fun_class".to_string(),
-                    function_class_type: "my_fun_class_type".to_string(),
-                    function_class_version: "0.0.1".to_string(),
-                    function_class_code: "byte-code".to_string().as_bytes().to_vec(),
-                    function_class_outputs: HashMap::from([
-                        (crate::function_instance::PortId("out1".to_string()), out_prt_spec_1.clone()),
-                        (crate::function_instance::PortId("out2".to_string()), out_port_spec_2.clone()),
-                    ]),
-                    function_class_inputs: HashMap::from([
-                        (crate::function_instance::PortId("in1".to_string()), in_port_spec_1.clone()),
-                        (crate::function_instance::PortId("in2".to_string()), in_port_spec_2.clone()),
-                    ]),
-                    function_class_inner_structure: HashMap::from([
-                        (
-                            crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in1".to_string())),
-                            vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
-                                "out1".to_string(),
-                            ))],
-                        ),
-                        (
-                            crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in2".to_string())),
-                            vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
-                                "out2".to_string(),
-                            ))],
-                        ),
-                    ]),
+                behavior: Behavior {
+                    spec: BehaviorSpec {
+                        behavior_id: BehaviorId {
+                            id: "my_fun_class".to_string(),
+                            version: "0.0.1".to_string(),
+                        },
+                        input_ports: BTreeMap::from([
+                            (crate::function_instance::PortId("in1".to_string()), in_port_spec_1.clone()),
+                            (crate::function_instance::PortId("in2".to_string()), in_port_spec_2.clone()),
+                        ]),
+                        output_ports: BTreeMap::from([
+                            (crate::function_instance::PortId("out1".to_string()), out_prt_spec_1.clone()),
+                            (crate::function_instance::PortId("out2".to_string()), out_port_spec_2.clone()),
+                        ]),
+                        inner_structure: BTreeMap::from([
+                            (
+                                crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in1".to_string())),
+                                vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
+                                    "out1".to_string(),
+                                ))],
+                            ),
+                            (
+                                crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in2".to_string())),
+                                vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
+                                    "out2".to_string(),
+                                ))],
+                            ),
+                        ]),
+                    },
+                    main_image: Some(crate::behavior::BehaviorImage {
+                        behavior_image_id: BehaviorImageId {
+                            behaviour_id: BehaviorId {
+                                id: "my_fun_class".to_string(),
+                                version: "0.0.1".to_string(),
+                            },
+                            enabled_ports: EnabledPorts {
+                                enabled_inputs: std::collections::BTreeSet::from([PortId("in1".to_string()), PortId("in2".to_string())]),
+                                enabled_outputs: std::collections::BTreeSet::from([PortId("out1".to_string()), PortId("out2".to_string())]),
+                            },
+                            dialect_type: RuntimeType {
+                                base_type: "RUST".to_string(),
+                                features: Vec::new(),
+                            },
+                        },
+                        image: "byte-code".to_string().as_bytes().to_vec(),
+                    }),
+                    extra_images: Vec::new(),
                 },
                 output_mapping: HashMap::from([
                     (

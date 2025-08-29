@@ -41,3 +41,5 @@ pub mod link;
 pub mod proxy_instance;
 
 pub mod image_repository;
+
+pub mod behavior;

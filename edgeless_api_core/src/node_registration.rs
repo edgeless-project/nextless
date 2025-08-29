@@ -12,7 +12,13 @@ pub struct EncodedNodeRegistration<'a> {
     pub agent_url: heapless::String<256>,
     pub invocation_url: heapless::String<256>,
     pub resources: heapless::Vec<ResourceProviderSpecification<'a>, 16>,
-    pub runtimes: heapless::Vec<heapless::String<32>, 4>, // 4: node capabilities
+    pub runtimes: heapless::Vec<EncodedRuntimeType, 4>, // 4: node capabilities
+}
+
+#[derive(Clone)]
+pub struct EncodedRuntimeType {
+    pub base_type: heapless::String<32>,
+    pub features: heapless::Vec<heapless::String<32>, 16>,
 }
 
 #[derive(Clone)]
@@ -60,7 +66,23 @@ impl<C> minicbor::Encode<C> for EncodedNodeRegistration<'_> {
         {
             e = e.array(self.runtimes.len().try_into().unwrap())?;
             for rt in &self.runtimes {
-                e = e.encode(rt.as_str())?;
+                e = e.encode(rt)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<C> minicbor::Encode<C> for EncodedRuntimeType {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+        let mut e = e;
+        e = e.encode(self.base_type.as_str())?;
+
+        {
+            e = e.array(self.features.len().try_into().unwrap())?;
+            for spec in &self.features {
+                e = e.encode(spec.as_str())?;
             }
         }
 
@@ -82,12 +104,9 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
             }
         }
 
-        let mut runtimes = heapless::Vec::<heapless::String<32>, 4>::new();
-        for item in d.array_iter::<&'b str>()?.flatten() {
-            if runtimes
-                .push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?)
-                .is_err()
-            {
+        let mut runtimes = heapless::Vec::<EncodedRuntimeType, 4>::new();
+        for item in d.array_iter::<EncodedRuntimeType>()?.flatten() {
+            if runtimes.push(item).is_err() {
                 log::error!("Too many Runtimes");
             }
         }
@@ -102,15 +121,43 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
     }
 }
 
+impl<'b, C> minicbor::Decode<'b, C> for EncodedRuntimeType {
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        let base_type: &str = d.str()?;
+
+        let mut features = heapless::Vec::<heapless::String<32>, 16>::new();
+        for item in d.array_iter::<&'b str>()?.flatten() {
+            if features
+                .push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?)
+                .is_err()
+            {
+                log::error!("Too many Runtime Features");
+            }
+        }
+
+        Ok(EncodedRuntimeType {
+            base_type: heapless::String::from_str(base_type).unwrap(),
+            features,
+        })
+    }
+}
+
 impl<C> minicbor::CborLen<C> for EncodedNodeRegistration<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let mut len = self.node_id.cbor_len(ctx) + self.agent_url.cbor_len(ctx) + self.invocation_url.cbor_len(ctx);
 
         len += self.resources[..self.resources.len()].cbor_len(ctx);
+        len + self.runtimes[..self.runtimes.len()].cbor_len(ctx)
+    }
+}
 
-        let rts: heapless::Vec<&str, 16> = self.runtimes.iter().map(|i| i.as_str()).collect();
+impl<C> minicbor::CborLen<C> for EncodedRuntimeType {
+    fn cbor_len(&self, ctx: &mut C) -> usize {
+        let len = self.base_type.cbor_len(ctx);
 
-        len + rts[..rts.len()].cbor_len(ctx)
+        let fts: heapless::Vec<&str, 16> = self.features.iter().map(|i| i.as_str()).collect();
+
+        len + fts[..fts.len()].cbor_len(ctx)
     }
 }
 

@@ -216,7 +216,8 @@ pub(crate) fn mock_nodes_and_candidates<'a>(
         .iter()
         .map(|c| crate::ir::transformations::placement::Candidate {
             node_id: c.clone(),
-            runtime: crate::ir::Runtime::WasmBase(runtime),
+            runtime: crate::ir::Runtime::WasmBase(runtime, std::collections::BTreeSet::new()),
+            runtime_features: std::collections::BTreeSet::new(),
         })
         .collect();
 
@@ -249,26 +250,33 @@ pub(crate) fn mock_workflow(
     }
 }
 
-pub(crate) fn mock_actor_image() -> crate::ir::actor::ActorImage {
-    crate::ir::actor::ActorImage {
-        id: crate::ir::actor::ActorImageIdent {
-            class_id: crate::ir::actor::ActorClassIdent {
-                id: "Foo".to_string(),
-                version: "0.1".to_string(),
-            },
-            format: "RUST_WASM".to_string(),
-            enabled_inputs: std::collections::BTreeSet::new(),
-            enabled_outputs: std::collections::BTreeSet::new(),
+pub(crate) fn mock_actor_image() -> crate::ir::actor::Behavior {
+    let behavior_id = crate::ir::actor::BehaviorId {
+        id: "Foo".to_string(),
+        version: "0.1".to_string(),
+    };
+
+    crate::ir::actor::Behavior {
+        spec: crate::ir::actor::BehaviorSpec {
+            behavior_id: behavior_id.clone(),
+            input_ports: std::collections::BTreeMap::new(),
+            output_ports: std::collections::BTreeMap::new(),
+            inner_structure: std::collections::BTreeMap::new(),
         },
-        class: crate::ir::actor::ActorClass {
-            id: crate::ir::actor::ActorClassIdent {
-                id: "Foo".to_string(),
-                version: "0.1".to_string(),
+        main_image: crate::ir::actor::BehaviorImage {
+            behavior_image_id: crate::ir::actor::BehaviorImageId {
+                behavior_id: behavior_id,
+                enabled_ports: edgeless_api::behavior::EnabledPorts {
+                    enabled_inputs: std::collections::BTreeSet::new(),
+                    enabled_outputs: std::collections::BTreeSet::new(),
+                },
+                dialect_type: crate::ir::actor::DialectType {
+                    base_type: "WASM".to_string(),
+                    features: std::collections::BTreeSet::new(),
+                },
             },
-            inputs: std::collections::HashMap::new(),
-            outputs: std::collections::HashMap::new(),
-            inner_structure: std::collections::HashMap::new(),
+            image: Vec::new(),
         },
-        code: Vec::new(),
+        extra_images: Vec::new(),
     }
 }

@@ -11,7 +11,7 @@ pub trait ScoreableRuntime {
 impl ScoreableRuntime for crate::ir::Runtime<'_> {
     fn load_score(&self) -> f32 {
         match self {
-            crate::ir::Runtime::WasmBase(wasm_runtime) => {
+            crate::ir::Runtime::WasmBase(wasm_runtime, _features) => {
                 if let Some(runtime_info) = wasm_runtime.runtime_info() {
                     let cpu_load_score = 1.0 - (runtime_info.cpu_load() / wasm_runtime.num_cores() as f32);
                     let memory_load_score = 1.0 - (runtime_info.mem_used() / wasm_runtime.mem_size_bytes() as f32);
@@ -20,7 +20,7 @@ impl ScoreableRuntime for crate::ir::Runtime<'_> {
                     0.01f32
                 }
             }
-            crate::ir::Runtime::NativeBase(native_runtime) => {
+            crate::ir::Runtime::NativeBase(native_runtime, _features) => {
                 if let Some(runtime_info) = native_runtime.runtime_info() {
                     let cpu_load_score = 1.0 - (runtime_info.cpu_load() / native_runtime.num_cores() as f32);
                     let memory_load_score = 1.0 - (runtime_info.mem_used() / native_runtime.mem_size_bytes() as f32);
@@ -34,17 +34,17 @@ impl ScoreableRuntime for crate::ir::Runtime<'_> {
 
     fn efficiency_score(&self) -> f32 {
         match self {
-            super::Runtime::WasmBase(_wasm_runtime) => 0.95,
-            super::Runtime::NativeBase(_native_runtime) => 1.0,
+            super::Runtime::WasmBase(_wasm_runtime, _features) => 0.95,
+            super::Runtime::NativeBase(_native_runtime, _features) => 1.0,
         }
     }
 
     fn capacity_score(&self) -> f64 {
         match self {
-            super::Runtime::WasmBase(wasm_runtime) => {
+            super::Runtime::WasmBase(wasm_runtime, _features) => {
                 ((wasm_runtime.cpu_freq_hz() as f64 * wasm_runtime.num_cores() as f64) / (5_000f64 * 128f64)).clamp(0.01f64, 1f64)
             }
-            super::Runtime::NativeBase(native_runtime) => {
+            super::Runtime::NativeBase(native_runtime, _features) => {
                 ((native_runtime.cpu_freq_hz() as f64 * native_runtime.num_cores() as f64) / (5_000f64 * 128f64)).clamp(0.01f64, 1f64)
             }
         }

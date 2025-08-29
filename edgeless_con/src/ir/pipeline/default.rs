@@ -11,7 +11,8 @@ pub struct DefaultTransformationPipeline<P: PlacementStrategy> {
 
 pub struct DefaultTransformationPipelineState<PS: Sync + Send> {
     pub placement_strategy_state: PS,
-    pub physical_pipeline_state: super::default_physical::PhysicalPipelineState,
+    pub pipe_generator_state: crate::ir::transformations::pipe_generator::PipeGeneratorState,
+    pub image_cache: crate::ir::support::image_cache::ImageCache,
 }
 
 impl<P: PlacementStrategy> DefaultTransformationPipeline<P> {
@@ -33,10 +34,24 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
         global_state: &DefaultTransformationPipelineState<P::GlobalState>,
     ) {
         self.logical_pipeline.apply_all(workflow, nodes, peer_clusters, &());
-        self.orchestration
-            .apply_all(workflow, nodes, peer_clusters, &global_state.placement_strategy_state);
-        self.physical_pipeline
-            .apply_all(workflow, nodes, peer_clusters, &global_state.physical_pipeline_state);
+        self.orchestration.apply_all(
+            workflow,
+            nodes,
+            peer_clusters,
+            &crate::ir::transformations::placement::PlacementState::<P> {
+                strategy_state: &global_state.placement_strategy_state,
+                image_chache: &global_state.image_cache,
+            },
+        );
+        self.physical_pipeline.apply_all(
+            workflow,
+            nodes,
+            peer_clusters,
+            &super::default_physical::PhysicalPipelineState {
+                pipe_generator_state: &global_state.pipe_generator_state,
+                compiler_state: &global_state.image_cache,
+            },
+        );
     }
 
     fn apply_dynamic(
@@ -46,9 +61,23 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
         peer_clusters: &crate::ir::Clusters,
         global_state: &DefaultTransformationPipelineState<P::GlobalState>,
     ) {
-        self.orchestration
-            .apply_all(workflow, nodes, peer_clusters, &global_state.placement_strategy_state);
-        self.physical_pipeline
-            .apply_all(workflow, nodes, peer_clusters, &global_state.physical_pipeline_state);
+        self.orchestration.apply_all(
+            workflow,
+            nodes,
+            peer_clusters,
+            &crate::ir::transformations::placement::PlacementState::<P> {
+                strategy_state: &global_state.placement_strategy_state,
+                image_chache: &global_state.image_cache,
+            },
+        );
+        self.physical_pipeline.apply_all(
+            workflow,
+            nodes,
+            peer_clusters,
+            &super::default_physical::PhysicalPipelineState {
+                pipe_generator_state: &global_state.pipe_generator_state,
+                compiler_state: &global_state.image_cache,
+            },
+        );
     }
 }

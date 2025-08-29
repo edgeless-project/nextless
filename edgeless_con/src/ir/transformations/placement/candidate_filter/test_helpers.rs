@@ -24,9 +24,13 @@ pub(crate) fn mock_function_under_test(
                 std::cell::RefCell::new(crate::ir::PhysicalComponentState::Materialized(Box::new(
                     crate::ir::actor::PhysicalActor {
                         id: instance_id,
-                        runtime_type: "RUST_WASM".to_string(),
+                        runtime_type: crate::ir::actor::DialectType {
+                            base_type: "WASM".to_string(),
+                            features: std::collections::BTreeSet::new(),
+                        },
                         creation_time: std::time::Instant::now(),
-                        image: crate::ir::test::mock_actor_image(),
+                        image: crate::ir::test::mock_actor_image().main_image,
+                        behavior_spec: crate::ir::test::mock_actor_image().spec,
                         desired_mapping: crate::ir::PhysicalPorts {
                             physical_output_mapping: std::collections::HashMap::new(),
                             physical_input_mapping: std::collections::HashMap::new(),
@@ -76,9 +80,13 @@ pub(crate) fn mock_peer_function(
                 std::cell::RefCell::new(crate::ir::PhysicalComponentState::Materialized(Box::new(
                     crate::ir::actor::PhysicalActor {
                         id: instance_id,
-                        runtime_type: "RUST_WASM".to_string(),
+                        runtime_type: crate::ir::actor::DialectType {
+                            base_type: "WASM".to_string(),
+                            features: std::collections::BTreeSet::new(),
+                        },
                         creation_time: std::time::Instant::now(),
-                        image: crate::ir::test::mock_actor_image(),
+                        image: crate::ir::test::mock_actor_image().main_image,
+                        behavior_spec: crate::ir::test::mock_actor_image().spec,
                         desired_mapping: crate::ir::PhysicalPorts {
                             physical_output_mapping: std::collections::HashMap::new(),
                             physical_input_mapping: std::collections::HashMap::new(),

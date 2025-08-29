@@ -40,7 +40,7 @@ pub struct ResourceDesc {
 
 impl Agent {
     pub fn new(
-        runners: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
+        runners: std::collections::HashMap<edgeless_api::node_registration::RuntimeType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
         resources: std::collections::HashMap<String, ResourceDesc>,
         node_id: uuid::Uuid,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
@@ -61,9 +61,7 @@ impl Agent {
 
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>,
-        // runners-key: class_type
-        // runners-value: RuntimeBox
-        mut runners: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
+        mut runners: std::collections::HashMap<edgeless_api::node_registration::RuntimeType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
         resources: std::collections::HashMap<String, ResourceDesc>,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
         mut proxy: Box<dyn ProxyInstanceAPI>,
@@ -107,8 +105,8 @@ impl Agent {
                     component_id_to_class_map.insert(spawn_req.instance_id, spawn_req.code.function_class_type.clone());
 
                     // Get runner for function_class of spawn_req
-                    match runners.get_mut(&spawn_req.code.function_class_type) {
-                        Some(r) => {
+                    match runners.iter_mut().find(|(k, _)| k.base_type == spawn_req.code.function_class_type) {
+                        Some((_, r)) => {
                             // Forward the start request to the correct runner
                             match r.start(*spawn_req).await {
                                 Ok(_) => {}
@@ -137,8 +135,8 @@ impl Agent {
                     };
 
                     // Get runner for function_class
-                    match runners.get_mut(&function_class) {
-                        Some(r) => {
+                    match runners.iter_mut().find(|(k, _)| k.base_type == function_class) {
+                        Some((_, r)) => {
                             // Forward the stop request to the correct runner
                             match r.stop(stop_function_id).await {
                                 Ok(_) => {
@@ -173,8 +171,8 @@ impl Agent {
                     };
 
                     // Get runner for function_class
-                    match runners.get_mut(&function_class) {
-                        Some(r) => {
+                    match runners.iter_mut().find(|(k, _)| k.base_type == function_class) {
+                        Some((_, r)) => {
                             // Forward the patch request to the correct runner
                             match r.patch(update).await {
                                 Ok(_) => {}

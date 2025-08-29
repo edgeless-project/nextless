@@ -5,7 +5,7 @@ GPUExample = edgeless_actor_class(
     inputs = [cast_input("trigger", "String")],
     inner_structure = [sink("trigger")],
     code = file("gpu_example.wasm"),
-    code_type = "RUST_WASM"
+    code_type = "WASM_WGPU"
 )
 
 el_main = GPUExample

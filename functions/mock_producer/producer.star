@@ -9,7 +9,7 @@ MockProducer = edgeless_actor_class(
         source("output{}".format(x)) for x in range(1, 11)
     ],
     code = file("mock_producer.tar.gz"),
-    code_type = "RUST"
+    code_type = "RUST_BASE"
 )
 
 el_main = MockProducer

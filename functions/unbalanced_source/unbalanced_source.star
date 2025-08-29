@@ -11,7 +11,7 @@ UnbalancedSource = edgeless_actor_class(
        source("infrequent")
     ],
     code = file("unbalanced_source.tar.gz"),
-    code_type = "RUST"
+    code_type = "RUST_BASE"
 )
 
 el_main = UnbalancedSource

@@ -8,7 +8,7 @@ MessagingTest = edgeless_actor_class(
         sink("test_call")
     ],
     code = file("messaging_test.wasm"),
-    code_type = "RUST_WASM"
+    code_type = "WASM_BASE"
 )
 
 el_main = MessagingTest

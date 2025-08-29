@@ -119,7 +119,7 @@ async fn basic_lifecycle() {
         instance_id,
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
-            function_class_type: "RUST_WASM".to_string(),
+            function_class_type: "WASM".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
             function_class_outputs: std::collections::HashMap::new(),
@@ -205,7 +205,7 @@ async fn messaging_test_setup() -> (
         instance_id,
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
-            function_class_type: "RUST_WASM".to_string(),
+            function_class_type: "WASM".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
             function_class_outputs: std::collections::HashMap::new(),
@@ -585,7 +585,7 @@ async fn state_management() {
         instance_id,
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
-            function_class_type: "RUST_WASM".to_string(),
+            function_class_type: "WASM".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: include_bytes!("fixtures/state_test.wasm").to_vec(),
             function_class_outputs: std::collections::HashMap::new(),

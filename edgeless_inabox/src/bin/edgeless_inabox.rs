@@ -117,9 +117,9 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 metrics_url: next_url(),
                 controller_url: con_conf.controller_url.clone(),
             },
-            wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
+            wasmtime_runtime: Some(edgeless_node::EdgelessNodeWasmtimeRuntimeSettings { enabled: true, wgpu: None }),
             native_runtime: None,
-            container_runtime: None,
+            wasmi_runtime: None,
             resources: Some(EdgelessNodeResourceSettings {
                 http_ingress_url: match first_node {
                     true => Some(next_url()),

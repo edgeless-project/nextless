@@ -5,7 +5,7 @@ HTTPProcessor = edgeless_actor_class(
     inputs = [call_input("new_req", "edgeless.http.Request", "edgeless.http.Response")],
     inner_structure = [sink("new_req")],
     code = file("http_processor.tar.gz"),
-    code_type = "RUST"
+    code_type = "RUST_BASE"
 )
 
 el_main = HTTPProcessor

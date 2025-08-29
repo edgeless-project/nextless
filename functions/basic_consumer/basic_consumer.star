@@ -7,7 +7,7 @@ BasicConsumer = edgeless_actor_class(
         sink("data_in")
     ],
     code = file("basic_consumer.tar.gz"),
-    code_type = "RUST"
+    code_type = "RUST_BASE"
 )
 
 el_main = BasicConsumer

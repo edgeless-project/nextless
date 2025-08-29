@@ -78,6 +78,44 @@ message FunctionClassSpecification {
     repeated Mapping function_class_inner_structure = 7;
 }
 
+message PortId {
+    string id = 1;
+}
+
+message BehaviorId {
+    string id = 1;
+    string version = 2;
+}
+
+message EnabledPorts {
+    repeated PortId enabled_inputs = 1;
+    repeated PortId enabled_outputs = 2;
+}
+
+message BehaviorImageId {
+    BehaviorId behavior_id = 1;
+    EnabledPorts enabled_ports = 2;
+    RuntimeType dialect_type = 3;
+}
+
+message BehaviorImage {
+    BehaviorImageId behavior_image_id = 1;
+    bytes image = 2;
+}
+
+message BehaviorSpec {
+    BehaviorId behavior_id = 1;
+    map<string, Port> output_ports = 2;
+    map<string, Port> input_ports = 3;
+    repeated Mapping inner_structure = 4;
+}
+
+message Behavior {
+    BehaviorSpec spec = 1;
+    optional BehaviorImage main_image = 2;
+    repeated BehaviorImage extra_images = 3;
+}
+
 // Message to request the creation a new function instance.
 message SpawnFunctionRequest {
     // The function instance identifier.
@@ -163,7 +201,12 @@ message NodeCapabilities {
     // True if the node has a Trusted Platform Module for authenticated registration.
     bool has_tpm             = 40;
     // List of run-times supported by the node.
-    repeated string runtimes = 50;
+    repeated RuntimeType runtimes = 50;
+}
+
+message RuntimeType {
+    string base_type = 1;
+    repeated string features = 2;
 }
 
 // Response message of FunctionInstance::UpdateNode().
@@ -286,7 +329,7 @@ message WorkflowFunction {
     // Name of this function within the workflow.
     string name = 1;
     // Specification of the function.
-    FunctionClassSpecification class_spec = 2;
+    Behavior behavior = 2;
     // Mapping of the outputs to other functions/resources in the workflow.
     map<string, PortMapping> output_mapping = 3;
     // Annotations associated with this function, if any.

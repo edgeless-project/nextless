@@ -5,7 +5,7 @@ MessageGenerator = edgeless_actor_class(
     inputs = [],
     inner_structure = [source("message")],
     code = file("message_generator.tar.gz"),
-    code_type = "RUST"
+    code_type = "RUST_BASE"
 )
 
 el_main = MessageGenerator

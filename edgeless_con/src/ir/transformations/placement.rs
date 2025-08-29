@@ -8,7 +8,7 @@ mod feasibility;
 mod scoring;
 pub mod strategy;
 
-use crate::ir::transformations::placement::candidate_filter::FilterStrategy;
+use crate::ir::{support::image_cache, transformations::placement::candidate_filter::FilterStrategy};
 
 use super::super::*;
 use scoring::ScoreableRuntime;
@@ -29,13 +29,18 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
     }
 }
 
-impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalState> for DefaultPlacement<P> {
+pub struct PlacementState<'a, P: strategy::PlacementStrategy> {
+    pub strategy_state: &'a P::GlobalState,
+    pub image_chache: &'a crate::ir::support::image_cache::ImageCache,
+}
+
+impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<PlacementState<'a, P>> for DefaultPlacement<P> {
     fn apply(
         &mut self,
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
-        global_state: &P::GlobalState,
+        global_state: &PlacementState<P>,
     ) {
         for (f_id, function) in &workflow.functions {
             let mut function = function.borrow_mut();
@@ -194,6 +199,7 @@ impl<P: strategy::PlacementStrategy> super::StatefulTransformation<P::GlobalStat
 pub struct Candidate<'a> {
     pub(crate) node_id: edgeless_api::function_instance::NodeId,
     pub(crate) runtime: crate::ir::Runtime<'a>,
+    pub(crate) runtime_features: std::collections::BTreeSet<crate::ir::DialectFeature>,
 }
 impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
     fn spawn_new(
@@ -202,23 +208,29 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         logical_name: String,
         function: &crate::ir::actor::LogicalActor,
         nodes: &crate::ir::Nodes,
-        global_state: &P::GlobalState,
+        global_state: &PlacementState<P>,
         new_instance: bool,
     ) -> Option<PhysicalComponentState> {
-        let candidates = find_candidates_for_actor(function, nodes, new_instance);
+        let candidates = find_candidates_for_actor(function, nodes, new_instance, global_state.image_chache);
         let mut filtered = self.dynamic_colocation_filter.filter_candidates(function, candidates, workflow);
         if filtered.len() > 1 {
             filtered = self.static_colocation_filter.filter_candidates(function, filtered, workflow);
         };
-        let dst = self.placement_strategy.select_candidate(filtered, global_state);
+        let dst = self.placement_strategy.select_candidate(filtered, global_state.strategy_state);
 
         if let Some(dst) = dst {
+            log::info!("Target: {}, {:?}", dst.runtime.id(), dst.runtime_features);
             let new_id = edgeless_api::function_instance::InstanceId::new(dst.node_id);
             let new_instance = actor::PhysicalActor {
                 id: new_id,
-                runtime_type: dst.runtime.id(),
+                runtime_type: crate::ir::actor::DialectType {
+                    base_type: dst.runtime.id(),
+                    features: dst.runtime_features,
+                },
                 desired_mapping: PhysicalPorts::default(),
-                image: function.image.clone(),
+                //TODO (use correct image)
+                image: function.image.main_image.clone(),
+                behavior_spec: function.image.spec.clone(),
                 materialized: None,
                 creation_time: std::time::Instant::now(),
                 component_name: logical_name,
@@ -234,8 +246,68 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
     }
 }
 
-fn find_candidates_for_actor<'b>(actor: &actor::LogicalActor, nodes: &'b crate::ir::Nodes, new_instance: bool) -> Vec<Candidate<'b>> {
+fn find_candidates_for_actor<'b>(
+    actor: &actor::LogicalActor,
+    nodes: &'b crate::ir::Nodes,
+    new_instance: bool,
+    image_cache: &crate::ir::support::image_cache::ImageCache,
+) -> Vec<Candidate<'b>> {
     let mut candiates = Vec::new();
+
+    if new_instance {
+        for node in nodes.values() {
+            let mut node_cadidates: Vec<_> = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance)
+                .into_iter()
+                .filter(|c| {
+                    let image_ident = crate::ir::actor::BehaviorImageId {
+                        behavior_id: actor.image.spec.behavior_id.clone(),
+                        enabled_ports: crate::ir::actor::EnabledPorts {
+                            enabled_inputs: actor.enabled_inputs().iter().cloned().collect(),
+                            enabled_outputs: actor.enabled_outputs().iter().cloned().collect(),
+                        },
+                        dialect_type: crate::ir::actor::DialectType {
+                            base_type: c.runtime.id(),
+                            features: c.runtime_features.clone(),
+                        },
+                    };
+
+                    for extra in actor.image.extra_images.clone() {
+                        log::info!("Got Extra Image");
+                        image_cache.insert_blocking(extra);
+                    }
+
+                    let existing = image_cache.get_blocking(&image_ident);
+
+                    match existing {
+                        image_cache::CacheResult::NotFound => {}
+                        image_cache::CacheResult::PartialMatch(partial_match) => {
+                            log::info!("Partial Image");
+                            let existing_images: Vec<_> = partial_match
+                                .same_or_more_ports(&image_ident)
+                                .same_runtime_feature_subset(&image_ident)
+                                .into();
+                            if !existing_images.is_empty() {
+                                return true;
+                            }
+                        }
+                        image_cache::CacheResult::FullMatch(_) => {
+                            log::info!("Full Image");
+                            return true;
+                        }
+                    }
+                    false
+                })
+                .collect();
+            node_cadidates.sort_by(|a, b| a.runtime.efficiency_score().total_cmp(&b.runtime.efficiency_score()));
+            if let Some(c) = node_cadidates.pop() {
+                candiates.push(c);
+            }
+        }
+    }
+
+    if !candiates.is_empty() {
+        return candiates;
+    }
 
     for node in nodes.values() {
         let mut node_cadidates = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance);

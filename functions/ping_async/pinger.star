@@ -5,7 +5,7 @@ Pinger = edgeless_actor_class(
     inputs = [cast_input("pong", "edgeless.example.Pong")],
     inner_structure = [source("ping"), sink("pong")],
     code = file("ping_async.tar.gz"),
-    code_type = "RUST"
+    code_type = "RUST_BASE"
 )
 
 el_main = Pinger

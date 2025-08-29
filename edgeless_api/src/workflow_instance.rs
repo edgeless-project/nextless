@@ -71,7 +71,7 @@ pub enum PortMapping {
 #[derive(Clone, Debug, serde::Deserialize, PartialEq)]
 pub struct WorkflowFunction {
     pub name: String,
-    pub function_class_specification: crate::function_instance::FunctionClassSpecification,
+    pub behavior: crate::behavior::Behavior,
     pub output_mapping: std::collections::HashMap<super::function_instance::PortId, PortMapping>,
     pub input_mapping: std::collections::HashMap<super::function_instance::PortId, PortMapping>,
     pub annotations: std::collections::HashMap<String, String>,
