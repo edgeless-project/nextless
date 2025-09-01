@@ -42,14 +42,6 @@ struct Args {
 #[derive(serde::Deserialize)]
 struct CLiConfig {
     controller_url: String,
-    function_repository: Option<FunctionRepositoryConfig>,
-}
-
-#[derive(serde::Deserialize)]
-struct FunctionRepositoryConfig {
-    pub url: String,
-    pub basic_auth_user: String,
-    pub basic_auth_pass: String,
 }
 
 #[tokio::main]
@@ -85,11 +77,6 @@ async fn main() -> anyhow::Result<()> {
 pub fn edgeless_cli_default_conf() -> String {
     String::from(
         r##"controller_url = "http://127.0.0.1:7001"
-
-#[function_repository]
-#url = ""
-#basic_auth_user = ""
-#basic_auth_pass = ""
 "##,
     )
 }
