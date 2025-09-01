@@ -11,10 +11,6 @@ edition = "2021"
 name = "edgeless_cli"
 path = "src/edgeless_cli.rs"
 
-[lib]
-name = "edgeless_cli"
-path = "src/lib.rs"
-
 [dependencies]
 log = "0.4"
 env_logger = "0.10"
