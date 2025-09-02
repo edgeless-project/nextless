@@ -82,7 +82,7 @@ impl LatencyHarnessAPI<'_> for LatencyHarness {
             (
                 configuration[0].parse::<u64>().unwrap(),
                 configuration[1].parse::<u64>().unwrap(),
-                configuration[1].parse::<u64>().unwrap(),
+                configuration[2].parse::<u64>().unwrap(),
             )
         } else {
             (100, 1000, 0)

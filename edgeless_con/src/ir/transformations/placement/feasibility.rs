@@ -118,8 +118,6 @@ fn runtime_supported(
             Some(enabled_features)
         }
         super::Runtime::NativeBase(_native_runtime, _features) => {
-            log::info!("WHY NOT NATIVE");
-
             if !["RUST", "NATIVE"].contains(&source_format.base_type.as_str()) || disable_native {
                 return None;
             }

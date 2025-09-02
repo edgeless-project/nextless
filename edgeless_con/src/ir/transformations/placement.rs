@@ -44,12 +44,15 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
     ) {
         for (f_id, function) in &workflow.functions {
             let mut function = function.borrow_mut();
+
+            let num_active_instances = function.instances.iter().filter(|i| i.borrow().try_unpack_active().is_some()).count();
+
             let mut new_instances = Vec::new();
             for i in &function.instances {
                 let mut i = i.borrow_mut();
                 match &mut *i {
                     PhysicalComponentState::Requested => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, true);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, true, num_active_instances < 1);
                         if let Some(new_instance) = new_instance {
                             *i = new_instance;
                         } else {
@@ -61,7 +64,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         }
                     }
                     PhysicalComponentState::MigrationRequested(c) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false, false);
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             if new_id.node_id == c.id().node_id {
@@ -90,7 +93,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         }
                     }
                     PhysicalComponentState::Lost(_) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false, num_active_instances < 1);
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             new_instances.push(std::cell::RefCell::new(new_instance));
@@ -98,7 +101,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         }
                     }
                     PhysicalComponentState::Dead(_) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false, num_active_instances < 1);
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             new_instances.push(std::cell::RefCell::new(new_instance));
@@ -210,8 +213,9 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         nodes: &crate::ir::Nodes,
         global_state: &PlacementState<P>,
         new_instance: bool,
+        urgent: bool,
     ) -> Option<PhysicalComponentState> {
-        let candidates = find_candidates_for_actor(function, nodes, new_instance, global_state.image_chache);
+        let candidates = find_candidates_for_actor(function, nodes, new_instance, urgent, global_state.image_chache);
         let mut filtered = self.dynamic_colocation_filter.filter_candidates(function, candidates, workflow);
         if filtered.len() > 1 {
             filtered = self.static_colocation_filter.filter_candidates(function, filtered, workflow);
@@ -250,11 +254,12 @@ fn find_candidates_for_actor<'b>(
     actor: &actor::LogicalActor,
     nodes: &'b crate::ir::Nodes,
     new_instance: bool,
+    urgent: bool,
     image_cache: &crate::ir::support::image_cache::ImageCache,
 ) -> Vec<Candidate<'b>> {
     let mut candiates = Vec::new();
 
-    if new_instance {
+    if urgent {
         for node in nodes.values() {
             let mut node_cadidates: Vec<_> = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance)
                 .into_iter()
