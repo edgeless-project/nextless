@@ -7,7 +7,10 @@
 // Based on the example loader in https://github.com/gz/rust-elfloader
 // Usage of rustix for mmap/mprotect inspired by wasmtime (darwin does not allow concurrent Write&Execute).
 
+#[cfg(target_arch = "aarch64")]
 const PAGE_SIZE: usize = 0x10000;
+#[cfg(target_arch = "x86_64")]
+const PAGE_SIZE: usize = 4096;
 
 pub(crate) struct ActorLoader {
     data: *mut u8,
@@ -69,6 +72,12 @@ impl elfloader::ElfLoader for ActorLoader {
             let dst: *mut *mut u8 = self.data.add((entry.offset) as usize).cast();
             match entry.rtype {
                 elfloader::RelocationType::AArch64(elfloader::arch::aarch64::RelocationTypes::R_AARCH64_RELATIVE) => {
+                    let addend = entry.addend.ok_or(elfloader::ElfLoaderErr::UnsupportedRelocationEntry)?;
+                    let t: *mut u8 = self.data.add(addend as usize).cast();
+                    *dst = t;
+                    Ok(())
+                }
+                elfloader::RelocationType::x86_64(elfloader::arch::x86_64::RelocationTypes::R_AMD64_RELATIVE) => {
                     let addend = entry.addend.ok_or(elfloader::ElfLoaderErr::UnsupportedRelocationEntry)?;
                     let t: *mut u8 = self.data.add(addend as usize).cast();
                     *dst = t;

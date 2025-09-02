@@ -44,11 +44,8 @@ pub fn rust_to_dynlib(
             ("aarch64-edgeless-none-actor", build_config)
         }
         NativeTarget::AMD64 => {
-            // "amd64-edgeless-none-actor",
-            return Err(BuildError::Toolchain {
-                msg: "Native AMD64 Currently Unimplemented".to_string(),
-                source: None,
-            });
+            let build_config = format!("{}/build_config/amd64/x86_64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"));
+            ("x86_64-edgeless-none-actor", build_config)
         }
     };
 

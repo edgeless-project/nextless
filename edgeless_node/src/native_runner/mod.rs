@@ -6,16 +6,22 @@
 mod host_api;
 mod loader;
 
+static ARENA_LEN: usize = 128 * 1024 * 1024;
+
 pub struct NativeFunctionInstance {
     fns: edgeless_actor_abi::GuestApi<'static>,
     host_api: *mut host_api::HostApiImpl,
     // Stored to ensure the memory is cleaned up.
     _actor: loader::LoadedActor,
+    buffer: *mut u8,
 }
 
 impl Drop for NativeFunctionInstance {
     fn drop(&mut self) {
         core::mem::drop(unsafe { Box::from_raw(self.host_api) });
+        unsafe {
+            rustix::mm::munmap(self.buffer as *mut std::ffi::c_void, ARENA_LEN).unwrap();
+        }
     }
 }
 
@@ -29,11 +35,16 @@ impl crate::base_runtime::FunctionInstanceSync for NativeFunctionInstance {
         code: &[u8],
     ) -> crate::base_runtime::FunctionInstanceResult<Box<Self>> {
         unsafe {
-            let buffer = Box::<[u8; 128 * 1024 * 1024]>::new_uninit();
-            let mut buffer = buffer.assume_init();
+            let buffer = rustix::mm::mmap_anonymous(
+                std::ptr::null_mut(),
+                ARENA_LEN,
+                rustix::mm::ProtFlags::WRITE | rustix::mm::ProtFlags::READ,
+                rustix::mm::MapFlags::PRIVATE,
+            )
+            .unwrap() as *mut u8;
             let mut alloc = talc::Talc::new(talc::ErrOnOom);
             alloc
-                .claim(talc::Span::from_array(&mut *buffer))
+                .claim(talc::Span::from_base_size(buffer, ARENA_LEN))
                 .map_err(|_| crate::base_runtime::FunctionInstanceError::Internal(anyhow::anyhow!("Could not claim Memory")))?;
 
             // The elfloader / xmas-elf require the parsed elf to reside on aligned memory.
@@ -73,6 +84,7 @@ impl crate::base_runtime::FunctionInstanceSync for NativeFunctionInstance {
             let handler = actor.instantiate(api.as_mut().unwrap());
 
             Ok(Box::new(Self {
+                buffer,
                 _actor: actor,
                 host_api: api,
                 fns: handler,
