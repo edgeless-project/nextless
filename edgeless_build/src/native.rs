@@ -33,28 +33,55 @@ pub fn rust_to_dynlib(
     })?;
 
     let build_dir = std::env::temp_dir().join(format!("edgeless-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&build_dir).map_err(|e| BuildError::Toolchain {
+        msg: "Could not write target config".to_string(),
+        source: Some(e.into()),
+    })?;
 
     let (target_tripple, target_desc) = match target {
         NativeTarget::AARCH64 => {
-            let build_config = if features.contains(&NativeFeature::Aes) {
-                format!("{}/build_config/aarch64/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))
+            let extra_features = if features.contains(&NativeFeature::Aes) {
+                vec!["+aes".to_string()]
             } else {
-                format!("{}/build_config/aarch64_aes/aarch64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"))
+                Vec::new()
             };
-            ("aarch64-edgeless-none-actor", build_config)
+
+            let target_desc = super::rust::cargo_target::aarch64_target(extra_features);
+
+            ("aarch64-edgeless-none-actor", target_desc)
         }
         NativeTarget::AMD64 => {
-            let build_config = format!("{}/build_config/amd64/x86_64-edgeless-none-actor.json", env!("CARGO_MANIFEST_DIR"));
-            ("x86_64-edgeless-none-actor", build_config)
+            let extra_features = Vec::new();
+            let target_desc = super::rust::cargo_target::amd64_target(extra_features);
+
+            ("x86_64-edgeless-none-actor", target_desc)
         }
     };
+
+    let config_str = serde_json::to_string(&target_desc).map_err(|e| BuildError::Toolchain {
+        msg: "Could not serialize target config".to_string(),
+        source: Some(e.into()),
+    })?;
+    let config_path = build_dir.join(format!("{target_tripple}.json"));
+    std::fs::write(&config_path, config_str).map_err(|e| BuildError::Toolchain {
+        msg: "Could not write target config".to_string(),
+        source: Some(e.into()),
+    })?;
+
+    let config_path_str = config_path
+        .to_str()
+        .ok_or(BuildError::Toolchain {
+            msg: "Target config file path string error".to_string(),
+            source: None,
+        })?
+        .to_string();
 
     crate::rust::build_rust(
         cargo_project_path.clone(),
         enabled_features,
         enable_default_features,
         enable_all_features,
-        target_desc,
+        config_path_str,
         target_tripple.to_string(),
         "".to_string(),
         ".actor".to_string(),

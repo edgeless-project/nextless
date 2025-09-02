@@ -6,6 +6,7 @@
 // https://rust-lang-nursery.github.io/rust-cookbook/compression/tar.html
 
 mod cargo_messages;
+pub(crate) mod cargo_target;
 
 use super::BuildError;
 
@@ -124,6 +125,16 @@ pub(crate) fn build_rust(
                 compiler_errors += &format!("Crate {}:\n{}\n", target.name, message.rendered);
             }
         }
+
+        if compiler_errors.len() == 0 {
+            let err_str = String::from_utf8(build_output.stderr).map_err(|e| BuildError::Toolchain {
+                msg: "Could not parse build stderr".to_string(),
+                source: Some(e.into()),
+            })?;
+
+            compiler_errors = err_str;
+        }
+
         return Err(BuildError::Compiler {
             msg: compiler_errors,
             source: None,
@@ -297,7 +308,7 @@ fn check_rust_component(name: &str, env_var: Option<String>, requires_nightly: b
 
         if !version_str.contains("nightly") {
             return Err(BuildError::Toolchain {
-                msg: format!("System required nightly version of {name}"),
+                msg: format!("System required nightly version of {name}. Got Version {version_str}"),
                 source: None,
             });
         }
