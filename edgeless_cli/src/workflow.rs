@@ -255,7 +255,7 @@ fn api_behavior_for_actor_class(class: edgeless_config::actor_class::EdgelessAct
             image: std::fs::read(class.code.clone().unwrap().path).unwrap(),
         }),
         // TODO: Cleanup; This is just a quick and dirty experiment but the whole file needs cleanup...
-        extra_images: if ["RUST"].contains(&dialect.base_type.as_str()) {
+        extra_images: if !extra_images.is_empty() && ["RUST"].contains(&dialect.base_type.as_str()) {
             extra_images
                 .split(",")
                 .map(|i| match i {
