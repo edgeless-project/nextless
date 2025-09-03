@@ -11,14 +11,14 @@ pub struct EncodedNodeRegistration<'a> {
     pub node_id: NodeId,
     pub agent_url: heapless::String<256>,
     pub invocation_url: heapless::String<256>,
-    pub resources: heapless::Vec<ResourceProviderSpecification<'a>, 16>,
+    pub resources: heapless::Vec<ResourceProviderSpecification<'a>, 4>,
     pub runtimes: heapless::Vec<EncodedRuntimeType, 4>, // 4: node capabilities
 }
 
 #[derive(Clone)]
 pub struct EncodedRuntimeType {
     pub base_type: heapless::String<32>,
-    pub features: heapless::Vec<heapless::String<32>, 16>,
+    pub features: heapless::Vec<heapless::String<32>, 4>,
 }
 
 #[derive(Clone)]
@@ -96,7 +96,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
         let agent_url: &str = d.str()?;
         let invocation_url: &str = d.str()?;
 
-        let mut resources: heapless::Vec<ResourceProviderSpecification, 16> = heapless::Vec::new();
+        let mut resources: heapless::Vec<ResourceProviderSpecification, 4> = heapless::Vec::new();
 
         for item in d.array_iter::<ResourceProviderSpecification<'b>>()?.flatten() {
             if resources.push(item).is_err() {
@@ -125,7 +125,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedRuntimeType {
     fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let base_type: &str = d.str()?;
 
-        let mut features = heapless::Vec::<heapless::String<32>, 16>::new();
+        let mut features = heapless::Vec::<heapless::String<32>, 4>::new();
         for item in d.array_iter::<&'b str>()?.flatten() {
             if features
                 .push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?)
@@ -155,7 +155,7 @@ impl<C> minicbor::CborLen<C> for EncodedRuntimeType {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let len = self.base_type.cbor_len(ctx);
 
-        let fts: heapless::Vec<&str, 16> = self.features.iter().map(|i| i.as_str()).collect();
+        let fts: heapless::Vec<&str, 4> = self.features.iter().map(|i| i.as_str()).collect();
 
         len + fts[..fts.len()].cbor_len(ctx)
     }
@@ -200,7 +200,7 @@ impl<C> minicbor::CborLen<C> for ResourceProviderSpecification<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let len = self.provider_id.cbor_len(ctx) + self.class_type.cbor_len(ctx);
 
-        let mut data: [&str; 16] = [""; 16];
+        let mut data: [&str; 4] = [""; 4];
         let mut data_count = 0;
 
         for i in &self.outputs {
