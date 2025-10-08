@@ -6,7 +6,7 @@ use crate::ir::transformations::{StatefulTransformation, StatelessTransformation
 pub struct DefaultPhysicalPipeline {
     physical_connection_mapper: crate::ir::transformations::physical_mapper::PhysicalConnectionMapper,
     pipe_generator: crate::ir::transformations::pipe_generator::PipeGenerator,
-    compiler: crate::ir::transformations::rust_compiler::RustCompiler,
+    compiler: crate::ir::transformations::compiler::Compiler,
 }
 
 pub struct PhysicalPipelineState<'a> {
@@ -19,7 +19,7 @@ impl DefaultPhysicalPipeline {
         DefaultPhysicalPipeline {
             physical_connection_mapper: crate::ir::transformations::physical_mapper::PhysicalConnectionMapper::new(),
             pipe_generator: crate::ir::transformations::pipe_generator::PipeGenerator::new(),
-            compiler: crate::ir::transformations::rust_compiler::RustCompiler::new(),
+            compiler: crate::ir::transformations::compiler::Compiler::new(),
         }
     }
 }

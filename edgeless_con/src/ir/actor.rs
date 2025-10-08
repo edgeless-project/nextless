@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 pub struct LogicalActor {
-    pub image: Behavior,
+    pub image: super::behavior::Behavior,
     pub annotations: std::collections::HashMap<String, String>,
     pub constraints: ActorConstraints,
     pub logical_ports: super::LogicalPorts,
@@ -23,14 +23,19 @@ pub struct ActorConstraints {
 pub struct PhysicalActor {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
     pub(crate) component_name: String,
-    pub(crate) runtime_type: DialectType,
     pub(crate) creation_time: std::time::Instant,
-    pub(crate) image: BehaviorImage,
+    pub(crate) image: ImageState,
     // Temporary is the Function API still is based on older types
-    pub(crate) behavior_spec: BehaviorSpec,
+    pub(crate) behavior_spec: super::behavior::BehaviorSpec,
     pub(crate) desired_mapping: super::PhysicalPorts,
     pub(crate) materialized: Option<std::cell::RefCell<MaterializedActor>>,
     pub(crate) annotations: std::collections::HashMap<String, String>,
+}
+
+#[derive(Clone)]
+pub enum ImageState {
+    Planned(super::behavior::BehaviorImageId),
+    Existing(super::behavior::BehaviorImage),
 }
 
 impl super::LogicalComponent for LogicalActor {
@@ -91,7 +96,13 @@ impl super::PhysicalComponent for PhysicalActor {
             changes.push(super::RequiredChange::StartFunction {
                 function_id: self.id,
                 function_name: self.component_name.clone(),
-                image: self.image.clone(),
+                image: match &self.image {
+                    ImageState::Planned(_) => {
+                        // Need proper handling for this
+                        panic!("Image Creation Failed");
+                    }
+                    ImageState::Existing(behavior_image) => behavior_image.clone(),
+                },
                 behavior_spec: self.behavior_spec.clone(),
                 input_mapping: self.desired_mapping.physical_input_mapping.clone(),
                 output_mapping: self.desired_mapping.physical_output_mapping.clone(),
@@ -133,186 +144,10 @@ impl super::MaterializedComponent for MaterializedActor {
     }
 }
 
-// #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-// pub struct ActorClassIdent {
-//     pub id: String,
-//     pub version: String,
-// }
-// pub type ActorClassIdent = edgeless_api::behavior::BehaviorId;
-
-// #[derive(Clone, Debug, PartialEq)]
-// pub struct ActorClass {
-//     pub id: ActorClassIdent,
-//     pub inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::function_instance::Port>,
-//     pub outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::function_instance::Port>,
-//     pub inner_structure: std::collections::HashMap<
-//         edgeless_api::function_instance::MappingNode,
-//         std::collections::HashSet<edgeless_api::function_instance::MappingNode>,
-//     >,
-// }
-
-// #[derive(Clone, Debug)]
-// pub struct ActorImage {
-//     pub id: ActorImageIdent,
-//     pub class: ActorClass,
-//     pub code: Vec<u8>,
-// }
-
-// #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-// pub struct ActorImageIdent {
-//     pub class_id: ActorClassIdent,
-//     pub format: DialectType,
-//     pub enabled_inputs: std::collections::BTreeSet<edgeless_api::function_instance::PortId>,
-//     pub enabled_outputs: std::collections::BTreeSet<edgeless_api::function_instance::PortId>,
-// }
-
-pub type BehaviorId = edgeless_api::behavior::BehaviorId;
-pub type BehaviorSpec = edgeless_api::behavior::BehaviorSpec;
-pub type EnabledPorts = edgeless_api::behavior::EnabledPorts;
-
-#[derive(Debug, Clone)]
-pub struct Behavior {
-    pub(crate) spec: BehaviorSpec,
-    pub(crate) main_image: BehaviorImage,
-    pub(crate) extra_images: Vec<BehaviorImage>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BehaviorImageId {
-    pub(crate) behavior_id: BehaviorId,
-    pub(crate) enabled_ports: edgeless_api::behavior::EnabledPorts,
-    pub(crate) dialect_type: DialectType,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BehaviorImage {
-    pub(crate) behavior_image_id: BehaviorImageId,
-    pub(crate) image: Vec<u8>,
-}
-
-impl TryFrom<edgeless_api::behavior::Behavior> for Behavior {
-    type Error = anyhow::Error;
-
-    fn try_from(value: edgeless_api::behavior::Behavior) -> Result<Self, Self::Error> {
-        Ok(Self {
-            spec: value.spec,
-            main_image: value
-                .main_image
-                .clone()
-                .ok_or(anyhow::anyhow!("System currently required a root image"))?
-                .try_into()?,
-            extra_images: value
-                .extra_images
-                .into_iter()
-                .map(|i| i.try_into())
-                .collect::<Result<Vec<_>, Self::Error>>()?,
-        })
-    }
-}
-
-impl TryFrom<edgeless_api::behavior::BehaviorImageId> for BehaviorImageId {
-    type Error = anyhow::Error;
-
-    fn try_from(value: edgeless_api::behavior::BehaviorImageId) -> Result<Self, Self::Error> {
-        Ok(Self {
-            behavior_id: value.behaviour_id,
-            enabled_ports: value.enabled_ports,
-            dialect_type: value.dialect_type.try_into()?,
-        })
-    }
-}
-
-impl TryFrom<edgeless_api::behavior::BehaviorImage> for BehaviorImage {
-    type Error = anyhow::Error;
-
-    fn try_from(value: edgeless_api::behavior::BehaviorImage) -> Result<Self, Self::Error> {
-        Ok(BehaviorImage {
-            behavior_image_id: value.behavior_image_id.try_into()?,
-            image: value.image,
-        })
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct DialectType {
-    pub base_type: String,
-    pub features: std::collections::BTreeSet<crate::ir::DialectFeature>,
-}
-
-impl TryFrom<edgeless_api::node_registration::RuntimeType> for DialectType {
-    type Error = anyhow::Error;
-
-    fn try_from(value: edgeless_api::node_registration::RuntimeType) -> Result<Self, Self::Error> {
-        Ok(Self {
-            features: match value.base_type.as_str() {
-                "WASM" => value
-                    .features
-                    .iter()
-                    .map(|f| match f.as_str() {
-                        "WGPU" => Ok(crate::ir::DialectFeature::Wasm(crate::ir::WasmRuntimeFeatures::Wgpu)),
-                        _ => Err(anyhow::anyhow!("Unknown WASM Feature")),
-                    })
-                    .collect::<Result<std::collections::BTreeSet<_>, Self::Error>>()?,
-                "RUST" => value
-                    .features
-                    .iter()
-                    .map(|f| match f.as_str() {
-                        "WGPU" => Ok(crate::ir::DialectFeature::Rust(crate::ir::RustDialectFeatures::Wgpu)),
-                        _ => Err(anyhow::anyhow!("Unknown Rust Feature")),
-                    })
-                    .collect::<Result<std::collections::BTreeSet<_>, Self::Error>>()?,
-                _ => return Err(anyhow::anyhow!("Unknown Dialect")),
-            },
-            base_type: value.base_type,
-        })
-    }
-}
-
 impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
     fn from(function_req: edgeless_api::workflow_instance::WorkflowFunction) -> Self {
         Self {
-            image: Behavior::try_from(function_req.behavior).unwrap(),
-            // image: ActorImage {
-            //     id: ActorImageIdent {
-            //         class_id: class_id.clone(),
-            //         format: match function_req.function_class_specification.function_class_type.as_str() {
-            //             "RUST_BASE" => DialectType {
-            //                 base_type: "RUST".to_string(),
-            //                 features: std::collections::BTreeSet::new(),
-            //             },
-            //             "RUST_WGPU" => DialectType {
-            //                 base_type: "RUST".to_string(),
-            //                 features: std::collections::BTreeSet::from([crate::ir::DialectFeature::Rust(crate::ir::RustDialectFeatures::Wgpu)]),
-            //             },
-            //             "WASM_BASE" => DialectType {
-            //                 base_type: "WASM".to_string(),
-            //                 features: std::collections::BTreeSet::new(),
-            //             },
-            //             "WASM_WGPU" => DialectType {
-            //                 base_type: "WASM".to_string(),
-            //                 features: std::collections::BTreeSet::from([crate::ir::DialectFeature::Wasm(crate::ir::WasmRuntimeFeatures::Wgpu)]),
-            //             },
-            //             _ => {
-            //                 panic!("Unsupported Type (unhandled)")
-            //             }
-            //         },
-            //         enabled_inputs: function_req.function_class_specification.function_class_inputs.keys().cloned().collect(),
-            //         enabled_outputs: function_req.function_class_specification.function_class_outputs.keys().cloned().collect(),
-            //     },
-            //     class: ActorClass {
-            //         id: class_id,
-            //         inputs: function_req.function_class_specification.function_class_inputs,
-            //         outputs: function_req.function_class_specification.function_class_outputs,
-            //         inner_structure: function_req
-            //             .function_class_specification
-            //             .function_class_inner_structure
-            //             .into_iter()
-            //             .map(|(k, v)| (k, std::collections::HashSet::from_iter(v)))
-            //             .collect(),
-            //     },
-
-            //     code: function_req.function_class_specification.function_class_code,
-            // },
+            image: super::behavior::Behavior::try_from(function_req.behavior).unwrap(),
             instances: Vec::new(),
             constraints: ActorConstraints::from_annotations(&function_req.annotations),
             annotations: function_req.annotations,

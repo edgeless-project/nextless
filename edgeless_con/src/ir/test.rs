@@ -208,16 +208,23 @@ pub(crate) fn new_actor_with_mocked_materialized_instances(
 pub(crate) fn mock_nodes_and_candidates<'a>(
     n: usize,
     runtime: &'a dyn crate::ir::WasmRuntime,
+    behavior_image_id: crate::ir::behavior::BehaviorImageId,
 ) -> (Vec<uuid::Uuid>, Vec<crate::ir::transformations::placement::Candidate<'a>>) {
     let mut nodes = Vec::new();
     nodes.resize_with(n, || uuid::Uuid::new_v4());
+
+    let rt = crate::ir::Runtime::WasmBase(runtime, std::collections::BTreeSet::new());
 
     let candidates: Vec<_> = nodes
         .iter()
         .map(|c| crate::ir::transformations::placement::Candidate {
             node_id: c.clone(),
-            runtime: crate::ir::Runtime::WasmBase(runtime, std::collections::BTreeSet::new()),
-            runtime_features: std::collections::BTreeSet::new(),
+            runtime: rt.clone(),
+            dest_image: crate::ir::actor::ImageState::Planned(crate::ir::behavior::BehaviorImageId {
+                behavior_id: behavior_image_id.behavior_id.clone(),
+                enabled_ports: behavior_image_id.enabled_ports.clone(),
+                dialect_type: rt.supported_dialect(),
+            }),
         })
         .collect();
 
@@ -250,28 +257,28 @@ pub(crate) fn mock_workflow(
     }
 }
 
-pub(crate) fn mock_actor_image() -> crate::ir::actor::Behavior {
-    let behavior_id = crate::ir::actor::BehaviorId {
+pub(crate) fn mock_actor_image() -> crate::ir::behavior::Behavior {
+    let behavior_id = crate::ir::behavior::BehaviorId {
         id: "Foo".to_string(),
         version: "0.1".to_string(),
     };
 
-    crate::ir::actor::Behavior {
-        spec: crate::ir::actor::BehaviorSpec {
+    crate::ir::behavior::Behavior {
+        spec: crate::ir::behavior::BehaviorSpec {
             behavior_id: behavior_id.clone(),
             input_ports: std::collections::BTreeMap::new(),
             output_ports: std::collections::BTreeMap::new(),
             inner_structure: std::collections::BTreeMap::new(),
         },
-        main_image: crate::ir::actor::BehaviorImage {
-            behavior_image_id: crate::ir::actor::BehaviorImageId {
+        main_image: crate::ir::behavior::BehaviorImage {
+            behavior_image_id: crate::ir::behavior::BehaviorImageId {
                 behavior_id: behavior_id,
                 enabled_ports: edgeless_api::behavior::EnabledPorts {
                     enabled_inputs: std::collections::BTreeSet::new(),
                     enabled_outputs: std::collections::BTreeSet::new(),
                 },
-                dialect_type: crate::ir::actor::DialectType {
-                    base_type: "WASM".to_string(),
+                dialect_type: crate::ir::behavior::dialect::DialectType {
+                    base_type: super::behavior::dialect::wasm::ID,
                     features: std::collections::BTreeSet::new(),
                 },
             },

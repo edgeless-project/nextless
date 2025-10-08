@@ -126,7 +126,7 @@ pub(crate) fn build_rust(
             }
         }
 
-        if compiler_errors.len() == 0 {
+        if compiler_errors.is_empty() {
             let err_str = String::from_utf8(build_output.stderr).map_err(|e| BuildError::Toolchain {
                 msg: "Could not parse build stderr".to_string(),
                 source: Some(e.into()),

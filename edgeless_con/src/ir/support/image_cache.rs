@@ -8,28 +8,28 @@ pub struct ImageCache {
 
 #[derive(Default)]
 struct ImageCacheInner {
-    images: std::collections::HashMap<crate::ir::actor::BehaviorId, Vec<crate::ir::actor::BehaviorImage>>,
+    images: std::collections::HashMap<crate::ir::behavior::BehaviorId, Vec<crate::ir::behavior::BehaviorImage>>,
 }
 
 pub enum CacheResult {
     NotFound,
     PartialMatch(PartialMatch),
-    FullMatch(crate::ir::actor::BehaviorImage),
+    FullMatch(crate::ir::behavior::BehaviorImage),
 }
 
 #[derive(Clone)]
 pub struct PartialMatch {
-    images: Vec<crate::ir::actor::BehaviorImage>,
+    images: Vec<crate::ir::behavior::BehaviorImage>,
 }
 
-impl From<PartialMatch> for Vec<crate::ir::actor::BehaviorImage> {
+impl From<PartialMatch> for Vec<crate::ir::behavior::BehaviorImage> {
     fn from(val: PartialMatch) -> Self {
         val.images
     }
 }
 
 impl PartialMatch {
-    pub fn same_runtime_feature_subset(self, other: &crate::ir::actor::BehaviorImageId) -> PartialMatch {
+    pub fn same_runtime_feature_subset(self, other: &crate::ir::behavior::BehaviorImageId) -> PartialMatch {
         PartialMatch {
             images: self
                 .images
@@ -45,7 +45,7 @@ impl PartialMatch {
         }
     }
 
-    pub fn same_or_more_ports(self, other: &crate::ir::actor::BehaviorImageId) -> PartialMatch {
+    pub fn same_or_more_ports(self, other: &crate::ir::behavior::BehaviorImageId) -> PartialMatch {
         PartialMatch {
             images: self
                 .images
@@ -66,7 +66,7 @@ impl PartialMatch {
 }
 
 impl ImageCache {
-    pub async fn get(&self, ident: &crate::ir::actor::BehaviorImageId) -> CacheResult {
+    pub async fn get(&self, ident: &crate::ir::behavior::BehaviorImageId) -> CacheResult {
         let lck = self.inner.lock().await;
 
         // https://stackoverflow.com/a/75486197
@@ -81,7 +81,7 @@ impl ImageCache {
         CacheResult::PartialMatch(PartialMatch { images: images.to_vec() })
     }
 
-    pub async fn insert(&self, image: crate::ir::actor::BehaviorImage) {
+    pub async fn insert(&self, image: crate::ir::behavior::BehaviorImage) {
         let mut lck = self.inner.lock().await;
 
         let images = lck.images.entry(image.behavior_image_id.behavior_id.clone()).or_insert(Vec::new());
@@ -89,11 +89,11 @@ impl ImageCache {
         images.push(image);
     }
 
-    pub fn get_blocking(&self, ident: &crate::ir::actor::BehaviorImageId) -> CacheResult {
+    pub fn get_blocking(&self, ident: &crate::ir::behavior::BehaviorImageId) -> CacheResult {
         tokio::runtime::Handle::current().block_on(self.get(ident))
     }
 
-    pub fn insert_blocking(&self, image: crate::ir::actor::BehaviorImage) {
+    pub fn insert_blocking(&self, image: crate::ir::behavior::BehaviorImage) {
         tokio::runtime::Handle::current().block_on(self.insert(image))
     }
 }

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use crate::ir::actor;
+
 pub(crate) fn mock_function_under_test(
     instances: Vec<(edgeless_api::function_instance::InstanceId, Box<dyn crate::ir::PortStatistics>)>,
 ) -> std::cell::RefCell<crate::ir::actor::LogicalActor> {
@@ -24,12 +26,8 @@ pub(crate) fn mock_function_under_test(
                 std::cell::RefCell::new(crate::ir::PhysicalComponentState::Materialized(Box::new(
                     crate::ir::actor::PhysicalActor {
                         id: instance_id,
-                        runtime_type: crate::ir::actor::DialectType {
-                            base_type: "WASM".to_string(),
-                            features: std::collections::BTreeSet::new(),
-                        },
                         creation_time: std::time::Instant::now(),
-                        image: crate::ir::test::mock_actor_image().main_image,
+                        image: actor::ImageState::Existing(crate::ir::test::mock_actor_image().main_image),
                         behavior_spec: crate::ir::test::mock_actor_image().spec,
                         desired_mapping: crate::ir::PhysicalPorts {
                             physical_output_mapping: std::collections::HashMap::new(),
@@ -80,12 +78,8 @@ pub(crate) fn mock_peer_function(
                 std::cell::RefCell::new(crate::ir::PhysicalComponentState::Materialized(Box::new(
                     crate::ir::actor::PhysicalActor {
                         id: instance_id,
-                        runtime_type: crate::ir::actor::DialectType {
-                            base_type: "WASM".to_string(),
-                            features: std::collections::BTreeSet::new(),
-                        },
                         creation_time: std::time::Instant::now(),
-                        image: crate::ir::test::mock_actor_image().main_image,
+                        image: actor::ImageState::Existing(crate::ir::test::mock_actor_image().main_image),
                         behavior_spec: crate::ir::test::mock_actor_image().spec,
                         desired_mapping: crate::ir::PhysicalPorts {
                             physical_output_mapping: std::collections::HashMap::new(),

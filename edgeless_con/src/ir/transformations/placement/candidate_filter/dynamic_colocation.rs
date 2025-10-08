@@ -101,7 +101,8 @@ mod test {
         let mut colocation_filter = DynamicColocation::new();
         let runtime = MockWasmRuntime {};
 
-        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime, actor_image.main_image.behavior_image_id);
         let fut_id = edgeless_api::function_instance::InstanceId::new(node_ids[1]);
         let colocated_peer_id = edgeless_api::function_instance::InstanceId::new(node_ids[0]);
 

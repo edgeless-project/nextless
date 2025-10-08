@@ -130,7 +130,7 @@ impl WorkerNode {
 }
 
 impl crate::ir::Node for WorkerNode {
-    fn available_runtimes(&self) -> std::collections::HashMap<String, crate::ir::Runtime> {
+    fn available_runtimes<'a>(&'a self) -> std::collections::HashMap<String, crate::ir::Runtime<'a>> {
         self.capabilities
             .runtimes
             .iter()
@@ -140,7 +140,7 @@ impl crate::ir::Node for WorkerNode {
                         .features
                         .iter()
                         .filter_map(|feature| match feature.as_str() {
-                            "WGPU" => Some(crate::ir::WasmRuntimeFeatures::Wgpu),
+                            "WGPU" => Some(crate::ir::behavior::dialect::wasm::WasmDialectFeatures::Wgpu),
                             _ => {
                                 log::warn!("Node announced unknown feature");
                                 None
@@ -151,11 +151,11 @@ impl crate::ir::Node for WorkerNode {
                     Some(("WASM".to_string(), crate::ir::Runtime::WasmBase(self, features)))
                 }
                 "NATIVE_DYNAMIC" => {
-                    let mut features: std::collections::BTreeSet<crate::ir::NativeRuntimeFeatures> = rt
+                    let mut features: std::collections::BTreeSet<crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures> = rt
                         .features
                         .iter()
                         .filter_map(|feature| match feature.as_str() {
-                            "AES" => Some(crate::ir::NativeRuntimeFeatures::Aes),
+                            "AES" => Some(crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Aes),
                             _ => {
                                 log::warn!("Node announced unknown feature");
                                 None
@@ -164,8 +164,8 @@ impl crate::ir::Node for WorkerNode {
                         .collect();
 
                     features.insert(match self.capabilities.cpu_arch.as_str() {
-                        "x86_64" => crate::ir::NativeRuntimeFeatures::Amd64,
-                        "aarch64" => crate::ir::NativeRuntimeFeatures::Aarch64,
+                        "x86_64" => crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Amd64,
+                        "aarch64" => crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Aarch64,
                         _ => {
                             log::info!("Unsupported Arch");
                             return None;
@@ -178,7 +178,7 @@ impl crate::ir::Node for WorkerNode {
             .collect()
     }
 
-    fn available_resource_providers(&self) -> crate::ir::ResourceProviders {
+    fn available_resource_providers<'a>(&'a self) -> crate::ir::ResourceProviders<'a> {
         self.resource_providers
             .iter()
             .map(|(k, v)| (k.clone(), v as &dyn crate::ir::ResourceProvider))
@@ -237,31 +237,8 @@ impl crate::ir::NativeRuntime for WorkerNode {
         self.capabilities.mem_size
     }
 
-    fn node_architecture(&self) -> crate::ir::NodeArchitecture {
-        match self.capabilities.cpu_arch.as_str() {
-            "x86_64" => crate::ir::NodeArchitecture::Amd64,
-            "aarch64" => crate::ir::NodeArchitecture::Arm64,
-            "xtensa" => crate::ir::NodeArchitecture::Xtensa,
-            _ => {
-                log::error!("Bad Node Architecture; Defaulting to amd64.");
-                crate::ir::NodeArchitecture::Amd64
-            }
-        }
-    }
-
     fn runtime_info(&self) -> Option<Box<dyn crate::ir::WasmRuntimeInfo>> {
         todo!()
-    }
-
-    fn node_sys(&self) -> crate::ir::NodeSys {
-        match self.capabilities.sys.as_str() {
-            "linux" => crate::ir::NodeSys::Linux,
-            "darwin" => crate::ir::NodeSys::Darwin,
-            _ => {
-                log::error!("Bad Node Architecture; Defaulting to \"linux\"");
-                crate::ir::NodeSys::Linux
-            }
-        }
     }
 }
 

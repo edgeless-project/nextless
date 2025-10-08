@@ -5,12 +5,11 @@
 
 use std::str::FromStr;
 
-use crate::ir::ImplicitFeature;
-
 pub fn feasible_node_runtime_candidates<'b>(
     actor: &crate::ir::actor::LogicalActor,
     node: &'b dyn crate::ir::Node,
     new_instance: bool,
+    allow_suboptimal: bool,
 ) -> Vec<super::Candidate<'b>> {
     let mut candidates = Vec::new();
 
@@ -28,15 +27,33 @@ pub fn feasible_node_runtime_candidates<'b>(
     }
 
     for (_rt_id, rt) in node.available_runtimes() {
-        if let Some(features) = runtime_supported(
-            &actor.image.main_image.behavior_image_id.dialect_type,
-            &rt,
-            actor.annotations.contains_key("NO_NATIVE"),
-        ) {
+        let disable_native = actor.annotations.contains_key("NO_NATIVE");
+        let dest_dialect = rt.supported_dialect();
+
+        // This exists for debugging/evaluation puposes.
+        // If we need this permanently, this should be automatic and available for all features.
+        if disable_native && dest_dialect.base_type == crate::ir::behavior::dialect::native_dyanamic::ID {
+            continue;
+        }
+
+        let dest_spec = crate::ir::behavior::BehaviorImageId {
+            behavior_id: actor.image.main_image.behavior_image_id.behavior_id.clone(),
+            enabled_ports: crate::ir::behavior::EnabledPorts {
+                enabled_inputs: actor.enabled_inputs().iter().cloned().collect(),
+                enabled_outputs: actor.enabled_outputs().iter().cloned().collect(),
+            },
+            dialect_type: dest_dialect,
+        };
+
+        let target_image_id = crate::ir::behavior::dialect::DialectRegistry::new_default()
+            .plan_translation(&actor.image.main_image.behavior_image_id.clone(), &dest_spec, !allow_suboptimal)
+            .ok();
+
+        if let Some(dest_image_id) = target_image_id {
             candidates.push(super::Candidate {
                 node_id: node.node_id(),
                 runtime: rt.clone(),
-                runtime_features: features,
+                dest_image: crate::ir::actor::ImageState::Planned(dest_image_id),
             });
         }
     }
@@ -74,88 +91,4 @@ fn node_fulfills_constraints(actor: &crate::ir::actor::LogicalActor, node: &dyn 
     }
 
     true
-}
-
-fn runtime_supported(
-    source_format: &crate::ir::actor::DialectType,
-    runtime: &crate::ir::Runtime,
-    disable_native: bool,
-) -> Option<std::collections::BTreeSet<crate::ir::DialectFeature>> {
-    match runtime {
-        super::Runtime::WasmBase(_wasm_runtime, _features) => {
-            if !["RUST", "WASM"].contains(&source_format.base_type.as_str()) {
-                return None;
-            }
-
-            let mut requires_unsupported_feature = false;
-            let translated_features: std::collections::BTreeSet<_> = source_format
-                .features
-                .iter()
-                .filter_map(|f| match f {
-                    crate::ir::DialectFeature::Rust(rust_dialect_feature) => match rust_dialect_feature {
-                        crate::ir::RustDialectFeatures::Wgpu => Some(crate::ir::DialectFeature::Wasm(crate::ir::WasmRuntimeFeatures::Wgpu)),
-                    },
-                    crate::ir::DialectFeature::Wasm(_) => Some(f.clone()),
-                    _ => {
-                        log::warn!("Tried mapping feature from unsupported runtime.");
-                        requires_unsupported_feature = true;
-                        None
-                    }
-                })
-                .collect();
-
-            if !runtime.features().is_superset(&translated_features) || requires_unsupported_feature {
-                return None;
-            }
-
-            let mut enabled_features = translated_features;
-            for feature in runtime.features() {
-                if feature.enable_implicitly() {
-                    enabled_features.insert(feature.clone());
-                }
-            }
-
-            Some(enabled_features)
-        }
-        super::Runtime::NativeBase(_native_runtime, _features) => {
-            if !["RUST", "NATIVE"].contains(&source_format.base_type.as_str()) || disable_native {
-                return None;
-            }
-
-            let mut requires_unsupported_feature = false;
-            let translated_features: std::collections::BTreeSet<_> = source_format
-                .features
-                .iter()
-                .filter_map(|f| match f {
-                    crate::ir::DialectFeature::Rust(rust_dialect_feature) => match rust_dialect_feature {
-                        crate::ir::RustDialectFeatures::Wgpu => {
-                            requires_unsupported_feature = true;
-                            None
-                        }
-                    },
-                    crate::ir::DialectFeature::Native(_) => Some(f.clone()),
-                    _ => {
-                        log::warn!("Tried mapping feature from unsupported runtime.");
-                        requires_unsupported_feature = true;
-                        None
-                    }
-                })
-                .collect();
-
-            log::info!("{:?} {:?} {}", runtime.features(), translated_features, requires_unsupported_feature);
-
-            if !runtime.features().is_superset(&translated_features) || requires_unsupported_feature {
-                return None;
-            }
-
-            let mut enabled_features = translated_features;
-            for feature in runtime.features() {
-                if feature.enable_implicitly() {
-                    enabled_features.insert(feature.clone());
-                }
-            }
-
-            Some(enabled_features)
-        }
-    }
 }

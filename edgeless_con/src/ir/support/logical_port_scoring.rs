@@ -109,7 +109,8 @@ mod test {
     #[test]
     fn equal_peer_weights() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -126,7 +127,8 @@ mod test {
     #[test]
     fn equal_port_weights() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);

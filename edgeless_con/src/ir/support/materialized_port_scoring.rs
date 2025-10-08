@@ -181,7 +181,8 @@ mod test {
     #[test]
     fn port_weights_different_rates() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -202,7 +203,8 @@ mod test {
     #[test]
     fn port_weights_different_rates_rounding() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -223,7 +225,8 @@ mod test {
     #[test]
     fn port_weights_equal_rates() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -244,7 +247,8 @@ mod test {
     #[test]
     fn port_link_cost_one_remote() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -268,7 +272,8 @@ mod test {
     #[test]
     fn port_link_cost_both_local() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[0]);
@@ -292,7 +297,8 @@ mod test {
     #[test]
     fn port_link_cost_both_remote() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
         let remote_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -316,7 +322,8 @@ mod test {
     #[test]
     fn traffic_locality_all_local() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[0]);
@@ -332,7 +339,8 @@ mod test {
     #[test]
     fn traffic_locality_all_remote() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
         let remote_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -348,7 +356,8 @@ mod test {
     #[test]
     fn traffic_locality_split() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);

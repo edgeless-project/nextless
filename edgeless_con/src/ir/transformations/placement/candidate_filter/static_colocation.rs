@@ -79,7 +79,8 @@ mod test {
         let mut colocation_filter = StaticColocation::new();
         let runtime = MockWasmRuntime {};
 
-        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime, actor_image.main_image.behavior_image_id);
         let colocated_peer_id = edgeless_api::function_instance::InstanceId::new(node_ids[0]);
 
         let function_under_test = mock_function_under_test(vec![]);
@@ -102,7 +103,8 @@ mod test {
         let mut colocation_filter = StaticColocation::new();
         let runtime = MockWasmRuntime {};
 
-        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime, actor_image.main_image.behavior_image_id);
         let colocated_peer_id = edgeless_api::function_instance::InstanceId::new(node_ids[0]);
         let colocated_peer_id2 = edgeless_api::function_instance::InstanceId::new(node_ids[1]);
 
@@ -130,7 +132,8 @@ mod test {
         let mut colocation_filter = StaticColocation::new();
         let runtime = MockWasmRuntime {};
 
-        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime, actor_image.main_image.behavior_image_id);
         let colocated_peer_id = edgeless_api::function_instance::InstanceId::new(node_ids[0]);
         let colocated_peer_id2 = edgeless_api::function_instance::InstanceId::new(node_ids[0]);
         let colocated_peer_id3 = edgeless_api::function_instance::InstanceId::new(node_ids[1]);
@@ -155,7 +158,8 @@ mod test {
         let mut colocation_filter = StaticColocation::new();
         let runtime = MockWasmRuntime {};
 
-        let (_node_ids, candidates) = mock_nodes_and_candidates(3, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (_node_ids, candidates) = mock_nodes_and_candidates(3, &runtime, actor_image.main_image.behavior_image_id);
 
         let function_under_test = mock_function_under_test(vec![]);
         let other_function = mock_peer_function(vec![

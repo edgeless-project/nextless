@@ -91,7 +91,8 @@ mod test {
     #[test]
     fn migration_when_usefull() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -122,7 +123,8 @@ mod test {
     #[test]
     fn no_migration_if_port_rate_equal() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
@@ -153,7 +155,8 @@ mod test {
     #[test]
     fn no_migration_if_link_cost_equal() {
         let runtime = crate::ir::test::MockWasmRuntime {};
-        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime);
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
         let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
         let remote_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[1]);

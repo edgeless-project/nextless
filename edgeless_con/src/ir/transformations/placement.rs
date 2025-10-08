@@ -201,10 +201,12 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
 #[derive(Clone)]
 pub struct Candidate<'a> {
     pub(crate) node_id: edgeless_api::function_instance::NodeId,
+    pub(crate) dest_image: actor::ImageState,
     pub(crate) runtime: crate::ir::Runtime<'a>,
-    pub(crate) runtime_features: std::collections::BTreeSet<crate::ir::DialectFeature>,
 }
+
 impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
+    #[allow(clippy::too_many_arguments)]
     fn spawn_new(
         &mut self,
         workflow: &crate::ir::workflow::ActiveWorkflow,
@@ -223,17 +225,11 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         let dst = self.placement_strategy.select_candidate(filtered, global_state.strategy_state);
 
         if let Some(dst) = dst {
-            log::info!("Target: {}, {:?}", dst.runtime.id(), dst.runtime_features);
             let new_id = edgeless_api::function_instance::InstanceId::new(dst.node_id);
             let new_instance = actor::PhysicalActor {
                 id: new_id,
-                runtime_type: crate::ir::actor::DialectType {
-                    base_type: dst.runtime.id(),
-                    features: dst.runtime_features,
-                },
                 desired_mapping: PhysicalPorts::default(),
-                //TODO (use correct image)
-                image: function.image.main_image.clone(),
+                image: dst.dest_image,
                 behavior_spec: function.image.spec.clone(),
                 materialized: None,
                 creation_time: std::time::Instant::now(),
@@ -257,56 +253,34 @@ fn find_candidates_for_actor<'b>(
     urgent: bool,
     image_cache: &crate::ir::support::image_cache::ImageCache,
 ) -> Vec<Candidate<'b>> {
+    image_cache.insert_blocking(actor.image.main_image.clone());
+    for extra in actor.image.extra_images.clone() {
+        log::debug!("Storing Extra Image in Cache: {:?}", extra.behavior_image_id);
+        image_cache.insert_blocking(extra);
+    }
+
     let mut candiates = Vec::new();
 
+    // For urgent requests (e.g. the first instance), attempt to use an existing image.
+    // This can fail as the normal mode will always be executed if the urgen mode fails.
     if urgent {
         for node in nodes.values() {
-            let mut node_cadidates: Vec<_> = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance)
-                .into_iter()
-                .filter(|c| {
-                    let image_ident = crate::ir::actor::BehaviorImageId {
-                        behavior_id: actor.image.spec.behavior_id.clone(),
-                        enabled_ports: crate::ir::actor::EnabledPorts {
-                            enabled_inputs: actor.enabled_inputs().iter().cloned().collect(),
-                            enabled_outputs: actor.enabled_outputs().iter().cloned().collect(),
-                        },
-                        dialect_type: crate::ir::actor::DialectType {
-                            base_type: c.runtime.id(),
-                            features: c.runtime_features.clone(),
-                        },
-                    };
-
-                    for extra in actor.image.extra_images.clone() {
-                        log::info!("Got Extra Image");
-                        image_cache.insert_blocking(extra);
-                    }
-
-                    let existing = image_cache.get_blocking(&image_ident);
-
-                    match existing {
-                        image_cache::CacheResult::NotFound => {}
-                        image_cache::CacheResult::PartialMatch(partial_match) => {
-                            log::info!("Partial Image");
-                            let existing_images: Vec<_> = partial_match
-                                .same_or_more_ports(&image_ident)
-                                .same_runtime_feature_subset(&image_ident)
-                                .into();
-                            if !existing_images.is_empty() {
-                                return true;
-                            }
-                        }
-                        image_cache::CacheResult::FullMatch(_) => {
-                            log::info!("Full Image");
-                            return true;
-                        }
-                    }
-                    false
-                })
-                .collect();
-            node_cadidates.sort_by(|a, b| a.runtime.efficiency_score().total_cmp(&b.runtime.efficiency_score()));
-            if let Some(c) = node_cadidates.pop() {
-                candiates.push(c);
+            let node_candidates = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance, true);
+            if let Some(node_candidate) = select_node_candidate(node_candidates, true, true, image_cache) {
+                candiates.push(node_candidate)
             }
+        }
+
+        if !candiates.is_empty() {
+            return candiates;
+        }
+    }
+
+    // Attempt to request the best image.
+    for node in nodes.values() {
+        let node_candidates = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance, false);
+        if let Some(node_candidate) = select_node_candidate(node_candidates, false, false, image_cache) {
+            candiates.push(node_candidate)
         }
     }
 
@@ -314,16 +288,85 @@ fn find_candidates_for_actor<'b>(
         return candiates;
     }
 
+    // Last attempt: Just use any image
     for node in nodes.values() {
-        let mut node_cadidates = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance);
-
-        node_cadidates.sort_by(|a, b| a.runtime.efficiency_score().total_cmp(&b.runtime.efficiency_score()));
-        if let Some(c) = node_cadidates.pop() {
-            candiates.push(c);
+        let node_candidates = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance, true);
+        if let Some(node_candidate) = select_node_candidate(node_candidates, false, true, image_cache) {
+            candiates.push(node_candidate)
         }
     }
 
     candiates
+}
+
+fn select_node_candidate<'b>(
+    candiates: Vec<Candidate<'b>>,
+    only_available: bool,
+    allow_imperfect: bool,
+    image_cache: &crate::ir::support::image_cache::ImageCache,
+) -> Option<Candidate<'b>> {
+    let mut viable_candidates: Vec<_> = candiates
+        .into_iter()
+        .filter_map(|c| {
+            let image_request = c.dest_image.clone();
+
+            let image_ident = if let actor::ImageState::Planned(p) = image_request {
+                p
+            } else {
+                return Some(c);
+            };
+
+            // We here assume the cache also contains the main image and all extra images.
+            let existing = image_cache.get_blocking(&image_ident);
+
+            match existing {
+                image_cache::CacheResult::NotFound => {
+                    log::info!("Not Found: {image_ident:?}");
+                    if !only_available {
+                        return Some(c);
+                    }
+                }
+                image_cache::CacheResult::PartialMatch(partial_match) => {
+                    if allow_imperfect {
+                        log::info!("Partial Image");
+                        let mut image_options: Vec<_> = partial_match
+                            .same_runtime_feature_subset(&image_ident)
+                            .same_or_more_ports(&image_ident)
+                            .into();
+                        image_options.sort_by(|a, b| {
+                            let a_diff = a
+                                .behavior_image_id
+                                .dialect_type
+                                .features
+                                .difference(&image_ident.dialect_type.features)
+                                .count();
+                            let b_diff = b
+                                .behavior_image_id
+                                .dialect_type
+                                .features
+                                .difference(&image_ident.dialect_type.features)
+                                .count();
+                            a_diff.cmp(&b_diff)
+                        });
+                        if let Some(image) = image_options.pop() {
+                            let mut new_candidate = c.clone();
+                            new_candidate.dest_image = actor::ImageState::Existing(image.clone());
+                            return Some(new_candidate);
+                        }
+                    }
+                }
+                image_cache::CacheResult::FullMatch(image) => {
+                    log::info!("Full Image");
+                    let mut new_candidate = c.clone();
+                    new_candidate.dest_image = actor::ImageState::Existing(image.clone());
+                    return Some(new_candidate);
+                }
+            }
+            None
+        })
+        .collect();
+    viable_candidates.sort_by(|a, b| a.runtime.efficiency_score().total_cmp(&b.runtime.efficiency_score()));
+    viable_candidates.pop()
 }
 
 fn select_node_for_resource(resource: &resource::LogicalResource, nodes: &crate::ir::Nodes) -> Option<edgeless_api::function_instance::NodeId> {
