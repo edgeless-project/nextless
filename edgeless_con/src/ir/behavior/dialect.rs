@@ -61,7 +61,7 @@ impl DialectRegistry {
     }
 
     pub fn get_dialect_for_str(&self, id_str: &str) -> Option<&dyn BehaviorDialect> {
-        self.registry.get(&id_str.to_string()).map(|b| b.as_ref())
+        self.registry.get(id_str).map(|b| b.as_ref())
     }
 
     pub fn plan_translation(
@@ -75,11 +75,11 @@ impl DialectRegistry {
 
         let source_dialect = self
             .registry
-            .get(&source_dialect_type.base_type.0.to_string())
+            .get(source_dialect_type.base_type.0)
             .ok_or(super::BehaviorError::UnknownDialect(source_dialect_type.base_type.0.to_string()))?;
         let dest_dialect = self
             .registry
-            .get(&dest_dialect_type.base_type.0.to_string())
+            .get(dest_dialect_type.base_type.0)
             .ok_or(super::BehaviorError::UnknownDialect(dest_dialect_type.base_type.0.to_string()))?;
 
         if source_dialect_type.base_type == dest_dialect_type.base_type {
@@ -124,11 +124,11 @@ impl DialectRegistry {
 
         let source_dialect = self
             .registry
-            .get(&source_dialect_type.base_type.0.to_string())
+            .get(source_dialect_type.base_type.0)
             .ok_or(super::BehaviorError::UnknownDialect(source_dialect_type.base_type.0.to_string()))?;
         let dest_dialect = self
             .registry
-            .get(&dest_dialect_type.base_type.0.to_string())
+            .get(dest_dialect_type.base_type.0)
             .ok_or(super::BehaviorError::UnknownDialect(dest_dialect_type.base_type.0.to_string()))?;
 
         if source_dialect

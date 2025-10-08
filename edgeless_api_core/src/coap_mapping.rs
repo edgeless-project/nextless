@@ -8,6 +8,16 @@ use coap_lite::{MessageClass, MessageType, ResponseType};
 
 pub struct COAPEncoder {}
 
+#[derive(Debug, thiserror::Error)]
+pub enum CoAPError {
+    #[error("Received unexpected CoAP message.")]
+    UnexpectedMessage,
+    #[error("Received CoAP request with unexpected path.")]
+    UnexpectedRequest,
+    #[error("Received CoAP request with bad Paylaod.")]
+    BadPayload,
+}
+
 impl COAPEncoder {
     pub fn encode_invocation_event<Endpoint>(
         endpoint: Endpoint,
@@ -317,16 +327,16 @@ pub enum CoapMessage<'a> {
 pub struct CoapDecoder {}
 
 impl CoapDecoder {
-    pub fn decode(data: &[u8]) -> Result<(CoapMessage<'_>, u8), ()> {
+    pub fn decode(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoAPError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
         match packet.header.code {
             MessageClass::Request(_) => Self::decode_request(data),
             MessageClass::Response(_) => Self::decode_response(data),
-            _ => Err(()),
+            _ => Err(CoAPError::UnexpectedMessage),
         }
     }
 
-    pub fn decode_request(data: &[u8]) -> Result<(CoapMessage<'_>, u8), ()> {
+    pub fn decode_request(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoAPError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
 
         let path = match packet.get_option(coap_lite::CoapOption::UriPath) {
@@ -418,11 +428,11 @@ impl CoapDecoder {
                     packet.get_token()[0],
                 ))
             }
-            _ => Err(()),
+            _ => Err(CoAPError::UnexpectedRequest),
         }
     }
 
-    pub fn decode_response(data: &[u8]) -> Result<(CoapMessage<'_>, u8), ()> {
+    pub fn decode_response(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoAPError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
         let response = coap_lite::CoapResponse { message: packet };
         let body_len = response.message.payload.len();
@@ -449,19 +459,11 @@ impl CoapDecoder {
         Ok((CoapMessage::Response(body_ref, return_status_ok), response.message.get_token()[0]))
     }
 
-    pub fn decode_instance_id(data: &[u8]) -> Result<crate::instance_id::InstanceId, ()> {
+    pub fn decode_instance_id(data: &[u8]) -> Result<crate::instance_id::InstanceId, CoAPError> {
         let parsed = minicbor::decode::<crate::instance_id::InstanceId>(data);
         match parsed {
             Ok(id) => Ok(id),
-            Err(_) => Err(()),
-        }
-    }
-
-    pub fn decode_error_response(data: &[u8]) -> Result<crate::instance_id::InstanceId, ()> {
-        let parsed = minicbor::decode::<crate::instance_id::InstanceId>(data);
-        match parsed {
-            Ok(id) => Ok(id),
-            Err(_) => Err(()),
+            Err(_) => Err(CoAPError::BadPayload),
         }
     }
 }

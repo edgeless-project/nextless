@@ -26,6 +26,7 @@ coap-lite = { version = "0.13", default-features = false }
 minicbor = { version = "0.19", default-features = false, features = ["derive"] }
 heapless = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
+thiserror = {version = "2", default-features = false }
 # tonic = {version = "0.9", optional = true}
 # prost = {version = "0.11", optional = true}
 # regex = "1.8"

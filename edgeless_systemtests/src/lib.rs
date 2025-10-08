@@ -12,7 +12,7 @@ mod tests {
         num_domains: u32,
         num_nodes_per_domain: u32,
         _redis_url: Option<&str>,
-    ) -> (Vec<futures::future::AbortHandle>, Box<(dyn WorkflowInstanceAPI)>) {
+    ) -> (Vec<futures::future::AbortHandle>, Box<dyn WorkflowInstanceAPI>) {
         assert!(num_domains > 0);
         assert!(num_nodes_per_domain > 0);
 
@@ -78,7 +78,7 @@ mod tests {
         (handles, con_client.workflow_instance_api())
     }
 
-    async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowInstance> {
+    async fn wf_list(client: &mut Box<dyn WorkflowInstanceAPI>) -> Vec<edgeless_api::workflow_instance::WorkflowInstance> {
         (client.list(edgeless_api::workflow_instance::WorkflowId::none()).await).unwrap_or_default()
     }
 

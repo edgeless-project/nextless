@@ -1333,6 +1333,7 @@ dependencies = [
  "log",
  "minicbor",
  "serde",
+ "thiserror 2.0.14",
  "uuid",
 ]
 
