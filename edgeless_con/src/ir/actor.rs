@@ -152,24 +152,8 @@ impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
             constraints: ActorConstraints::from_annotations(&function_req.annotations),
             annotations: function_req.annotations,
             logical_ports: super::LogicalPorts {
-                logical_input_mapping: function_req
-                    .input_mapping
-                    .into_iter()
-                    .map(|(port_id, port)| {
-                        (
-                            port_id,
-                            match port {
-                                edgeless_api::workflow_instance::PortMapping::DirectTarget(target_fid, target_port) => {
-                                    super::LogicalInput::Direct(vec![(target_fid, target_port)])
-                                }
-                                edgeless_api::workflow_instance::PortMapping::AnyOfTargets(targets) => super::LogicalInput::Direct(targets),
-                                edgeless_api::workflow_instance::PortMapping::AllOfTargets(targets) => super::LogicalInput::Direct(targets),
-                                edgeless_api::workflow_instance::PortMapping::Topic(topic) => super::LogicalInput::Topic(topic),
-                            },
-                        )
-                    })
-                    .collect(),
-                logical_output_mapping: function_req.output_mapping.clone(),
+                logical_input_mapping: super::logical_model::parse_api_input_mapping(function_req.input_mapping),
+                logical_output_mapping: super::logical_model::parse_api_output_mapping(function_req.output_mapping),
             },
         }
     }

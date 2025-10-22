@@ -13,10 +13,20 @@ pub(crate) fn mock_function_under_test(
         logical_ports: crate::ir::LogicalPorts {
             logical_output_mapping: std::collections::HashMap::from([(
                 edgeless_api::function_instance::PortId("port1".to_string()),
-                edgeless_api::workflow_instance::PortMapping::DirectTarget(
-                    "f_other".to_string(),
-                    edgeless_api::function_instance::PortId("port_other".to_string()),
-                ),
+                crate::ir::interaction::SourcePortMapping {
+                    dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                        base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                        constraints: std::collections::BTreeSet::new(),
+                    },
+                    mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
+                        destination: crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(
+                            crate::ir::interaction::LogicalPortId {
+                                component: "f_other".to_string(),
+                                port: edgeless_api::function_instance::PortId("port_other".to_string()),
+                            },
+                        ),
+                    }),
+                },
             )]),
             logical_input_mapping: std::collections::HashMap::new(),
         },
@@ -38,10 +48,20 @@ pub(crate) fn mock_function_under_test(
                                 materialized_outputs: std::collections::HashMap::from([(
                                     edgeless_api::function_instance::PortId("port1".to_string()),
                                     crate::ir::MaterializedOutput {
-                                        mapping: edgeless_api::common::Output::Single(
-                                            edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
-                                            edgeless_api::function_instance::PortId("port_other".to_string()),
-                                        ),
+                                        mapping: crate::ir::interaction::SourcePortMapping {
+                                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                                base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                                constraints: std::collections::BTreeSet::new(),
+                                            },
+                                            mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                                                destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(
+                                                    crate::ir::interaction::PhysicalPortId {
+                                                        instance: edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
+                                                        port: edgeless_api::function_instance::PortId("port_other".to_string()),
+                                                    },
+                                                ),
+                                            }),
+                                        },
                                         port_statistics: Some(port_statistics),
                                     },
                                 )]),
@@ -68,7 +88,18 @@ pub(crate) fn mock_peer_function(
         logical_ports: crate::ir::LogicalPorts {
             logical_input_mapping: std::collections::HashMap::from([(
                 edgeless_api::function_instance::PortId("port_other".to_string()),
-                crate::ir::LogicalInput::Direct(vec![("fut".to_string(), edgeless_api::function_instance::PortId("port1".to_string()))]),
+                crate::ir::interaction::DestiantionPortMapping {
+                    dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                        base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                        constraints: std::collections::BTreeSet::new(),
+                    },
+                    mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDestinationPort {
+                        sources: vec![crate::ir::interaction::LogicalPortId {
+                            component: "fut".to_string(),
+                            port: edgeless_api::function_instance::PortId("port1".to_string()),
+                        }],
+                    }),
+                },
             )]),
             logical_output_mapping: std::collections::HashMap::new(),
         },

@@ -37,7 +37,15 @@ impl DeadComponentRemoval {
                 f.image.spec.inner_structure.clone();
             let ports = &mut f.logical_ports_mut();
             ports.logical_output_mapping.retain(|output_id, output_spec: &mut LogicalOutput| {
-                assert!(!std::matches!(output_spec, super::super::LogicalOutput::Topic(_)));
+                // assert!(!std::matches!(output_spec, super::super::LogicalOutput::Topic(_)));
+
+                let m = output_spec.mapping.as_ref() as &dyn std::any::Any;
+                let p = m.downcast_ref::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort>();
+
+                let Some(mapping) = p else {
+                    panic!("Bad Mapping");
+                };
+
                 let this = edgeless_api::function_instance::MappingNode::Port(output_id.clone());
                 for (src, dests) in &inner {
                     if dests.contains(&this) {
@@ -55,19 +63,31 @@ impl DeadComponentRemoval {
                 }
 
                 log::info!("Optimizer wants to remove output: {}", output_id.0);
-                let mut to_remove = match output_spec {
-                    LogicalOutput::DirectTarget(target_node_id, target_port_id) => {
-                        vec![((target_node_id.clone(), target_port_id.clone()), (f_id.clone(), output_id.clone()))]
+                let mut to_remove = match &mapping.destination {
+                    interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => {
+                        vec![(
+                            (logical_port_id.component.clone(), logical_port_id.port.clone()),
+                            (f_id.clone(), output_id.clone()),
+                        )]
                     }
-                    LogicalOutput::AnyOfTargets(targets) => targets
+                    interaction::dialect::logical_overlay::DestinationMapping::Anycast(logical_port_ids) => logical_port_ids
                         .iter()
-                        .map(|(target_node_id, target_port_id)| ((target_node_id.clone(), target_port_id.clone()), (f_id.clone(), output_id.clone())))
+                        .map(|logical_port_id| {
+                            (
+                                (logical_port_id.component.clone(), logical_port_id.port.clone()),
+                                (f_id.clone(), output_id.clone()),
+                            )
+                        })
                         .collect(),
-                    LogicalOutput::AllOfTargets(targets) => targets
+                    interaction::dialect::logical_overlay::DestinationMapping::Multicast(logical_port_ids) => logical_port_ids
                         .iter()
-                        .map(|(target_node_id, target_port_id)| ((target_node_id.clone(), target_port_id.clone()), (f_id.clone(), output_id.clone())))
+                        .map(|logical_port_id| {
+                            (
+                                (logical_port_id.component.clone(), logical_port_id.port.clone()),
+                                (f_id.clone(), output_id.clone()),
+                            )
+                        })
                         .collect(),
-                    LogicalOutput::Topic(_) => vec![],
                 };
                 input_links_to_remove.append(&mut to_remove);
                 changed = true;
@@ -79,10 +99,17 @@ impl DeadComponentRemoval {
             if let Some(source) = slf.functions.get_mut(target_component_id) {
                 let mut source = source.borrow_mut();
                 let mut remove = false;
-                if let Some(LogicalInput::Direct(sources)) = source.logical_ports_mut().logical_input_mapping.get_mut(target_port_id) {
-                    sources.retain(|(s_id, s_p_id)| s_id != source_component_id && s_p_id != source_port_id);
-                    if sources.is_empty() {
-                        remove = true;
+
+                if let Some(input_spec) = source.logical_ports_mut().logical_input_mapping.get_mut(target_port_id) {
+                    let m = input_spec.mapping.as_mut() as &mut dyn std::any::Any;
+                    let p = m.downcast_mut::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDestinationPort>();
+                    if let Some(input) = p {
+                        input
+                            .sources
+                            .retain(|source_port| &source_port.component != source_component_id && &source_port.port != source_port_id);
+                        if input.sources.is_empty() {
+                            remove = true;
+                        }
                     }
                 }
                 if remove {
@@ -104,7 +131,10 @@ impl DeadComponentRemoval {
             let behavior = f.image.clone();
             let f_ports = &mut f.logical_ports_mut();
             f_ports.logical_input_mapping.retain(|input_id, input_spec| {
-                if let LogicalInput::Direct(mapped_inputs) = input_spec {
+                let m = input_spec.mapping.as_mut() as &mut dyn std::any::Any;
+                let p = m.downcast_mut::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDestinationPort>();
+
+                if let Some(input_spec) = p {
                     let port_method = behavior.spec.input_ports.get(input_id).unwrap().method.clone();
                     // We only need to worry about removing casts as calls will always be usefull
                     if port_method == edgeless_api::function_instance::PortMethod::Cast {
@@ -127,9 +157,10 @@ impl DeadComponentRemoval {
                         log::info!("Optimizer wants to remove input: {}", input_id.0);
 
                         output_links_to_remove.append(
-                            &mut mapped_inputs
+                            &mut input_spec
+                                .sources
                                 .iter()
-                                .map(|(o_comp, o_port)| ((o_comp.clone(), o_port.clone()), (f_id.clone(), input_id.clone())))
+                                .map(|o| ((o.component.clone(), o.port.clone()), (f_id.clone(), input_id.clone())))
                                 .collect(),
                         );
                         changed = true;
@@ -148,25 +179,33 @@ impl DeadComponentRemoval {
                 let mut source = source.borrow_mut();
                 let mut remove = false;
                 if let Some(source_port) = source.logical_ports_mut().logical_output_mapping.get_mut(source_port_id) {
-                    match source_port {
-                        LogicalOutput::DirectTarget(target_id, target_port_id) => {
-                            if target_id == dest_id && target_port_id == dest_port_id {
+                    let m = source_port.mapping.as_mut() as &mut dyn std::any::Any;
+                    let p = m.downcast_mut::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort>();
+
+                    let Some(logical_source_port) = p else {
+                        continue;
+                    };
+
+                    match &mut logical_source_port.destination {
+                        interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => {
+                            if &logical_port_id.component == dest_id && &logical_port_id.port == dest_port_id {
                                 remove = true;
                             }
                         }
-                        LogicalOutput::AnyOfTargets(targets) => {
-                            targets.retain(|(target_id, target_port_id)| !(target_id == dest_id && target_port_id == dest_port_id));
-                            if targets.is_empty() {
+                        interaction::dialect::logical_overlay::DestinationMapping::Anycast(logical_port_ids) => {
+                            logical_port_ids
+                                .retain(|logical_port_id| !(&logical_port_id.component == dest_id && &logical_port_id.port == dest_port_id));
+                            if logical_port_ids.is_empty() {
                                 remove = true;
                             }
                         }
-                        LogicalOutput::AllOfTargets(targets) => {
-                            targets.retain(|(target_id, target_port_id)| !(target_id == dest_id && target_port_id == dest_port_id));
-                            if targets.is_empty() {
+                        interaction::dialect::logical_overlay::DestinationMapping::Multicast(logical_port_ids) => {
+                            logical_port_ids
+                                .retain(|logical_port_id| !(&logical_port_id.component == dest_id && &logical_port_id.port == dest_port_id));
+                            if logical_port_ids.is_empty() {
                                 remove = true;
                             }
                         }
-                        LogicalOutput::Topic(_) => {}
                     }
                 }
                 if remove {

@@ -34,8 +34,18 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
             let (logical_ports, physical_instances) = component.split_view();
 
             for (output_id, output) in &logical_ports.logical_output_mapping {
-                match output {
-                    LogicalOutput::DirectTarget(target_component, target_port_id) => {
+                let m = output.mapping.as_ref() as &dyn std::any::Any;
+                let p = m.downcast_ref::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort>();
+
+                let Some(logical_output) = p else {
+                    continue;
+                };
+
+                match &logical_output.destination {
+                    interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => {
+                        let target_component = &logical_port_id.component;
+                        let target_port_id = &logical_port_id.port;
+
                         let mut instances = components.get(target_component).unwrap().clone();
 
                         if instances.len() > 1 {
@@ -44,74 +54,163 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                                 if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
                                     c_instance.physical_ports().physical_output_mapping.insert(
                                         output_id.clone(),
-                                        PhysicalOutput::Any(instances.iter().map(|i| (*i, target_port_id.clone())).collect()),
+                                        crate::ir::interaction::SourcePortMapping {
+                                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                                base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                                constraints: std::collections::BTreeSet::new(),
+                                            },
+                                            mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                                                destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(
+                                                    instances
+                                                        .iter()
+                                                        .map(|i| crate::ir::interaction::PhysicalPortId {
+                                                            instance: *i,
+                                                            port: target_port_id.clone(),
+                                                        })
+                                                        .collect(),
+                                                ),
+                                            }),
+                                        },
                                     );
                                 }
                             }
                         } else if let Some(id) = instances.pop() {
                             for c_instance in &physical_instances {
                                 if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
-                                    c_instance
-                                        .physical_ports()
-                                        .physical_output_mapping
-                                        .insert(output_id.clone(), PhysicalOutput::Single(id, target_port_id.clone()));
+                                    c_instance.physical_ports().physical_output_mapping.insert(
+                                        output_id.clone(),
+                                        crate::ir::interaction::SourcePortMapping {
+                                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                                base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                                constraints: std::collections::BTreeSet::new(),
+                                            },
+                                            mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                                                destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(
+                                                    crate::ir::interaction::PhysicalPortId {
+                                                        instance: id,
+                                                        port: target_port_id.clone(),
+                                                    },
+                                                ),
+                                            }),
+                                        },
+                                    );
                                 }
                             }
                         }
                     }
-                    LogicalOutput::AnyOfTargets(targets) => {
+                    interaction::dialect::logical_overlay::DestinationMapping::Anycast(logical_port_ids) => {
                         let mut instances = Vec::new();
-                        for (target_id, port_id) in targets {
+                        for logical_port_id in logical_port_ids {
+                            let target_id = &logical_port_id.component;
+                            let port_id = &logical_port_id.port;
                             instances.append(
                                 &mut components
                                     .get(target_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|target| (*target, port_id.clone()))
+                                    .map(|target| crate::ir::interaction::PhysicalPortId {
+                                        instance: *target,
+                                        port: port_id.clone(),
+                                    })
                                     .collect(),
                             )
                         }
                         for c_instance in &physical_instances {
                             if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
-                                c_instance
-                                    .physical_ports()
-                                    .physical_output_mapping
-                                    .insert(output_id.clone(), PhysicalOutput::Any(instances.clone()));
+                                c_instance.physical_ports().physical_output_mapping.insert(
+                                    output_id.clone(),
+                                    crate::ir::interaction::SourcePortMapping {
+                                        dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                            base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                            constraints: std::collections::BTreeSet::new(),
+                                        },
+                                        mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                                            destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(
+                                                instances.clone(),
+                                            ),
+                                        }),
+                                    },
+                                );
                             }
                         }
                     }
-                    LogicalOutput::AllOfTargets(targets) => {
+                    interaction::dialect::logical_overlay::DestinationMapping::Multicast(logical_port_ids) => {
                         let mut instances = Vec::new();
-                        for (target_id, port_id) in targets {
+                        for logical_port_id in logical_port_ids {
+                            let target_id = &logical_port_id.component;
+                            let port_id = &logical_port_id.port;
                             instances.append(
                                 &mut components
                                     .get(target_id)
                                     .unwrap()
                                     .iter()
-                                    .map(|target| (*target, port_id.clone()))
+                                    .map(|target| crate::ir::interaction::PhysicalPortId {
+                                        instance: *target,
+                                        port: port_id.clone(),
+                                    })
                                     .collect(),
                             )
                         }
                         for c_instance in &physical_instances {
                             if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
-                                c_instance
-                                    .physical_ports()
-                                    .physical_output_mapping
-                                    .insert(output_id.clone(), PhysicalOutput::All(instances.clone()));
+                                c_instance.physical_ports().physical_output_mapping.insert(
+                                    output_id.clone(),
+                                    crate::ir::interaction::SourcePortMapping {
+                                        dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                            base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                            constraints: std::collections::BTreeSet::new(),
+                                        },
+                                        mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                                            destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(
+                                                instances.clone(),
+                                            ),
+                                        }),
+                                    },
+                                );
                             }
                         }
                     }
-                    LogicalOutput::Topic(_) => {}
                 }
             }
 
-            for input_id in logical_ports.logical_input_mapping.keys() {
+            for (input_id, input) in &logical_ports.logical_input_mapping {
+                let any_mapping = input.mapping.as_ref() as &dyn std::any::Any;
+                let maybe_mapping = any_mapping.downcast_ref::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDestinationPort>();
+
+                let Some(mapping) = maybe_mapping else {
+                    continue;
+                };
+
+                let mut sources = Vec::new();
+                for logical_port_id in &mapping.sources {
+                    let target_id = &logical_port_id.component;
+                    let port_id = &logical_port_id.port;
+                    sources.append(
+                        &mut components
+                            .get(target_id)
+                            .unwrap()
+                            .iter()
+                            .map(|target| crate::ir::interaction::PhysicalPortId {
+                                instance: *target,
+                                port: port_id.clone(),
+                            })
+                            .collect(),
+                    )
+                }
                 for c_instance in &physical_instances {
                     if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
-                        c_instance
-                            .physical_ports()
-                            .physical_input_mapping
-                            .insert(input_id.clone(), edgeless_api::common::Input::Stub);
+                        c_instance.physical_ports().physical_input_mapping.insert(
+                            input_id.clone(),
+                            crate::ir::interaction::DestiantionPortMapping {
+                                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                    base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                    constraints: std::collections::BTreeSet::new(),
+                                },
+                                mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayDestinationPort {
+                                    sources: sources.clone(),
+                                }),
+                            },
+                        );
                     }
                 }
             }

@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-struct ActiveMulticastLink {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ActiveMulticastLink {
     addr: std::net::Ipv4Addr,
     #[allow(unused)]
     active_nodes: Vec<edgeless_api::function_instance::NodeId>,

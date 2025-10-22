@@ -126,27 +126,29 @@ impl LogicalProxy {
             logical_ports: super::LogicalPorts {
                 logical_output_mapping: ingress_proxies
                     .iter()
-                    .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.inner_output.clone()))
+                    .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.inner_output.clone().into()))
                     .collect(),
                 logical_input_mapping: egress_proxies
                     .iter()
-                    .filter_map(|e| match &e.inner_input {
-                        edgeless_api::workflow_instance::PortMapping::Topic(t) => Some((
-                            edgeless_api::function_instance::PortId(e.id.clone()),
-                            super::LogicalInput::Topic(t.clone()),
-                        )),
-                        _ => None,
+                    .filter_map(|e| match e.inner_input.clone().try_into() {
+                        Ok(port) => Some((edgeless_api::function_instance::PortId(e.id.clone()), port)),
+                        Err(_) => None,
                     })
                     .collect(),
             },
             external_ports: super::ExternalPorts {
                 external_input_mapping: ingress_proxies
                     .iter()
-                    .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.external_input.clone()))
+                    .map(|i| {
+                        (
+                            edgeless_api::function_instance::PortId(i.id.clone()),
+                            i.external_input.clone().try_into().unwrap(),
+                        )
+                    })
                     .collect(),
                 external_output_mapping: egress_proxies
                     .iter()
-                    .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.external_output.clone()))
+                    .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.external_output.clone().into()))
                     .collect(),
             },
             instances: Vec::new(),

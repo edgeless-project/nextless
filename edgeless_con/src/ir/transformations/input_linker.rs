@@ -17,60 +17,85 @@ impl super::StatelessTransformation for InputLinker {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mut inputs = std::collections::HashMap::<
             String,
-            std::collections::HashMap<edgeless_api::function_instance::PortId, Vec<(String, edgeless_api::function_instance::PortId)>>,
+            std::collections::HashMap<edgeless_api::function_instance::PortId, Vec<interaction::LogicalPortId>>,
         >::new();
 
         for (out_cid, fdesc) in workflow.components() {
             for (out_port, mapping) in &fdesc.borrow_mut().logical_ports().logical_output_mapping {
-                match mapping {
-                    LogicalOutput::DirectTarget(target_fid, target_port) => inputs
-                        .entry(target_fid.clone())
+                let m = mapping.mapping.as_ref() as &dyn std::any::Any;
+                let p = m.downcast_ref::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort>();
+
+                let Some(mapping) = p else {
+                    continue;
+                };
+
+                match &mapping.destination {
+                    interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => inputs
+                        .entry(logical_port_id.component.clone())
                         .or_default()
-                        .entry(target_port.clone())
+                        .entry(logical_port_id.port.clone())
                         .or_default()
-                        .push((out_cid.to_string(), out_port.clone())),
-                    LogicalOutput::AnyOfTargets(targets) => {
-                        for (target_fid, target_port) in targets {
+                        .push(interaction::LogicalPortId {
+                            component: out_cid.to_string(),
+                            port: out_port.clone(),
+                        }),
+                    interaction::dialect::logical_overlay::DestinationMapping::Anycast(logical_port_ids) => {
+                        for logical_port_id in logical_port_ids {
                             inputs
-                                .entry(target_fid.clone())
+                                .entry(logical_port_id.component.clone())
                                 .or_default()
-                                .entry(target_port.clone())
+                                .entry(logical_port_id.port.clone())
                                 .or_default()
-                                .push((out_cid.to_string(), out_port.clone()))
+                                .push(interaction::LogicalPortId {
+                                    component: out_cid.to_string(),
+                                    port: out_port.clone(),
+                                })
                         }
                     }
-                    LogicalOutput::AllOfTargets(targets) => {
-                        for (target_fid, target_port) in targets {
+                    interaction::dialect::logical_overlay::DestinationMapping::Multicast(logical_port_ids) => {
+                        for logical_port_id in logical_port_ids {
                             inputs
-                                .entry(target_fid.clone())
+                                .entry(logical_port_id.component.clone())
                                 .or_default()
-                                .entry(target_port.clone())
+                                .entry(logical_port_id.port.clone())
                                 .or_default()
-                                .push((out_cid.to_string(), out_port.clone()))
+                                .push(interaction::LogicalPortId {
+                                    component: out_cid.to_string(),
+                                    port: out_port.clone(),
+                                })
                         }
                     }
-                    LogicalOutput::Topic(_) => {}
                 }
             }
         }
 
-        for (targed_fid, links) in &inputs {
-            if let Some(target) = workflow.functions.get_mut(targed_fid) {
+        for (targed_fid, links) in inputs {
+            if let Some(target) = workflow.functions.get_mut(&targed_fid) {
                 for (target_port, sources) in links {
-                    target
-                        .borrow_mut()
-                        .logical_ports
-                        .logical_input_mapping
-                        .insert(target_port.clone(), LogicalInput::Direct(sources.clone()));
+                    target.borrow_mut().logical_ports.logical_input_mapping.insert(
+                        target_port.clone(),
+                        interaction::DestiantionPortMapping {
+                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                                constraints: std::collections::BTreeSet::new(),
+                            },
+                            mapping: Box::new(interaction::dialect::logical_overlay::LogicalOverlayDestinationPort { sources: sources }),
+                        },
+                    );
                 }
-            } else if let Some(target) = workflow.resources.get_mut(targed_fid) {
+            } else if let Some(target) = workflow.resources.get_mut(&targed_fid) {
                 // Some(&mut target.borrow_mut().ports)
                 for (target_port, sources) in links {
-                    target
-                        .borrow_mut()
-                        .logical_ports
-                        .logical_input_mapping
-                        .insert(target_port.clone(), LogicalInput::Direct(sources.clone()));
+                    target.borrow_mut().logical_ports.logical_input_mapping.insert(
+                        target_port.clone(),
+                        interaction::DestiantionPortMapping {
+                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                                constraints: std::collections::BTreeSet::new(),
+                            },
+                            mapping: Box::new(interaction::dialect::logical_overlay::LogicalOverlayDestinationPort { sources: sources }),
+                        },
+                    );
                 }
             }
         }

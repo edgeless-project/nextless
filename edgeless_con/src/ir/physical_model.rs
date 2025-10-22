@@ -75,8 +75,93 @@ pub trait PortStatistics: Sync + Send {
     // fn latency_by_peer_mean_secs(&self, period: Option<std::time::Duration>) -> Vec<(edgeless_api::function_instance::InstanceId, f64)>;
 }
 
-pub type PhysicalOutput = edgeless_api::common::Output;
-pub type PhysicalInput = edgeless_api::common::Input;
+pub type PhysicalOutput = crate::ir::interaction::SourcePortMapping;
+pub type PhysicalInput = crate::ir::interaction::DestiantionPortMapping;
+
+pub fn parse_api_output_mapping(
+    mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
+) -> std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping> {
+    mapping.into_iter().map(|(port_id, port)| (port_id, port.into())).collect()
+}
+
+impl From<edgeless_api::common::Output> for PhysicalOutput {
+    fn from(value: edgeless_api::common::Output) -> Self {
+        match value {
+            edgeless_api::common::Output::Single(instance_id, port_id) => crate::ir::interaction::SourcePortMapping {
+                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                    base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                    constraints: std::collections::BTreeSet::new(),
+                },
+                mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                    destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(
+                        crate::ir::interaction::PhysicalPortId {
+                            instance: instance_id,
+                            port: port_id,
+                        },
+                    ),
+                }),
+            },
+            edgeless_api::common::Output::Any(items) => crate::ir::interaction::SourcePortMapping {
+                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                    base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                    constraints: std::collections::BTreeSet::new(),
+                },
+                mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                    destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(
+                        items
+                            .into_iter()
+                            .map(|i| crate::ir::interaction::PhysicalPortId { instance: i.0, port: i.1 })
+                            .collect(),
+                    ),
+                }),
+            },
+            edgeless_api::common::Output::All(items) => crate::ir::interaction::SourcePortMapping {
+                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                    base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                    constraints: std::collections::BTreeSet::new(),
+                },
+                mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                    destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(
+                        items
+                            .into_iter()
+                            .map(|i| crate::ir::interaction::PhysicalPortId { instance: i.0, port: i.1 })
+                            .collect(),
+                    ),
+                }),
+            },
+            edgeless_api::common::Output::Link(_link_instance_id) => {
+                panic!("Link Parsing not Implemented Yet.")
+            }
+        }
+    }
+}
+
+pub fn parse_api_input_mapping(
+    mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
+) -> std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping> {
+    mapping
+        .into_iter()
+        .filter_map(|(port_id, port)| match port.try_into() {
+            Ok(port) => Some((port_id, port)),
+            Err(_) => None,
+        })
+        .collect()
+}
+
+impl TryFrom<edgeless_api::common::Input> for PhysicalInput {
+    type Error = anyhow::Error;
+
+    fn try_from(value: edgeless_api::common::Input) -> Result<Self, Self::Error> {
+        match value {
+            edgeless_api::common::Input::Stub => {
+                panic!("Handling Stubs not Implemented Yet.")
+            }
+            edgeless_api::common::Input::Link(_link_instance_id) => {
+                panic!("Link Parsing not Implemented Yet.")
+            }
+        }
+    }
+}
 
 #[derive(Clone, Default, Debug)]
 pub struct PhysicalPorts {
@@ -91,12 +176,12 @@ pub struct MaterializedPorts {
 }
 
 pub struct MaterializedInput {
-    pub(crate) mapping: edgeless_api::common::Input,
+    pub(crate) mapping: PhysicalInput,
     pub(crate) port_statistics: Option<Box<dyn PortStatistics>>,
 }
 
 pub struct MaterializedOutput {
-    pub(crate) mapping: edgeless_api::common::Output,
+    pub(crate) mapping: PhysicalOutput,
     pub(crate) port_statistics: Option<Box<dyn PortStatistics>>,
 }
 

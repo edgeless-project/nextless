@@ -70,8 +70,8 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
     ) -> Vec<super::RequiredChange> {
         {
             let mut prx = self.wf.proxy.borrow_mut();
-            prx.external_ports.external_input_mapping = update.input_mapping;
-            prx.external_ports.external_output_mapping = update.output_mapping;
+            prx.external_ports.external_input_mapping = crate::ir::physical_model::parse_api_input_mapping(update.input_mapping);
+            prx.external_ports.external_output_mapping = crate::ir::physical_model::parse_api_output_mapping(update.output_mapping);
         }
         self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
         self.materialize()

@@ -12,44 +12,47 @@ pub fn peer_weights(
 
     {
         for (input_id, input) in &component.logical_ports().logical_input_mapping {
-            match input {
-                crate::ir::LogicalInput::Direct(items) => {
-                    let ilen = items.len() as f64;
-                    for (item_id, _) in items {
-                        let port_weight = *port_weights.get(&input_id.0).unwrap() as f64;
-                        total += port_weight * 1.0f64 / ilen;
-                        *logical_peers.entry(item_id.clone()).or_insert(0.0f64) += port_weight * 1.0f64 / ilen;
-                    }
-                }
-                crate::ir::LogicalInput::Topic(_) => {
-                    log::warn!("Topic Port occured after logical phase.")
+            let m = input.mapping.as_ref() as &dyn std::any::Any;
+            let p = m.downcast_ref::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDestinationPort>();
+
+            if let Some(mapping) = p {
+                let ilen = mapping.sources.len() as f64;
+                for source in &mapping.sources {
+                    let port_weight = *port_weights.get(&input_id.0).unwrap() as f64;
+                    total += port_weight * 1.0f64 / ilen;
+                    *logical_peers.entry(source.component.clone()).or_insert(0.0f64) += port_weight * 1.0f64 / ilen;
                 }
             }
         }
 
         for (output_id, output) in &component.logical_ports().logical_output_mapping {
-            match output {
-                edgeless_api::workflow_instance::PortMapping::DirectTarget(logical_id, _port_id) => {
+            let m = output.mapping.as_ref() as &dyn std::any::Any;
+            let p = m.downcast_ref::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort>();
+
+            let Some(mapping) = p else {
+                continue;
+            };
+
+            match &mapping.destination {
+                crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => {
                     let port_weight = *port_weights.get(&output_id.0).unwrap() as f64;
                     total += port_weight;
-                    *logical_peers.entry(logical_id.clone()).or_insert(0.0f64) += port_weight;
+                    *logical_peers.entry(logical_port_id.component.clone()).or_insert(0.0f64) += port_weight;
                 }
-                edgeless_api::workflow_instance::PortMapping::AnyOfTargets(items) => {
-                    for (logical_id, _port_id) in items {
+                crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Anycast(logical_port_ids) => {
+                    for logical_port_id in logical_port_ids {
                         let port_weight = *port_weights.get(&output_id.0).unwrap() as f64;
-                        total += port_weight * 1.0f64 / items.len() as f64;
-                        *logical_peers.entry(logical_id.clone()).or_insert(0.0f64) += port_weight * 1.0f64 / items.len() as f64;
+                        total += port_weight * 1.0f64 / logical_port_ids.len() as f64;
+                        *logical_peers.entry(logical_port_id.component.clone()).or_insert(0.0f64) +=
+                            port_weight * 1.0f64 / logical_port_ids.len() as f64;
                     }
                 }
-                edgeless_api::workflow_instance::PortMapping::AllOfTargets(items) => {
-                    for (logical_id, _port_id) in items {
+                crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Multicast(logical_port_ids) => {
+                    for logical_port_id in logical_port_ids {
                         let port_weight = *port_weights.get(&output_id.0).unwrap() as f64;
                         total += port_weight;
-                        *logical_peers.entry(logical_id.clone()).or_insert(0.0f64) += port_weight;
+                        *logical_peers.entry(logical_port_id.component.clone()).or_insert(0.0f64) += port_weight;
                     }
-                }
-                edgeless_api::workflow_instance::PortMapping::Topic(_) => {
-                    log::warn!("Topic Port occured after logical phase.")
                 }
             }
         }

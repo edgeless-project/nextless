@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use crate::ir::interaction::{dialect::InteractionDialect, DestiantionPortMapping, SourcePortMapping};
+
 use super::super::*;
 
 pub struct TopicConverter {}
@@ -15,7 +17,8 @@ impl TopicConverter {
 
 impl super::StatelessTransformation for TopicConverter {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
-        let mut targets = std::collections::HashMap::<String, Vec<(String, edgeless_api::function_instance::PortId)>>::new();
+        let mut srcs = Vec::new();
+        let mut dests = Vec::new();
 
         // Find Targets
         for (cid, component) in &mut workflow.components() {
@@ -23,33 +26,112 @@ impl super::StatelessTransformation for TopicConverter {
                 .borrow_mut()
                 .logical_ports_mut()
                 .logical_input_mapping
-                .retain(|port_id, port_mapping| match port_mapping {
-                    LogicalInput::Topic(topic) => {
-                        targets.entry(topic.clone()).or_default().push((cid.to_string(), port_id.clone()));
-                        false
+                .retain(|port_id, port_mapping| {
+                    let m = port_mapping.mapping.as_ref() as &dyn std::any::Any;
+                    let p = m.downcast_ref::<crate::ir::interaction::dialect::topic_pub_sub::TopicPubSubDestinationPort>();
+
+                    match p {
+                        Some(topic_port) => {
+                            dests.push((
+                                interaction::LogicalPortId {
+                                    component: cid.to_string(),
+                                    port: port_id.clone(),
+                                },
+                                topic_port.clone(),
+                            ));
+                            false
+                        }
+                        None => true,
                     }
-                    _ => true,
+                });
+            component
+                .borrow_mut()
+                .logical_ports_mut()
+                .logical_output_mapping
+                .retain(|port_id, port_mapping| {
+                    let m = port_mapping.mapping.as_ref() as &dyn std::any::Any;
+                    let p = m.downcast_ref::<crate::ir::interaction::dialect::topic_pub_sub::TopicPubSubSourcePort>();
+
+                    match p {
+                        Some(topic_port) => {
+                            srcs.push((
+                                interaction::LogicalPortId {
+                                    component: cid.to_string(),
+                                    port: port_id.clone(),
+                                },
+                                topic_port.clone(),
+                            ));
+                            false
+                        }
+                        None => true,
+                    }
                 })
         }
 
-        // Create Outputs
-        for (_cid, component) in &mut workflow.components() {
-            let mut component = component.borrow_mut();
-            let output_mapping = &mut component.logical_ports_mut().logical_output_mapping;
+        let interactions = crate::ir::interaction::dialect::topic_pub_sub::TopicPubSubDialect {}.ports_to_interaction(srcs, dests);
 
-            *output_mapping = std::mem::take(output_mapping)
-                .into_iter()
-                .filter_map(|(port_id, port_mapping)| {
-                    if let LogicalOutput::Topic(topic) = port_mapping.clone() {
-                        if let Some(t) = targets.get(&topic) {
-                            return Some((port_id, LogicalOutput::AllOfTargets(t.clone())));
-                        }
-                        None
-                    } else {
-                        Some((port_id, port_mapping))
-                    }
-                })
-                .collect();
+        let mapped_interactions: Vec<interaction::dialect::logical_overlay::LogicalOverlayInteraction> = interactions
+            .into_iter()
+            .flat_map(|i| crate::ir::interaction::dialect::topic_pub_sub::TopicPubSubDialect::translate_to_logical_overlay(i))
+            .collect();
+
+        let mut replacement_srcs = std::collections::BTreeMap::<
+            String,
+            std::collections::BTreeMap<edgeless_api::function_instance::PortId, interaction::dialect::logical_overlay::LogicalOverlaySourcePort>,
+        >::new();
+        let mut replacement_dests = std::collections::BTreeMap::<
+            String,
+            std::collections::BTreeMap<edgeless_api::function_instance::PortId, interaction::dialect::logical_overlay::LogicalOverlayDestinationPort>,
+        >::new();
+
+        for i in mapped_interactions {
+            let (s, d) = crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDialect {}.interaction_to_ports(i);
+            for (port_id, source_spec) in s {
+                replacement_srcs
+                    .entry(port_id.component.clone())
+                    .or_default()
+                    .insert(port_id.port.clone(), source_spec);
+            }
+            for (port_id, dest_spec) in d {
+                replacement_dests
+                    .entry(port_id.component.clone())
+                    .or_default()
+                    .insert(port_id.port.clone(), dest_spec);
+            }
+        }
+
+        for (cid, component) in &mut workflow.components() {
+            let mut c = component.borrow_mut();
+            let ports = c.logical_ports_mut();
+
+            let inputs = replacement_dests.remove(&cid.to_string()).unwrap_or_default();
+            let outputs = replacement_srcs.remove(&cid.to_string()).unwrap_or_default();
+
+            for (input_port_id, input_port_spec) in inputs {
+                ports.logical_input_mapping.insert(
+                    input_port_id,
+                    DestiantionPortMapping {
+                        dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                            base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                            constraints: std::collections::BTreeSet::new(),
+                        },
+                        mapping: Box::new(input_port_spec),
+                    },
+                );
+            }
+
+            for (ouput_port_id, output_port_spec) in outputs {
+                ports.logical_output_mapping.insert(
+                    ouput_port_id,
+                    SourcePortMapping {
+                        dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                            base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                            constraints: std::collections::BTreeSet::new(),
+                        },
+                        mapping: Box::new(output_port_spec),
+                    },
+                );
+            }
         }
     }
 }

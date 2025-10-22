@@ -405,6 +405,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
 
         self.image_repository.update(image.image.image_hash(), image.image.clone()).await;
 
+        let (api_output_mapping, api_input_mapping) = Self::convert_mappings(output_mapping, input_mapping);
+
         let response = self
             .fn_client(&function_id.node_id)
             .await
@@ -429,8 +431,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     state_id: uuid::Uuid::new_v4(),
                     state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
                 },
-                input_mapping: input_mapping.clone(),
-                output_mapping: output_mapping.clone(),
+                input_mapping: api_input_mapping,
+                output_mapping: api_output_mapping,
             })
             .await;
 
@@ -469,6 +471,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalInput>,
         configurations: std::collections::HashMap<String, String>,
     ) -> Result<(), String> {
+        let (api_output_mapping, api_input_mapping) = Self::convert_mappings(output_mapping, input_mapping);
+
         let response = self
             .resource_client(&resource_id.node_id)
             .await
@@ -477,8 +481,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 resource_id,
                 class_type: class_type.clone(),
                 configuration: configurations.clone(),
-                output_mapping: output_mapping.clone(),
-                input_mapping: input_mapping.clone(),
+                output_mapping: api_output_mapping,
+                input_mapping: api_input_mapping,
             })
             .await;
 
@@ -513,21 +517,24 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     async fn start_proxy_on_node(
         &mut self,
         proxy_id: edgeless_api::function_instance::InstanceId,
-        internal_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        internal_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
-        external_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
+        internal_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping>,
+        internal_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping>,
+        external_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping>,
+        external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping>,
     ) -> Result<(), String> {
+        let (internal_api_outputs, internal_api_inputs) = Self::convert_mappings(internal_outputs, internal_inputs);
+        let (external_api_outputs, external_api_inputs) = Self::convert_mappings(external_outputs, external_inputs);
+
         match self
             .proxy_client(&proxy_id.node_id)
             .await
             .ok_or(format!("No proxy client for node {}", proxy_id.node_id))?
             .start(edgeless_api::proxy_instance::ProxySpec {
                 instance_id: proxy_id,
-                inner_outputs: internal_outputs,
-                inner_inputs: internal_inputs,
-                external_outputs,
-                external_inputs,
+                inner_outputs: internal_api_outputs,
+                inner_inputs: internal_api_inputs,
+                external_outputs: external_api_outputs,
+                external_inputs: external_api_inputs,
             })
             .await
         {
@@ -577,10 +584,12 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         &mut self,
         origin_id: edgeless_api::function_instance::InstanceId,
         origin_type: super::ComponentType,
-        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
-        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
+        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping>,
+        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping>,
         name_in_workflow: &str,
     ) -> Result<(), String> {
+        let (api_output_mapping, api_input_mapping) = Self::convert_mappings(output_mapping, input_mapping);
+
         match origin_type {
             super::ComponentType::Function => {
                 match self
@@ -589,8 +598,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     .ok_or(format!("No function client for node: {}", origin_id.node_id))?
                     .patch(edgeless_api::common::PatchRequest {
                         function_id: origin_id,
-                        output_mapping,
-                        input_mapping,
+                        output_mapping: api_output_mapping,
+                        input_mapping: api_input_mapping,
                     })
                     .await
                 {
@@ -605,8 +614,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     .ok_or(format!("No resource client for node: {}", origin_id.node_id))?
                     .patch(edgeless_api::common::PatchRequest {
                         function_id: origin_id,
-                        output_mapping,
-                        input_mapping,
+                        output_mapping: api_output_mapping,
+                        input_mapping: api_input_mapping,
                     })
                     .await
                 {
@@ -621,8 +630,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     .ok_or(format!("No workflow client for cluster {}", origin_id.node_id))?
                     .patch(edgeless_api::common::PatchRequest {
                         function_id: origin_id,
-                        output_mapping,
-                        input_mapping,
+                        output_mapping: api_output_mapping,
+                        input_mapping: api_input_mapping,
                     })
                     .await
                 {
@@ -633,24 +642,96 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         }
     }
 
+    fn convert_mappings(
+        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping>,
+        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping>,
+    ) -> (
+        std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
+        std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
+    ) {
+        let mut api_output_mapping = std::collections::HashMap::<edgeless_api::function_instance::PortId, edgeless_api::common::Output>::new();
+        let mut api_input_mapping = std::collections::HashMap::<edgeless_api::function_instance::PortId, edgeless_api::common::Input>::new();
+
+        for (port, output_port) in output_mapping {
+            let any_mapping = output_port.mapping.as_ref() as &dyn std::any::Any;
+
+            let maybe_overlay_mapping = any_mapping.downcast_ref::<crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort>();
+            if let Some(overlay_mapping) = maybe_overlay_mapping {
+                match &overlay_mapping.destination {
+                    crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(physical_port_id) => {
+                        api_output_mapping.insert(
+                            port,
+                            edgeless_api::common::Output::Single(physical_port_id.instance, physical_port_id.port.clone()),
+                        );
+                    }
+                    crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(physical_port_ids) => {
+                        api_output_mapping.insert(
+                            port,
+                            edgeless_api::common::Output::Any(physical_port_ids.iter().map(|p| (p.instance, p.port.clone())).collect()),
+                        );
+                    }
+                    crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(physical_port_ids) => {
+                        api_output_mapping.insert(
+                            port,
+                            edgeless_api::common::Output::Any(physical_port_ids.iter().map(|p| (p.instance, p.port.clone())).collect()),
+                        );
+                    }
+                }
+                continue;
+            }
+
+            let maybe_overlay_mapping = any_mapping.downcast_ref::<crate::ir::interaction::dialect::ip_multicast::IpMulticastSourcePort>();
+            if let Some(overlay_mapping) = maybe_overlay_mapping {
+                api_output_mapping.insert(port, edgeless_api::common::Output::Link(overlay_mapping.link_id.clone()));
+                continue;
+            }
+
+            log::warn!("Unknown Mapping!");
+        }
+
+        for (port, output_port) in input_mapping {
+            let any_mapping = output_port.mapping.as_ref() as &dyn std::any::Any;
+
+            let maybe_overlay_mapping =
+                any_mapping.downcast_ref::<crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayDestinationPort>();
+            if let Some(overlay_mapping) = maybe_overlay_mapping {
+                api_input_mapping.insert(port, edgeless_api::common::Input::Stub);
+                continue;
+            }
+
+            let maybe_overlay_mapping = any_mapping.downcast_ref::<crate::ir::interaction::dialect::ip_multicast::IpMulticastDestinationPort>();
+            if let Some(overlay_mapping) = maybe_overlay_mapping {
+                api_input_mapping.insert(port, edgeless_api::common::Input::Link(overlay_mapping.link_id.clone()));
+                continue;
+            }
+
+            log::warn!("Unknown Mapping!");
+        }
+
+        (api_output_mapping, api_input_mapping)
+    }
+
     async fn patch_proxy_instance(
         &mut self,
         proxy_id: edgeless_api::function_instance::InstanceId,
-        internal_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        internal_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
-        external_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
-        external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
+        internal_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping>,
+        internal_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping>,
+        external_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping>,
+        external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping>,
     ) -> Result<(), String> {
+        let (internal_api_outputs, internal_api_inputs) = Self::convert_mappings(internal_outputs, internal_inputs);
+        let (external_api_outputs, external_api_inputs) = Self::convert_mappings(external_outputs, external_inputs);
+
         match self
             .proxy_client(&proxy_id.node_id)
             .await
             .ok_or(format!("No proxy client for node {}", proxy_id.node_id))?
             .patch(edgeless_api::proxy_instance::ProxySpec {
                 instance_id: proxy_id,
-                inner_outputs: internal_outputs,
-                inner_inputs: internal_inputs,
-                external_outputs,
-                external_inputs,
+                inner_outputs: internal_api_outputs,
+                inner_inputs: internal_api_inputs,
+                external_outputs: external_api_outputs,
+                external_inputs: external_api_inputs,
             })
             .await
         {
@@ -664,7 +745,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         link_id: edgeless_api::link::LinkInstanceId,
         class: edgeless_api::link::LinkType,
     ) -> Result<(), String> {
-        if let Some(lc) = self.global_pipeline_state.pipe_generator_state.inner.lock().await.get_mut(&class) {
+        if let Some(lc) = self.global_pipeline_state.pipe_generator_state.inner.lock().await.old.get_mut(&class) {
             lc.instantiate_control_plane(link_id).await;
         }
         Ok(())

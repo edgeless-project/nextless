@@ -117,17 +117,37 @@ pub(crate) fn component_mock(
         logical_output_mapping: std::collections::HashMap::from([
             (
                 edgeless_api::function_instance::PortId("output_1".to_string()),
-                edgeless_api::workflow_instance::PortMapping::DirectTarget(
-                    "other_1".to_string(),
-                    edgeless_api::function_instance::PortId("input_1".to_string()),
-                ),
+                crate::ir::interaction::SourcePortMapping {
+                    dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                        base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                        constraints: std::collections::BTreeSet::new(),
+                    },
+                    mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
+                        destination: crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(
+                            crate::ir::interaction::LogicalPortId {
+                                component: "other_1".to_string(),
+                                port: edgeless_api::function_instance::PortId("input_1".to_string()),
+                            },
+                        ),
+                    }),
+                },
             ),
             (
                 edgeless_api::function_instance::PortId("output_2".to_string()),
-                edgeless_api::workflow_instance::PortMapping::DirectTarget(
-                    "other_2".to_string(),
-                    edgeless_api::function_instance::PortId("input_1".to_string()),
-                ),
+                crate::ir::interaction::SourcePortMapping {
+                    dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                        base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                        constraints: std::collections::BTreeSet::new(),
+                    },
+                    mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
+                        destination: crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(
+                            crate::ir::interaction::LogicalPortId {
+                                component: "other_2".to_string(),
+                                port: edgeless_api::function_instance::PortId("input_1".to_string()),
+                            },
+                        ),
+                    }),
+                },
             ),
         ]),
         logical_input_mapping: std::collections::HashMap::new(),
@@ -140,10 +160,20 @@ pub(crate) fn component_mock(
                 (
                     edgeless_api::function_instance::PortId("output_1".to_string()),
                     crate::ir::MaterializedOutput {
-                        mapping: edgeless_api::common::Output::Single(
-                            output_1.0.clone(),
-                            edgeless_api::function_instance::PortId("input_1".to_string()),
-                        ),
+                        mapping: crate::ir::interaction::SourcePortMapping {
+                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                constraints: std::collections::BTreeSet::new(),
+                            },
+                            mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                                destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(
+                                    crate::ir::interaction::PhysicalPortId {
+                                        instance: output_1.0.clone(),
+                                        port: edgeless_api::function_instance::PortId("input_1".to_string()),
+                                    },
+                                ),
+                            }),
+                        },
                         port_statistics: Some(Box::new(crate::ir::test::MockPortStats::new(
                             std::collections::HashMap::from([output_1.clone()]),
                             std::collections::HashMap::new(),
@@ -153,10 +183,20 @@ pub(crate) fn component_mock(
                 (
                     edgeless_api::function_instance::PortId("output_2".to_string()),
                     crate::ir::MaterializedOutput {
-                        mapping: edgeless_api::common::Output::Single(
-                            output_2.0.clone(),
-                            edgeless_api::function_instance::PortId("input_1".to_string()),
-                        ),
+                        mapping: crate::ir::interaction::SourcePortMapping {
+                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                constraints: std::collections::BTreeSet::new(),
+                            },
+                            mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                                destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(
+                                    crate::ir::interaction::PhysicalPortId {
+                                        instance: output_2.0.clone(),
+                                        port: edgeless_api::function_instance::PortId("input_1".to_string()),
+                                    },
+                                ),
+                            }),
+                        },
                         port_statistics: Some(Box::new(crate::ir::test::MockPortStats::new(
                             std::collections::HashMap::from([output_2.clone()]),
                             std::collections::HashMap::new(),

@@ -3,29 +3,34 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use crate::ir::interaction::dialect::InteractionDialect;
+
 use super::super::*;
 
-pub struct PipeGenerator {
-    existing_links: std::collections::HashMap<(String, edgeless_api::function_instance::PortId), edgeless_api::link::LinkInstanceId>,
-}
+pub struct PipeGenerator {}
 
 impl PipeGenerator {
     pub fn new() -> Self {
-        Self {
-            existing_links: std::collections::HashMap::new(),
-        }
+        Self {}
     }
 }
 
 pub struct PipeGeneratorState {
-    pub inner:
-        std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>>>,
+    pub inner: std::sync::Arc<tokio::sync::Mutex<PipeGeneratorStateInner>>,
+}
+
+pub struct PipeGeneratorStateInner {
+    pub old: std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>,
+    pub multicast_dialect: crate::ir::interaction::dialect::ip_multicast::IpMulticastDialect,
 }
 
 impl PipeGeneratorState {
     pub fn new(links: std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>) -> Self {
         Self {
-            inner: std::sync::Arc::new(tokio::sync::Mutex::new(links)),
+            inner: std::sync::Arc::new(tokio::sync::Mutex::new(PipeGeneratorStateInner {
+                old: links,
+                multicast_dialect: crate::ir::interaction::dialect::ip_multicast::IpMulticastDialect::new(),
+            })),
         }
     }
 }
@@ -44,93 +49,158 @@ impl super::StatefulTransformation<PipeGeneratorState> for PipeGenerator {
 
         let mcast = edgeless_api::link::LinkType("MULTICAST".to_string());
 
-        let mut new_links = Vec::<(edgeless_api::link::LinkInstanceId, link::WorkflowLink)>::new();
+        let mut srcs = Vec::new();
+        let mut dests = Vec::new();
 
-        for (c_id, c) in workflow.components() {
+        for (_c_id, c) in workflow.components() {
             let mut current = c.borrow_mut();
-            let (logical_ports, physical_instances) = current.split_view();
+            let (_logical_ports, physical_instances) = current.split_view();
             for i in &physical_instances {
                 if let Some(i) = i.borrow_mut().try_unpack_materialized_mut() {
-                    let own_id = i.id().node_id;
-                    for (out_id, out) in &mut i.physical_ports().physical_output_mapping {
-                        if let edgeless_api::common::Output::All(targets) = out {
-                            if targets.len() >= 2 {
-                                let new_link = if let Some(existing) = self.existing_links.get(&(c_id.to_string(), out_id.clone())) {
-                                    existing.clone()
-                                } else {
-                                    let mut target_nodes: std::collections::HashSet<_> = targets.iter().map(|(t_id, _)| t_id.node_id).collect();
-                                    target_nodes.insert(own_id);
-                                    let new_link = global_state
-                                        .inner
-                                        .blocking_lock()
-                                        .get_mut(&mcast)
-                                        .unwrap()
-                                        .new_link(target_nodes.clone().into_iter().collect())
-                                        .unwrap();
+                    let cloned_id = i.id().clone();
+                    let ports = i.physical_ports();
 
-                                    let node_links: Vec<_> = target_nodes
-                                        .iter()
-                                        .map(|n| {
-                                            (
-                                                *n,
-                                                nodes.get(n).unwrap().available_link_types().get(&mcast).unwrap().clone(),
-                                                global_state
-                                                    .inner
-                                                    .blocking_lock()
-                                                    .get(&mcast)
-                                                    .unwrap()
-                                                    .config_for(new_link.clone(), *n)
-                                                    .unwrap(),
-                                                false,
-                                            )
-                                        })
-                                        .collect();
+                    for (out_id, out) in &ports.physical_output_mapping {
+                        let out_any = out.mapping.as_ref() as &dyn std::any::Any;
+                        let maybe_out = out_any.downcast_ref::<crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort>();
 
-                                    new_links.push((
-                                        new_link.clone(),
-                                        link::WorkflowLink {
-                                            id: new_link.clone(),
-                                            class: mcast.clone(),
-                                            materialized: false,
-                                            nodes: node_links,
-                                        },
-                                    ));
+                        let Some(out_mapping) = maybe_out else {
+                            continue;
+                        };
 
-                                    self.existing_links.insert((c_id.to_string(), out_id.clone()), new_link.clone());
-
-                                    new_link
-                                };
-                                *out = PhysicalOutput::Link(new_link.clone());
-
-                                let logical_port = logical_ports.logical_output_mapping.get(out_id).unwrap();
-                                if let edgeless_api::workflow_instance::PortMapping::AllOfTargets(logical_targets) = logical_port {
-                                    for (target_name, target_port_id) in logical_targets {
-                                        workflow
-                                            .get_component(target_name)
-                                            .unwrap()
-                                            .borrow_mut()
-                                            .instances()
-                                            .iter()
-                                            .for_each(|i| {
-                                                if let Some(i) = i.borrow_mut().try_unpack_materialized_mut() {
-                                                    i.physical_ports()
-                                                        .physical_input_mapping
-                                                        .insert(target_port_id.clone(), PhysicalInput::Link(new_link.clone()));
-                                                }
-                                            });
-                                    }
-                                } else {
-                                    panic!("Mapping is Wrong!");
-                                }
-                            }
+                        if let crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(_) = &out_mapping.destination {
+                            srcs.push((
+                                crate::ir::interaction::PhysicalPortId {
+                                    instance: cloned_id.clone(),
+                                    port: out_id.clone(),
+                                },
+                                out_mapping.clone(),
+                            ));
                         }
+                    }
+
+                    for (input_id, input) in &ports.physical_input_mapping {
+                        let input_any = input.mapping.as_ref() as &dyn std::any::Any;
+                        let maybe_input =
+                            input_any.downcast_ref::<crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayDestinationPort>();
+
+                        let Some(input_mapping) = maybe_input else {
+                            continue;
+                        };
+
+                        dests.push((
+                            crate::ir::interaction::PhysicalPortId {
+                                instance: cloned_id,
+                                port: input_id.clone(),
+                            },
+                            input_mapping.clone(),
+                        ));
                     }
                 }
             }
         }
 
-        for (id, spec) in new_links {
-            workflow.links.insert(id, spec);
+        let interactions = crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayDialect {}.ports_to_interaction(srcs, dests);
+
+        let mapped_interactions: Vec<_> = interactions
+            .into_iter()
+            .flat_map(|i| global_state.inner.blocking_lock().multicast_dialect.translate_from_physial_overlay(i))
+            .collect();
+
+        let mut replacement_srcs = std::collections::BTreeMap::<
+            edgeless_api::function_instance::InstanceId,
+            std::collections::BTreeMap<edgeless_api::function_instance::PortId, interaction::dialect::ip_multicast::IpMulticastSourcePort>,
+        >::new();
+        let mut replacement_dests = std::collections::BTreeMap::<
+            edgeless_api::function_instance::InstanceId,
+            std::collections::BTreeMap<edgeless_api::function_instance::PortId, interaction::dialect::ip_multicast::IpMulticastDestinationPort>,
+        >::new();
+
+        for i in mapped_interactions {
+            let mut relevant_nodes = std::collections::BTreeSet::new();
+
+            for sub in &i.subscribers {
+                relevant_nodes.insert(sub.instance.node_id.clone());
+            }
+
+            for publisher in &i.publishers {
+                relevant_nodes.insert(publisher.instance.node_id.clone());
+            }
+
+            let relevant_nodes = relevant_nodes.into_iter().map(|n| {
+                (
+                    n.clone(),
+                    nodes.get(&n).unwrap().available_link_types().get(&mcast).unwrap().clone(),
+                    global_state
+                        .inner
+                        .blocking_lock()
+                        .multicast_dialect
+                        .config_for(i.link_id.clone(), n)
+                        .unwrap(),
+                    false,
+                )
+            });
+
+            workflow.links.entry(i.link_id.clone()).or_insert(link::WorkflowLink {
+                id: i.link_id.clone(),
+                class: mcast.clone(),
+                materialized: false,
+                nodes: relevant_nodes.collect(),
+            });
+
+            let (s, d) = global_state.inner.blocking_lock().multicast_dialect.interaction_to_ports(i);
+            for (port_id, source_spec) in s {
+                replacement_srcs
+                    .entry(port_id.instance.clone())
+                    .or_default()
+                    .insert(port_id.port.clone(), source_spec);
+            }
+            for (port_id, dest_spec) in d {
+                replacement_dests
+                    .entry(port_id.instance.clone())
+                    .or_default()
+                    .insert(port_id.port.clone(), dest_spec);
+            }
+        }
+
+        for (_c_id, c) in workflow.components() {
+            let mut current = c.borrow_mut();
+            let (_logical_ports, physical_instances) = current.split_view();
+            for i in &physical_instances {
+                if let Some(i) = i.borrow_mut().try_unpack_materialized_mut() {
+                    let cloned_id = i.id();
+                    let ports = i.physical_ports();
+
+                    let inputs = replacement_dests.remove(&cloned_id).unwrap_or_default();
+                    let outputs = replacement_srcs.remove(&cloned_id).unwrap_or_default();
+
+                    for (input_port, port_spec) in inputs {
+                        ports.physical_input_mapping.insert(
+                            input_port,
+                            crate::ir::interaction::DestiantionPortMapping {
+                                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                    base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                    constraints: std::collections::BTreeSet::new(),
+                                },
+                                mapping: Box::new(port_spec),
+                            },
+                        );
+                    }
+
+                    for (output_port, port_spec) in outputs {
+                        ports.physical_output_mapping.insert(
+                            output_port,
+                            crate::ir::interaction::SourcePortMapping {
+                                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                                    base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                                    constraints: std::collections::BTreeSet::new(),
+                                },
+                                mapping: Box::new(port_spec),
+                            },
+                        );
+                    }
+                }
+            }
         }
     }
 }
