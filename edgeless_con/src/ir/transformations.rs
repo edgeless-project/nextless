@@ -7,12 +7,12 @@ pub mod colocation_optimizer;
 pub mod compiler;
 pub mod dead_component_removal;
 pub mod input_linker;
+pub mod logical_interaction_normalizer;
 pub mod migration_finalizer;
+pub mod physical_interaction_specializer;
 pub mod physical_mapper;
-pub mod pipe_generator;
 pub mod placement;
 pub mod scaler;
-pub mod topic_converter;
 pub mod workflow_spitter;
 
 pub trait StatelessTransformation: Send + Sync {

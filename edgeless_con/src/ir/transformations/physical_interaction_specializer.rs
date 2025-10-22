@@ -7,27 +7,27 @@ use crate::ir::interaction::dialect::InteractionDialect;
 
 use super::super::*;
 
-pub struct PipeGenerator {}
+pub struct PhysicalInteractionSpecializer {}
 
-impl PipeGenerator {
+impl PhysicalInteractionSpecializer {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-pub struct PipeGeneratorState {
-    pub inner: std::sync::Arc<tokio::sync::Mutex<PipeGeneratorStateInner>>,
+pub struct PhysicalInteractionSpecializerState {
+    pub inner: std::sync::Arc<tokio::sync::Mutex<PhysicalInteractionSpecializerStateInner>>,
 }
 
-pub struct PipeGeneratorStateInner {
+pub struct PhysicalInteractionSpecializerStateInner {
     pub old: std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>,
     pub multicast_dialect: crate::ir::interaction::dialect::ip_multicast::IpMulticastDialect,
 }
 
-impl PipeGeneratorState {
+impl PhysicalInteractionSpecializerState {
     pub fn new(links: std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>) -> Self {
         Self {
-            inner: std::sync::Arc::new(tokio::sync::Mutex::new(PipeGeneratorStateInner {
+            inner: std::sync::Arc::new(tokio::sync::Mutex::new(PhysicalInteractionSpecializerStateInner {
                 old: links,
                 multicast_dialect: crate::ir::interaction::dialect::ip_multicast::IpMulticastDialect::new(),
             })),
@@ -35,13 +35,13 @@ impl PipeGeneratorState {
     }
 }
 
-impl super::StatefulTransformation<PipeGeneratorState> for PipeGenerator {
+impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for PhysicalInteractionSpecializer {
     fn apply(
         &mut self,
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         _peer_clusters: &crate::ir::Clusters,
-        global_state: &PipeGeneratorState,
+        global_state: &PhysicalInteractionSpecializerState,
     ) {
         if workflow.original_request.annotations.contains_key("DISABLE_MULTICAST") {
             return;

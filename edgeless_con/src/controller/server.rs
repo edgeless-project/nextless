@@ -31,10 +31,12 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     ) -> Self {
         let global_pipeline_state = crate::ir::pipeline::default::DefaultTransformationPipelineState::<P::GlobalState> {
             placement_strategy_state: P::GlobalState::default(),
-            pipe_generator_state: crate::ir::transformations::pipe_generator::PipeGeneratorState::new(std::collections::HashMap::from([(
-                edgeless_api::link::LinkType("MULTICAST".to_string()),
-                Box::new(edgeless_link_multicast::controller::MulticastController::new()) as Box<dyn edgeless_api::link::LinkController>,
-            )])),
+            pipe_generator_state: crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
+                std::collections::HashMap::from([(
+                    edgeless_api::link::LinkType("MULTICAST".to_string()),
+                    Box::new(edgeless_link_multicast::controller::MulticastController::new()) as Box<dyn edgeless_api::link::LinkController>,
+                )]),
+            ),
             image_cache: crate::ir::support::image_cache::ImageCache::default(),
         };
 

@@ -5,12 +5,12 @@ use crate::ir::transformations::{StatefulTransformation, StatelessTransformation
 
 pub struct DefaultPhysicalPipeline {
     physical_connection_mapper: crate::ir::transformations::physical_mapper::PhysicalConnectionMapper,
-    pipe_generator: crate::ir::transformations::pipe_generator::PipeGenerator,
+    pipe_generator: crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializer,
     compiler: crate::ir::transformations::compiler::Compiler,
 }
 
 pub struct PhysicalPipelineState<'a> {
-    pub pipe_generator_state: &'a crate::ir::transformations::pipe_generator::PipeGeneratorState,
+    pub pipe_generator_state: &'a crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState,
     pub compiler_state: &'a crate::ir::support::image_cache::ImageCache,
 }
 
@@ -18,7 +18,7 @@ impl DefaultPhysicalPipeline {
     pub fn new() -> Self {
         DefaultPhysicalPipeline {
             physical_connection_mapper: crate::ir::transformations::physical_mapper::PhysicalConnectionMapper::new(),
-            pipe_generator: crate::ir::transformations::pipe_generator::PipeGenerator::new(),
+            pipe_generator: crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializer::new(),
             compiler: crate::ir::transformations::compiler::Compiler::new(),
         }
     }

@@ -4,7 +4,7 @@
 use crate::ir::transformations::StatelessTransformation;
 
 pub struct DefaultLogicalPipeline {
-    topic_converter: crate::ir::transformations::topic_converter::TopicConverter,
+    topic_converter: crate::ir::transformations::logical_interaction_normalizer::LogicalInteractionNormalizer,
     input_linker: crate::ir::transformations::input_linker::InputLinker,
     workflow_splitter: crate::ir::transformations::workflow_spitter::WorkflowSplitter,
     dead_component_removal: crate::ir::transformations::dead_component_removal::DeadComponentRemoval,
@@ -13,7 +13,7 @@ pub struct DefaultLogicalPipeline {
 impl DefaultLogicalPipeline {
     pub fn new() -> Self {
         DefaultLogicalPipeline {
-            topic_converter: crate::ir::transformations::topic_converter::TopicConverter::new(),
+            topic_converter: crate::ir::transformations::logical_interaction_normalizer::LogicalInteractionNormalizer::new(),
             input_linker: crate::ir::transformations::input_linker::InputLinker::new(),
             workflow_splitter: crate::ir::transformations::workflow_spitter::WorkflowSplitter::new(),
             dead_component_removal: crate::ir::transformations::dead_component_removal::DeadComponentRemoval::new(),

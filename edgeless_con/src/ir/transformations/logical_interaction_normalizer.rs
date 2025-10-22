@@ -7,15 +7,15 @@ use crate::ir::interaction::{dialect::InteractionDialect, DestiantionPortMapping
 
 use super::super::*;
 
-pub struct TopicConverter {}
+pub struct LogicalInteractionNormalizer {}
 
-impl TopicConverter {
+impl LogicalInteractionNormalizer {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl super::StatelessTransformation for TopicConverter {
+impl super::StatelessTransformation for LogicalInteractionNormalizer {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mut srcs = Vec::new();
         let mut dests = Vec::new();

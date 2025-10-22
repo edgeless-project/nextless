@@ -11,7 +11,7 @@ pub struct DefaultTransformationPipeline<P: PlacementStrategy> {
 
 pub struct DefaultTransformationPipelineState<PS: Sync + Send> {
     pub placement_strategy_state: PS,
-    pub pipe_generator_state: crate::ir::transformations::pipe_generator::PipeGeneratorState,
+    pub pipe_generator_state: crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState,
     pub image_cache: crate::ir::support::image_cache::ImageCache,
 }
 
