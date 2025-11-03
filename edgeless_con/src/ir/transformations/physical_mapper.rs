@@ -57,7 +57,13 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                                         crate::ir::interaction::SourcePortMapping {
                                             dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
                                                 base_type: crate::ir::interaction::dialect::physical_overlay::ID,
-                                                constraints: std::collections::BTreeSet::new(),
+                                                constraints: std::collections::BTreeSet::from([
+                                                    crate::ir::interaction::dialect::DialectConstraint::PhysicalOverlay(
+                                                        interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(
+                                                            workflow.cluster_id.clone(),
+                                                        ),
+                                                    ),
+                                                ]),
                                             },
                                             mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
                                                 destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(
@@ -82,7 +88,13 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                                         crate::ir::interaction::SourcePortMapping {
                                             dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
                                                 base_type: crate::ir::interaction::dialect::physical_overlay::ID,
-                                                constraints: std::collections::BTreeSet::new(),
+                                                constraints: std::collections::BTreeSet::from([
+                                                    crate::ir::interaction::dialect::DialectConstraint::PhysicalOverlay(
+                                                        interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(
+                                                            workflow.cluster_id.clone(),
+                                                        ),
+                                                    ),
+                                                ]),
                                             },
                                             mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
                                                 destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(
@@ -122,7 +134,13 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                                     crate::ir::interaction::SourcePortMapping {
                                         dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
                                             base_type: crate::ir::interaction::dialect::physical_overlay::ID,
-                                            constraints: std::collections::BTreeSet::new(),
+                                            constraints: std::collections::BTreeSet::from([
+                                                crate::ir::interaction::dialect::DialectConstraint::PhysicalOverlay(
+                                                    interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(
+                                                        workflow.cluster_id.clone(),
+                                                    ),
+                                                ),
+                                            ]),
                                         },
                                         mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
                                             destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(
@@ -158,7 +176,13 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                                     crate::ir::interaction::SourcePortMapping {
                                         dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
                                             base_type: crate::ir::interaction::dialect::physical_overlay::ID,
-                                            constraints: std::collections::BTreeSet::new(),
+                                            constraints: std::collections::BTreeSet::from([
+                                                crate::ir::interaction::dialect::DialectConstraint::PhysicalOverlay(
+                                                    interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(
+                                                        workflow.cluster_id.clone(),
+                                                    ),
+                                                ),
+                                            ]),
                                         },
                                         mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
                                             destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(
@@ -204,7 +228,11 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                             crate::ir::interaction::DestiantionPortMapping {
                                 dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
                                     base_type: crate::ir::interaction::dialect::physical_overlay::ID,
-                                    constraints: std::collections::BTreeSet::new(),
+                                    constraints: std::collections::BTreeSet::from([
+                                        crate::ir::interaction::dialect::DialectConstraint::PhysicalOverlay(
+                                            interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(workflow.cluster_id.clone()),
+                                        ),
+                                    ]),
                                 },
                                 mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayDestinationPort {
                                     sources: sources.clone(),

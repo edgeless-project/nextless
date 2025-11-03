@@ -7,6 +7,7 @@ use super::{actor::LogicalActor, link::WorkflowLink, proxy::LogicalProxy, resour
 
 pub struct ActiveWorkflow {
     pub(crate) id: edgeless_api::workflow_instance::WorkflowId,
+    pub(crate) cluster_id: uuid::Uuid,
 
     pub(crate) original_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
 
@@ -19,7 +20,11 @@ pub struct ActiveWorkflow {
 }
 
 impl ActiveWorkflow {
-    pub fn new(request: edgeless_api::workflow_instance::SpawnWorkflowRequest, id: edgeless_api::workflow_instance::WorkflowId) -> Self {
+    pub fn new(
+        request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
+        id: edgeless_api::workflow_instance::WorkflowId,
+        cluster_id: uuid::Uuid,
+    ) -> Self {
         if !request.annotations.is_empty() {
             log::warn!("Workflow annotations ({}) are currently ignored", request.annotations.len());
         }
@@ -27,6 +32,7 @@ impl ActiveWorkflow {
         ActiveWorkflow {
             // state: WorkflowState::New,
             id,
+            cluster_id,
             original_request: request.clone(),
             functions: request
                 .workflow_functions

@@ -26,89 +26,90 @@ pub enum DestinationMapping {
     Multicast(Vec<crate::ir::interaction::LogicalPortId>),
 }
 
-#[derive(Debug)]
-pub enum LogicalOverlayConstraint {
-    None,
-}
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum LogicalOverlayConstraint {}
 
 pub struct LogicalOverlayDialect {}
 
 impl super::DestinationPort for LogicalOverlayDestinationPort {}
 impl super::SourcePort for LogicalOverlaySourcePort {}
-impl super::Interaction for LogicalOverlayInteraction {}
-
-impl
-    super::InteractionDialect<
-        crate::ir::interaction::LogicalPortId,
-        LogicalOverlaySourcePort,
-        LogicalOverlayDestinationPort,
-        LogicalOverlayInteraction,
-    > for LogicalOverlayDialect
-{
-    fn id(&self) -> super::DialectId {
-        return ID;
+impl super::Interaction for LogicalOverlayInteraction {
+    fn as_physical(&self) -> Option<&dyn super::PhysicalInteraction> {
+        None
     }
+}
 
-    fn provides_transformations_to(&self) -> &'static [super::DialectId] {
-        static TRANSFORMATIONS: [super::DialectId; 2] = [super::ip_multicast::ID, super::physical_overlay::ID];
-        &TRANSFORMATIONS
-    }
-
-    fn plan_translation_to(&self, src: super::DialectDescriptor, dst: super::DialectDescriptor) -> Result<super::DialectDescriptor, ()> {
-        todo!()
-    }
-
+impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for LogicalOverlayDialect {
     fn ports_to_interaction(
         &self,
-        srcs: Vec<(crate::ir::interaction::LogicalPortId, LogicalOverlaySourcePort)>,
-        _dests: Vec<(crate::ir::interaction::LogicalPortId, LogicalOverlayDestinationPort)>,
-    ) -> Vec<LogicalOverlayInteraction> {
+        srcs: Vec<(crate::ir::interaction::LogicalPortId, super::super::SourcePortMapping)>,
+        _dests: Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
+    ) -> Vec<super::super::InteractionMapping> {
         let mut collector = std::collections::BTreeMap::<DestinationMapping, Vec<crate::ir::interaction::LogicalPortId>>::new();
 
         for (src_port_id, src_spec) in srcs {
-            collector.entry(src_spec.destination).or_default().push(src_port_id)
+            let any_mapping = src_spec.mapping.as_ref() as &dyn std::any::Any;
+            let maybe_overlay_mapping = any_mapping.downcast_ref::<LogicalOverlaySourcePort>();
+            let overlay_mapping = maybe_overlay_mapping.unwrap();
+            collector.entry(overlay_mapping.destination.clone()).or_default().push(src_port_id)
         }
 
         collector
             .into_iter()
-            .map(|(destination, sources)| LogicalOverlayInteraction { sources, destination })
+            .map(|(destination, sources)| super::super::InteractionMapping {
+                mapping: Box::new(LogicalOverlayInteraction { sources, destination }),
+                dialect_type: super::DialectDescriptor {
+                    base_type: ID,
+                    constraints: std::collections::BTreeSet::new(),
+                },
+            })
             .collect()
     }
 
     fn interaction_to_ports(
         &self,
-        interaction: LogicalOverlayInteraction,
+        interaction: super::super::InteractionMapping,
     ) -> (
-        Vec<(crate::ir::interaction::LogicalPortId, LogicalOverlaySourcePort)>,
-        Vec<(crate::ir::interaction::LogicalPortId, LogicalOverlayDestinationPort)>,
+        Vec<(crate::ir::interaction::LogicalPortId, super::super::SourcePortMapping)>,
+        Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
     ) {
+        let any_mapping = interaction.mapping.as_ref() as &dyn std::any::Any;
+        let maybe_overlay_mapping = any_mapping.downcast_ref::<LogicalOverlayInteraction>();
+        let overlay_mapping = maybe_overlay_mapping.unwrap();
+
         let mut srcs = Vec::new();
         let mut dests = Vec::new();
 
-        for src_port_id in interaction.sources.clone() {
+        for src_port_id in overlay_mapping.sources.clone() {
             srcs.push((
                 src_port_id,
-                LogicalOverlaySourcePort {
-                    destination: interaction.destination.clone(),
+                super::super::SourcePortMapping {
+                    mapping: Box::new(LogicalOverlaySourcePort {
+                        destination: overlay_mapping.destination.clone(),
+                    }),
+                    dialect_type: super::DialectDescriptor {
+                        base_type: ID,
+                        constraints: std::collections::BTreeSet::new(),
+                    },
                 },
             ));
         }
 
-        match interaction.destination {
+        match &overlay_mapping.destination {
             DestinationMapping::Unicast(dest_port_id) => {
                 dests.push((
-                    dest_port_id,
+                    dest_port_id.clone(),
                     LogicalOverlayDestinationPort {
-                        sources: interaction.sources.clone(),
+                        sources: overlay_mapping.sources.clone(),
                     },
                 ));
             }
             DestinationMapping::Anycast(dest_port_ids) => {
                 for dest_port_id in dest_port_ids {
                     dests.push((
-                        dest_port_id,
+                        dest_port_id.clone(),
                         LogicalOverlayDestinationPort {
-                            sources: interaction.sources.clone(),
+                            sources: overlay_mapping.sources.clone(),
                         },
                     ));
                 }
@@ -116,15 +117,74 @@ impl
             DestinationMapping::Multicast(dest_port_ids) => {
                 for dest_port_id in dest_port_ids {
                     dests.push((
-                        dest_port_id,
+                        dest_port_id.clone(),
                         LogicalOverlayDestinationPort {
-                            sources: interaction.sources.clone(),
+                            sources: overlay_mapping.sources.clone(),
                         },
                     ));
                 }
             }
         }
 
+        let dests = dests
+            .into_iter()
+            .map(|(id, mapping)| {
+                (
+                    id,
+                    super::super::DestiantionPortMapping {
+                        dialect_type: super::DialectDescriptor {
+                            base_type: ID,
+                            constraints: std::collections::BTreeSet::new(),
+                        },
+                        mapping: Box::new(mapping),
+                    },
+                )
+            })
+            .collect();
+
         (srcs, dests)
+    }
+}
+
+impl super::InteractionDialect for LogicalOverlayDialect {
+    fn id(&self) -> super::DialectId {
+        return ID;
+    }
+
+    fn provides_transformations_to(&self) -> &'static [super::DialectId] {
+        // Logical->Physical is handled by a special transformation
+        &[]
+    }
+
+    fn provides_transformations_from(&self) -> &'static [super::DialectId] {
+        &[]
+    }
+
+    fn plan_translation_to(&self, _src: &super::DialectDescriptor, _dst: &super::DialectDescriptor) -> Result<super::DialectDescriptor, ()> {
+        Err(())
+    }
+
+    fn execute_transformation_to(
+        &self,
+        _src: &crate::ir::interaction::InteractionMapping,
+        _dest: &super::DialectDescriptor,
+    ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, ()> {
+        Err(())
+    }
+
+    fn logical_utils(&self) -> Option<&dyn super::InteractionPortUtils<crate::ir::interaction::LogicalPortId>> {
+        return Some(self);
+    }
+
+    fn physical_utils(&self) -> Option<&dyn super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId>> {
+        return None;
+    }
+
+    fn link_config(
+        &self,
+        _mapping: &crate::ir::interaction::InteractionMapping,
+        _nodes: &std::collections::HashMap<uuid::Uuid, &dyn crate::ir::Node>,
+    ) -> crate::ir::link::WorkflowLink {
+        todo!()
     }
 }

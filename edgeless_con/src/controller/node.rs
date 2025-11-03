@@ -189,6 +189,31 @@ impl crate::ir::Node for WorkerNode {
         self.supported_link_types.clone()
     }
 
+    fn available_interaction_dialects(&self) -> Vec<crate::ir::interaction::dialect::DialectDescriptor> {
+        let mut dialects = Vec::new();
+
+        dialects.push(crate::ir::interaction::dialect::DialectDescriptor {
+            base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+            constraints: std::collections::BTreeSet::from([crate::ir::interaction::dialect::DialectConstraint::PhysicalOverlay(
+                crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(self.cluster_id.clone()),
+            )]),
+        });
+
+        if self
+            .supported_link_types
+            .contains_key(&edgeless_api::link::LinkType("MULTICAST".to_string()))
+        {
+            dialects.push(crate::ir::interaction::dialect::DialectDescriptor {
+                base_type: crate::ir::interaction::dialect::ip_multicast::ID,
+                constraints: std::collections::BTreeSet::from([crate::ir::interaction::dialect::DialectConstraint::IpMulticast(
+                    crate::ir::interaction::dialect::ip_multicast::IpMulticastConstraint::Cluster(self.cluster_id.clone()),
+                )]),
+            });
+        }
+
+        dialects
+    }
+
     fn labels(&self) -> Vec<String> {
         self.capabilities.labels.clone()
     }

@@ -9,6 +9,7 @@ pub trait Node {
     fn available_runtimes<'a>(&'a self) -> Runtimes<'a>;
     fn available_resource_providers<'a>(&'a self) -> ResourceProviders<'a>;
     fn available_link_types(&self) -> LinkProviders;
+    fn available_interaction_dialects(&self) -> Vec<crate::ir::interaction::dialect::DialectDescriptor>;
     fn labels(&self) -> Vec<String>;
     fn is_proxy(&self) -> bool;
 }

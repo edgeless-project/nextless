@@ -694,7 +694,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
 
             let maybe_overlay_mapping =
                 any_mapping.downcast_ref::<crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayDestinationPort>();
-            if let Some(overlay_mapping) = maybe_overlay_mapping {
+            if let Some(_overlay_mapping) = maybe_overlay_mapping {
                 api_input_mapping.insert(port, edgeless_api::common::Input::Stub);
                 continue;
             }
@@ -745,10 +745,12 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         link_id: edgeless_api::link::LinkInstanceId,
         class: edgeless_api::link::LinkType,
     ) -> Result<(), String> {
-        if let Some(lc) = self.global_pipeline_state.pipe_generator_state.inner.lock().await.old.get_mut(&class) {
-            lc.instantiate_control_plane(link_id).await;
-        }
-        Ok(())
+        self.global_pipeline_state
+            .interaction_dialect_registry
+            .lock()
+            .await
+            .instantiate_link_data_plane(link_id, class)
+            .await
     }
 
     async fn fn_client(

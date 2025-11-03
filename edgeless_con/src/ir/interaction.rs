@@ -15,6 +15,12 @@ pub struct DestiantionPortMapping {
     pub mapping: Box<dyn dialect::DestinationPort>,
 }
 
+#[derive(Debug, Clone)]
+pub struct InteractionMapping {
+    pub dialect_type: dialect::DialectDescriptor,
+    pub mapping: Box<dyn dialect::Interaction>,
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct LogicalPortId {
     pub component: String,

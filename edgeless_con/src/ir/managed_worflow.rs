@@ -15,11 +15,12 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
     pub fn new(
         request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
         id: edgeless_api::workflow_instance::WorkflowId,
+        cluster_id: uuid::Uuid,
         telementry_provider: Option<Box<dyn super::TelemetryProvider>>,
         placement_strategy: P,
     ) -> Self {
         Self {
-            wf: super::workflow::ActiveWorkflow::new(request, id),
+            wf: super::workflow::ActiveWorkflow::new(request, id, cluster_id),
             pipeline: super::pipeline::default::DefaultTransformationPipeline::new_default(placement_strategy),
             telemetry_provider: telementry_provider,
         }

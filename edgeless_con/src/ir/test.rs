@@ -278,6 +278,7 @@ pub(crate) fn mock_workflow(
         id: edgeless_api::workflow_instance::WorkflowId {
             workflow_id: uuid::Uuid::new_v4(),
         },
+        cluster_id: uuid::Uuid::new_v4(),
         original_request: edgeless_api::workflow_instance::SpawnWorkflowRequest {
             workflow_functions: vec![],
             workflow_resources: vec![],

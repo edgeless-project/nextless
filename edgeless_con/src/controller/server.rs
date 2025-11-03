@@ -31,12 +31,9 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     ) -> Self {
         let global_pipeline_state = crate::ir::pipeline::default::DefaultTransformationPipelineState::<P::GlobalState> {
             placement_strategy_state: P::GlobalState::default(),
-            pipe_generator_state: crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
-                std::collections::HashMap::from([(
-                    edgeless_api::link::LinkType("MULTICAST".to_string()),
-                    Box::new(edgeless_link_multicast::controller::MulticastController::new()) as Box<dyn edgeless_api::link::LinkController>,
-                )]),
-            ),
+            interaction_dialect_registry: std::sync::Arc::new(tokio::sync::Mutex::new(
+                crate::ir::interaction::dialect::DialectRegistry::new_default(),
+            )),
             image_cache: crate::ir::support::image_cache::ImageCache::default(),
         };
 
@@ -127,6 +124,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         let wf = super::super::ir::managed_worflow::ManagedWorkflow::new(
             spawn_workflow_request.clone(),
             wf_id.clone(),
+            self.cluster_id.clone(),
             self.telemetry_provider.clone(),
             P::new(),
         );
