@@ -11,7 +11,7 @@ pub struct DefaultTransformationPipeline<P: PlacementStrategy> {
 
 pub struct DefaultTransformationPipelineState<PS: Sync + Send> {
     pub placement_strategy_state: PS,
-    pub pipe_generator_state: crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState,
+    pub interaction_dialect_registry: std::sync::Arc<tokio::sync::Mutex<crate::ir::interaction::dialect::DialectRegistry>>,
     pub image_cache: crate::ir::support::image_cache::ImageCache,
 }
 
@@ -33,7 +33,17 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
         peer_clusters: &crate::ir::Clusters,
         global_state: &DefaultTransformationPipelineState<P::GlobalState>,
     ) {
-        self.logical_pipeline.apply_all(workflow, nodes, peer_clusters, &());
+        self.logical_pipeline.apply_all(
+            workflow,
+            nodes,
+            peer_clusters,
+            &super::default_logical::LogicalPipelineState {
+                logical_interaction_normalizer_state:
+                    &crate::ir::transformations::logical_interaction_normalizer::LogicalInteractionNormalizerState {
+                        dialect_registry: global_state.interaction_dialect_registry.clone(),
+                    },
+            },
+        );
         self.orchestration.apply_all(
             workflow,
             nodes,
@@ -48,7 +58,9 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
             nodes,
             peer_clusters,
             &super::default_physical::PhysicalPipelineState {
-                pipe_generator_state: &global_state.pipe_generator_state,
+                pipe_generator_state: &crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
+                    global_state.interaction_dialect_registry.clone(),
+                ),
                 compiler_state: &global_state.image_cache,
             },
         );
@@ -75,7 +87,9 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
             nodes,
             peer_clusters,
             &super::default_physical::PhysicalPipelineState {
-                pipe_generator_state: &global_state.pipe_generator_state,
+                pipe_generator_state: &crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
+                    global_state.interaction_dialect_registry.clone(),
+                ),
                 compiler_state: &global_state.image_cache,
             },
         );

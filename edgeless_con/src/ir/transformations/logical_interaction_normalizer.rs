@@ -27,7 +27,10 @@ impl super::StatefulTransformation<LogicalInteractionNormalizerState> for Logica
     ) {
         let mut reg = global_state.dialect_registry.blocking_lock();
 
-        let interactions = collect_logical_interactions(workflow, &mut reg);
+        let Ok(interactions) = collect_logical_interactions(workflow, &mut reg) else {
+            log::warn!("Failed collecting logical interactions.");
+            return;
+        };
 
         let mapped_interactions = interactions
             .into_iter()
@@ -36,15 +39,13 @@ impl super::StatefulTransformation<LogicalInteractionNormalizerState> for Logica
                     return vec![i];
                 }
 
-                let target_dialect = reg.plan_translation(
-                    &i.dialect_type,
+                let Ok((target_dialect, _)) = reg.plan_translation(
+                    &i,
                     &crate::ir::interaction::dialect::DialectDescriptor {
                         base_type: crate::ir::interaction::dialect::logical_overlay::ID,
                         constraints: std::collections::BTreeSet::new(),
                     },
-                );
-
-                let Ok(target_dialect) = target_dialect else {
+                ) else {
                     log::warn!("Cannot Plan Translation to Logical Overlay: {:?}", i.dialect_type.base_type);
                     return Vec::new();
                 };
@@ -60,14 +61,16 @@ impl super::StatefulTransformation<LogicalInteractionNormalizerState> for Logica
             })
             .collect();
 
-        distribute_logical_interactions(mapped_interactions, workflow, &mut reg);
+        if let Err(e) = distribute_logical_interactions(mapped_interactions, workflow, &mut reg) {
+            log::warn!("Failure distributing logical interactions: {e}")
+        }
     }
 }
 
 fn collect_logical_interactions(
     workflow: &mut crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
-) -> Vec<crate::ir::interaction::InteractionMapping> {
+) -> Result<Vec<crate::ir::interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
     let mut port_collector = std::collections::BTreeMap::<
         crate::ir::interaction::dialect::DialectDescriptor,
         (
@@ -103,21 +106,20 @@ fn collect_logical_interactions(
             });
     }
 
-    port_collector
+    Ok(port_collector
         .into_iter()
-        .flat_map(|(dialect, (source_ports, destination_ports))| {
-            dialect_registry
-                .logical_ports_to_interaction(&dialect, source_ports, destination_ports)
-                .unwrap()
-        })
-        .collect()
+        .map(|(dialect, (source_ports, destination_ports))| dialect_registry.logical_ports_to_interaction(&dialect, source_ports, destination_ports))
+        .collect::<Result<Vec<_>, crate::ir::interaction::InteractionError>>()?
+        .into_iter()
+        .flatten()
+        .collect())
 }
 
 fn distribute_logical_interactions(
     mapped_interactions: Vec<crate::ir::interaction::InteractionMapping>,
     workflow: &mut crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
-) {
+) -> Result<(), crate::ir::interaction::InteractionError> {
     let mut replacement_source_ports = std::collections::BTreeMap::<
         String,
         std::collections::BTreeMap<edgeless_api::function_instance::PortId, interaction::SourcePortMapping>,
@@ -128,7 +130,7 @@ fn distribute_logical_interactions(
     >::new();
 
     for i in mapped_interactions {
-        let (s, d) = dialect_registry.logical_interaction_to_ports(i).unwrap();
+        let (s, d) = dialect_registry.logical_interaction_to_ports(i)?;
         for (port_id, source_spec) in s {
             replacement_source_ports
                 .entry(port_id.component.clone())
@@ -158,4 +160,6 @@ fn distribute_logical_interactions(
             ports.logical_output_mapping.insert(ouput_port_id, output_port_spec.clone());
         }
     }
+
+    Ok(())
 }

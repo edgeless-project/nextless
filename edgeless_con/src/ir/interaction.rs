@@ -3,6 +3,30 @@
 
 pub mod dialect;
 
+#[derive(thiserror::Error, Debug)]
+pub enum InteractionError {
+    #[error("Interaction Dialect \"{0}\" is unknown to the system.")]
+    UnknownDialect(String),
+    #[error("Translation Failed.")]
+    TranslationError(#[source] anyhow::Error),
+    #[error("{0:?} cannot be translated into {1:?}.")]
+    UnsupportedTranslation(dialect::DialectDescriptor, dialect::DialectDescriptor),
+    #[error("Unexpected Interaction Dialect.")]
+    UnexpectedDialect,
+    #[error("Translation would be inefficient.")]
+    Inefficient,
+    #[error("Link capacity exeeded.")]
+    LinkCapacity,
+    #[error("Link configuration error.")]
+    LinkConfiguration(#[source] anyhow::Error),
+}
+
+pub enum LinkConfigurationResult {
+    Ok(crate::ir::link::WorkflowLink),
+    NoConfig,
+    Err(InteractionError),
+}
+
 #[derive(Debug, Clone)]
 pub struct SourcePortMapping {
     pub dialect_type: dialect::DialectDescriptor,

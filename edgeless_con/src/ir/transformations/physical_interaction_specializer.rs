@@ -3,8 +3,6 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use crate::ir::interaction::dialect::InteractionDialect;
-
 use super::super::*;
 
 pub struct PhysicalInteractionSpecializer {}
@@ -39,113 +37,126 @@ impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for Phys
 
         let mut reg = global_state.dialect_registry.blocking_lock();
 
-        let interactions = collect_physical_interactions(workflow, &mut reg);
+        let Ok(interactions) = collect_physical_interactions(workflow, &mut reg) else {
+            log::warn!("Failure Collecting Interactions");
+            return;
+        };
 
-        // https://stackoverflow.com/a/59852696
-        //
-
-        // : Result<Vec<interaction::InteractionMapping>, ()>
         let mapped_interactions = interactions
             .into_iter()
             .flat_map(|i| {
-                let node_ids = i.mapping.as_physical().unwrap().relevant_nodes();
-
-                let mut supprted_dialects = std::collections::BTreeMap::new();
-
-                for node_id in node_ids {
-                    if let Some(node) = nodes.get(&node_id) {
-                        let node_dialects: std::collections::BTreeMap<_, _> = node
-                            .available_interaction_dialects()
-                            .into_iter()
-                            .map(|d| (d.base_type, d.constraints))
-                            .collect();
-
-                        if supprted_dialects.is_empty() {
-                            for (base_type, constraints) in &node_dialects {
-                                supprted_dialects.insert(base_type.clone(), constraints.clone());
-                            }
-                        } else {
-                            supprted_dialects.retain(|base_type, constraints| {
-                                node_dialects
-                                    .get(base_type)
-                                    .is_some_and(|existing_constraints| existing_constraints == constraints)
-                            });
-                        }
-                    } else {
-                        log::warn!("Could not find node for mapping.");
-                        return vec![];
-                    }
-                }
-
-                let mut supported_dialects: Vec<_> = supprted_dialects.into_iter().collect();
-
-                // TODO: Make this generic by moving it to the dialects.
-                supported_dialects.sort_by(|(a_base, _a_constraints), (b_base, _b_constraints)| {
-                    if a_base == &crate::ir::interaction::dialect::ip_multicast::ID
-                        && b_base == &crate::ir::interaction::dialect::physical_overlay::ID
-                    {
-                        return std::cmp::Ordering::Less;
-                    }
-
-                    if b_base == &crate::ir::interaction::dialect::ip_multicast::ID
-                        && a_base == &crate::ir::interaction::dialect::physical_overlay::ID
-                    {
-                        return std::cmp::Ordering::Greater;
-                    }
-
-                    return std::cmp::Ordering::Equal;
-                });
-
-                for (supported_dialect_base, supported_dialect_constraints) in supported_dialects {
-                    let target = reg.plan_translation(
-                        &i.dialect_type,
-                        &crate::ir::interaction::dialect::DialectDescriptor {
-                            base_type: supported_dialect_base,
-                            constraints: supported_dialect_constraints,
-                        },
-                    );
-
-                    let Ok(target) = target else {
-                        log::debug!(
-                            "Interaction translation plan failed: {:?} -> {:?}",
-                            i.dialect_type.base_type,
-                            supported_dialect_base
-                        );
-                        continue;
-                    };
-
-                    let translation = reg.try_translate(&i, &target);
-
-                    if let Ok(translation) = translation {
-                        return translation;
-                    } else {
-                        log::debug!(
-                            "Interaction translation failed: {:?} -> {:?}",
-                            i.dialect_type.base_type,
-                            supported_dialect_base
-                        );
-                    }
-                }
-
-                log::warn!("Failed to map interaction; Falling back to old value.");
-                vec![i.clone()]
+                try_map_interaction(&i, nodes, &mut reg).unwrap_or_else(|e| {
+                    log::debug!("Failed to map interaction: {e}; Falling back to original mapping");
+                    vec![i]
+                })
             })
             .collect();
 
         for i in &mapped_interactions {
-            let link_config = crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayDialect {}.link_config(i, nodes);
+            let link_config = reg.link_config(i, nodes);
 
-            workflow.links.entry(link_config.id.clone()).or_insert(link_config);
+            match link_config {
+                interaction::LinkConfigurationResult::Ok(workflow_link) => {
+                    workflow.links.entry(workflow_link.id.clone()).or_insert(workflow_link);
+                }
+                interaction::LinkConfigurationResult::NoConfig => {
+                    log::debug!("No Link Configuration Required");
+                }
+                interaction::LinkConfigurationResult::Err(link_configuration_error) => {
+                    log::warn!("Link Configuration Error {link_configuration_error}");
+                }
+            }
         }
 
-        distribute_physical_interactions(mapped_interactions, workflow, &mut reg);
+        if let Err(e) = distribute_physical_interactions(mapped_interactions, workflow, &mut reg) {
+            log::warn!("Failure distributing physical interactions: {e}");
+        }
     }
+}
+
+fn try_map_interaction(
+    src: &interaction::InteractionMapping,
+    nodes: &crate::ir::Nodes,
+    reg: &mut interaction::dialect::DialectRegistry,
+) -> Result<Vec<interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
+    let node_ids = src
+        .mapping
+        .as_physical()
+        .ok_or(interaction::InteractionError::UnexpectedDialect)?
+        .relevant_nodes();
+
+    let mut supported_dialects = std::collections::BTreeMap::new();
+
+    for node_id in node_ids {
+        if let Some(node) = nodes.get(&node_id) {
+            let node_dialects: std::collections::BTreeMap<_, _> = node
+                .available_interaction_dialects()
+                .into_iter()
+                .map(|d| (d.base_type, d.constraints))
+                .collect();
+
+            if supported_dialects.is_empty() {
+                for (base_type, constraints) in &node_dialects {
+                    supported_dialects.insert(base_type.clone(), constraints.clone());
+                }
+            } else {
+                supported_dialects.retain(|base_type, constraints| {
+                    node_dialects
+                        .get(base_type)
+                        .is_some_and(|existing_constraints| existing_constraints == constraints)
+                });
+            }
+        } else {
+            return Err(crate::ir::interaction::InteractionError::TranslationError(anyhow::anyhow!(
+                "Could not find node corresponding to instance while performing interaction mapping."
+            )));
+        }
+    }
+
+    let mut translation_plans: Vec<_> = supported_dialects
+        .into_iter()
+        .filter_map(|(base, constraints)| {
+            let d = &crate::ir::interaction::dialect::DialectDescriptor {
+                base_type: base,
+                constraints: constraints,
+            };
+
+            reg.plan_translation(&src, &d)
+                .map_err(|e| {
+                    log::debug!("Interaction translation plan failed: {:?} -> {:?}", src.dialect_type.base_type, base);
+                    e
+                })
+                .ok()
+        })
+        .collect();
+
+    translation_plans.sort_by(|a, b| b.1.cmp(&a.1));
+
+    for (target, _score) in translation_plans {
+        let translation = reg.try_translate(&src, &target);
+
+        if let Ok(translation) = translation {
+            return Ok(translation);
+        } else {
+            log::debug!(
+                "Interaction translation failed: {:?} -> {:?}",
+                src.dialect_type.base_type,
+                target.base_type
+            );
+        }
+    }
+
+    return Err(crate::ir::interaction::InteractionError::UnsupportedTranslation(
+        src.dialect_type.clone(),
+        // TODO might need to add an error case for this.
+        src.dialect_type.clone(),
+    ));
 }
 
 fn collect_physical_interactions(
     workflow: &mut crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
-) -> Vec<crate::ir::interaction::InteractionMapping> {
+) -> Result<Vec<crate::ir::interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
     let mut port_collector = std::collections::BTreeMap::<
         crate::ir::interaction::dialect::DialectDescriptor,
         (
@@ -185,21 +196,20 @@ fn collect_physical_interactions(
         }
     }
 
-    port_collector
+    Ok(port_collector
         .into_iter()
-        .flat_map(|(dialect, (source_ports, destination_ports))| {
-            dialect_registry
-                .physical_ports_to_interaction(&dialect, source_ports, destination_ports)
-                .unwrap()
-        })
-        .collect()
+        .map(|(dialect, (source_ports, destination_ports))| dialect_registry.physical_ports_to_interaction(&dialect, source_ports, destination_ports))
+        .collect::<Result<Vec<_>, crate::ir::interaction::InteractionError>>()?
+        .into_iter()
+        .flatten()
+        .collect())
 }
 
 fn distribute_physical_interactions(
     mapped_interactions: Vec<crate::ir::interaction::InteractionMapping>,
     workflow: &mut crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
-) {
+) -> Result<(), crate::ir::interaction::InteractionError> {
     let mut replacement_srcs = std::collections::BTreeMap::<
         edgeless_api::function_instance::InstanceId,
         std::collections::BTreeMap<edgeless_api::function_instance::PortId, interaction::SourcePortMapping>,
@@ -210,7 +220,7 @@ fn distribute_physical_interactions(
     >::new();
 
     for i in mapped_interactions {
-        let (s, d) = dialect_registry.physical_interaction_to_ports(i).unwrap();
+        let (s, d) = dialect_registry.physical_interaction_to_ports(i)?;
         for (port_id, source_spec) in s {
             replacement_srcs
                 .entry(port_id.instance.clone())
@@ -246,4 +256,6 @@ fn distribute_physical_interactions(
             }
         }
     }
+
+    Ok(())
 }

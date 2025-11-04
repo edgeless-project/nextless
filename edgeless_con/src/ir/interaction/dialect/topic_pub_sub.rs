@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use crate::ir::interaction::dialect::AsConcreteInteraction;
+use crate::ir::interaction::dialect::{AsConcreteDestinationPort, AsConcreteInteraction, AsConcreteSourcePort};
 
 pub static ID: super::DialectId = super::DialectId("TOPIC_PUB_SUB");
 
@@ -51,14 +51,12 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
         &self,
         srcs: Vec<(crate::ir::interaction::LogicalPortId, super::super::SourcePortMapping)>,
         dests: Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
-    ) -> Vec<super::super::InteractionMapping> {
+    ) -> Result<Vec<super::super::InteractionMapping>, crate::ir::interaction::InteractionError> {
         let mut collector =
             std::collections::HashMap::<String, (Vec<crate::ir::interaction::LogicalPortId>, Vec<crate::ir::interaction::LogicalPortId>)>::new();
 
         for (logical_port_id, port_spec) in srcs {
-            let any_mapping = port_spec.mapping.as_ref() as &dyn std::any::Any;
-            let maybe_topic_mapping = any_mapping.downcast_ref::<TopicPubSubSourcePort>();
-            let topic_mapping = maybe_topic_mapping.unwrap();
+            let topic_mapping = TopicPubSubSourcePort::as_concrete(port_spec.mapping.as_ref())?;
             collector
                 .entry(topic_mapping.topic.clone())
                 .or_insert((Vec::new(), Vec::new()))
@@ -67,9 +65,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
         }
 
         for (logical_port_id, port_spec) in dests {
-            let any_mapping = port_spec.mapping.as_ref() as &dyn std::any::Any;
-            let maybe_topic_mapping = any_mapping.downcast_ref::<TopicPubSubDestinationPort>();
-            let topic_mapping = maybe_topic_mapping.unwrap();
+            let topic_mapping = TopicPubSubDestinationPort::as_concrete(port_spec.mapping.as_ref())?;
             collector
                 .entry(topic_mapping.filter.clone())
                 .or_insert((Vec::new(), Vec::new()))
@@ -77,7 +73,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
                 .push(logical_port_id);
         }
 
-        collector
+        Ok(collector
             .into_iter()
             .map(|(topic, (publishers, subscribers))| super::super::InteractionMapping {
                 mapping: Box::new(TopicPubSubInteraction {
@@ -101,19 +97,20 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
                     constraints: std::collections::BTreeSet::new(),
                 },
             })
-            .collect()
+            .collect())
     }
 
     fn interaction_to_ports(
         &self,
         interaction: super::super::InteractionMapping,
-    ) -> (
-        Vec<(crate::ir::interaction::LogicalPortId, super::super::SourcePortMapping)>,
-        Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
-    ) {
-        let any_mapping = interaction.mapping.as_ref() as &dyn std::any::Any;
-        let maybe_topic_mapping = any_mapping.downcast_ref::<TopicPubSubInteraction>();
-        let topic_mapping = maybe_topic_mapping.unwrap();
+    ) -> Result<
+        (
+            Vec<(crate::ir::interaction::LogicalPortId, super::super::SourcePortMapping)>,
+            Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
+        ),
+        crate::ir::interaction::InteractionError,
+    > {
+        let topic_mapping = TopicPubSubInteraction::as_concrete(interaction.mapping.as_ref())?;
 
         let mut sources = Vec::new();
         let mut dests = Vec::new();
@@ -140,7 +137,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
             ));
         }
 
-        (sources, dests)
+        Ok((sources, dests))
     }
 }
 
@@ -158,42 +155,48 @@ impl super::InteractionDialect for TopicPubSubDialect {
         &[]
     }
 
-    fn plan_translation_to(&self, src: &super::DialectDescriptor, dst: &super::DialectDescriptor) -> Result<super::DialectDescriptor, ()> {
-        assert!(src.base_type == ID);
+    fn plan_translation_to(
+        &self,
+        src: &super::super::InteractionMapping,
+        dst: &super::DialectDescriptor,
+    ) -> Result<(super::DialectDescriptor, u64), crate::ir::interaction::InteractionError> {
+        assert!(src.dialect_type.base_type == ID);
         if dst.base_type == super::logical_overlay::ID && dst.constraints.is_empty() {
-            return Ok(dst.clone());
+            return Ok((dst.clone(), 1));
         }
-        Err(())
+        Err(crate::ir::interaction::InteractionError::UnsupportedTranslation(
+            src.dialect_type.clone(),
+            dst.clone(),
+        ))
     }
 
     fn execute_transformation_to(
         &self,
         src: &crate::ir::interaction::InteractionMapping,
         dest: &super::DialectDescriptor,
-    ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, ()> {
+    ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
         if src.dialect_type.base_type != ID || dest.base_type != super::logical_overlay::ID {
-            return Err(());
+            return Err(crate::ir::interaction::InteractionError::UnsupportedTranslation(
+                src.dialect_type.clone(),
+                dest.clone(),
+            ));
         }
 
         let topic_interaction = TopicPubSubInteraction::as_concrete(src.mapping.as_ref())?;
 
-        if dest.base_type == super::logical_overlay::ID {
-            let out_mapping = super::logical_overlay::LogicalOverlayInteraction {
-                sources: topic_interaction.sources.iter().map(|p| p.port.clone()).collect(),
-                destination: super::logical_overlay::DestinationMapping::Multicast(
-                    topic_interaction.subscribers.iter().map(|s| s.port.clone()).collect(),
-                ),
-            };
+        let out_mapping = super::logical_overlay::LogicalOverlayInteraction {
+            sources: topic_interaction.sources.iter().map(|p| p.port.clone()).collect(),
+            destination: super::logical_overlay::DestinationMapping::Multicast(
+                topic_interaction.subscribers.iter().map(|s| s.port.clone()).collect(),
+            ),
+        };
 
-            let out = super::super::InteractionMapping {
-                dialect_type: dest.clone(),
-                mapping: Box::new(out_mapping),
-            };
+        let out_interaction = super::super::InteractionMapping {
+            dialect_type: dest.clone(),
+            mapping: Box::new(out_mapping),
+        };
 
-            return Ok(vec![out]);
-        }
-
-        return Err(());
+        return Ok(vec![out_interaction]);
     }
 
     fn logical_utils(&self) -> Option<&dyn super::InteractionPortUtils<crate::ir::interaction::LogicalPortId>> {
@@ -208,7 +211,7 @@ impl super::InteractionDialect for TopicPubSubDialect {
         &self,
         _mapping: &crate::ir::interaction::InteractionMapping,
         _nodes: &std::collections::HashMap<uuid::Uuid, &dyn crate::ir::Node>,
-    ) -> crate::ir::link::WorkflowLink {
-        todo!()
+    ) -> crate::ir::interaction::LinkConfigurationResult {
+        crate::ir::interaction::LinkConfigurationResult::NoConfig
     }
 }

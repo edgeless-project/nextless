@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use crate::ir::interaction::dialect::{AsConcreteInteraction, AsConcreteSourcePort};
+
 pub static ID: super::DialectId = super::DialectId("LOGICAL_OVERLAY");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,17 +46,15 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Logi
         &self,
         srcs: Vec<(crate::ir::interaction::LogicalPortId, super::super::SourcePortMapping)>,
         _dests: Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
-    ) -> Vec<super::super::InteractionMapping> {
+    ) -> Result<Vec<super::super::InteractionMapping>, crate::ir::interaction::InteractionError> {
         let mut collector = std::collections::BTreeMap::<DestinationMapping, Vec<crate::ir::interaction::LogicalPortId>>::new();
 
         for (src_port_id, src_spec) in srcs {
-            let any_mapping = src_spec.mapping.as_ref() as &dyn std::any::Any;
-            let maybe_overlay_mapping = any_mapping.downcast_ref::<LogicalOverlaySourcePort>();
-            let overlay_mapping = maybe_overlay_mapping.unwrap();
+            let overlay_mapping = LogicalOverlaySourcePort::as_concrete(src_spec.mapping.as_ref())?;
             collector.entry(overlay_mapping.destination.clone()).or_default().push(src_port_id)
         }
 
-        collector
+        Ok(collector
             .into_iter()
             .map(|(destination, sources)| super::super::InteractionMapping {
                 mapping: Box::new(LogicalOverlayInteraction { sources, destination }),
@@ -63,19 +63,20 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Logi
                     constraints: std::collections::BTreeSet::new(),
                 },
             })
-            .collect()
+            .collect())
     }
 
     fn interaction_to_ports(
         &self,
         interaction: super::super::InteractionMapping,
-    ) -> (
-        Vec<(crate::ir::interaction::LogicalPortId, super::super::SourcePortMapping)>,
-        Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
-    ) {
-        let any_mapping = interaction.mapping.as_ref() as &dyn std::any::Any;
-        let maybe_overlay_mapping = any_mapping.downcast_ref::<LogicalOverlayInteraction>();
-        let overlay_mapping = maybe_overlay_mapping.unwrap();
+    ) -> Result<
+        (
+            Vec<(crate::ir::interaction::LogicalPortId, super::super::SourcePortMapping)>,
+            Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
+        ),
+        crate::ir::interaction::InteractionError,
+    > {
+        let overlay_mapping = LogicalOverlayInteraction::as_concrete(interaction.mapping.as_ref())?;
 
         let mut srcs = Vec::new();
         let mut dests = Vec::new();
@@ -142,7 +143,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Logi
             })
             .collect();
 
-        (srcs, dests)
+        Ok((srcs, dests))
     }
 }
 
@@ -160,16 +161,26 @@ impl super::InteractionDialect for LogicalOverlayDialect {
         &[]
     }
 
-    fn plan_translation_to(&self, _src: &super::DialectDescriptor, _dst: &super::DialectDescriptor) -> Result<super::DialectDescriptor, ()> {
-        Err(())
+    fn plan_translation_to(
+        &self,
+        src: &super::super::InteractionMapping,
+        dst: &super::DialectDescriptor,
+    ) -> Result<(super::DialectDescriptor, u64), crate::ir::interaction::InteractionError> {
+        Err(crate::ir::interaction::InteractionError::UnsupportedTranslation(
+            src.dialect_type.clone(),
+            dst.clone(),
+        ))
     }
 
     fn execute_transformation_to(
         &self,
-        _src: &crate::ir::interaction::InteractionMapping,
-        _dest: &super::DialectDescriptor,
-    ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, ()> {
-        Err(())
+        src: &crate::ir::interaction::InteractionMapping,
+        dest: &super::DialectDescriptor,
+    ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
+        Err(crate::ir::interaction::InteractionError::UnsupportedTranslation(
+            src.dialect_type.clone(),
+            dest.clone(),
+        ))
     }
 
     fn logical_utils(&self) -> Option<&dyn super::InteractionPortUtils<crate::ir::interaction::LogicalPortId>> {
@@ -184,7 +195,7 @@ impl super::InteractionDialect for LogicalOverlayDialect {
         &self,
         _mapping: &crate::ir::interaction::InteractionMapping,
         _nodes: &std::collections::HashMap<uuid::Uuid, &dyn crate::ir::Node>,
-    ) -> crate::ir::link::WorkflowLink {
-        todo!()
+    ) -> crate::ir::interaction::LinkConfigurationResult {
+        crate::ir::interaction::LinkConfigurationResult::NoConfig
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use crate::ir::interaction::dialect::AsConcreteInteraction;
+use crate::ir::interaction::dialect::{AsConcreteDestinationPort, AsConcreteInteraction, AsConcreteSourcePort};
 
 pub static ID: super::DialectId = super::DialectId("IP_MULTICAST");
 
@@ -66,13 +66,11 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
         &self,
         srcs: Vec<(crate::ir::interaction::PhysicalPortId, super::super::SourcePortMapping)>,
         dests: Vec<(crate::ir::interaction::PhysicalPortId, super::super::DestiantionPortMapping)>,
-    ) -> Vec<super::super::InteractionMapping> {
+    ) -> Result<Vec<super::super::InteractionMapping>, crate::ir::interaction::InteractionError> {
         let mut buffer = std::collections::HashMap::<edgeless_api::link::LinkInstanceId, IpMulticastInteraction>::new();
 
         for (port_id, src) in srcs {
-            let any_mapping = src.mapping.as_ref() as &dyn std::any::Any;
-            let maybe_multicast_mapping = any_mapping.downcast_ref::<IpMulticastSourcePort>();
-            let multicast_mapping = maybe_multicast_mapping.unwrap();
+            let multicast_mapping = IpMulticastSourcePort::as_concrete(src.mapping.as_ref())?;
             buffer
                 .entry(multicast_mapping.link_id.clone())
                 .or_insert(IpMulticastInteraction {
@@ -86,9 +84,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
         }
 
         for (port_id, dst) in dests {
-            let any_mapping = dst.mapping.as_ref() as &dyn std::any::Any;
-            let maybe_multicast_mapping = any_mapping.downcast_ref::<IpMulticastDestinationPort>();
-            let multicast_mapping = maybe_multicast_mapping.unwrap();
+            let multicast_mapping = IpMulticastDestinationPort::as_concrete(dst.mapping.as_ref())?;
             buffer
                 .entry(multicast_mapping.link_id.clone())
                 .or_insert(IpMulticastInteraction {
@@ -101,7 +97,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                 .push(port_id);
         }
 
-        buffer
+        Ok(buffer
             .into_values()
             .map(|i| super::super::InteractionMapping {
                 mapping: Box::new(i),
@@ -110,19 +106,20 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                     constraints: std::collections::BTreeSet::new(),
                 },
             })
-            .collect()
+            .collect())
     }
 
     fn interaction_to_ports(
         &self,
         interaction: super::super::InteractionMapping,
-    ) -> (
-        Vec<(crate::ir::interaction::PhysicalPortId, super::super::SourcePortMapping)>,
-        Vec<(crate::ir::interaction::PhysicalPortId, super::super::DestiantionPortMapping)>,
-    ) {
-        let any_mapping = interaction.mapping.as_ref() as &dyn std::any::Any;
-        let maybe_multicast_mapping = any_mapping.downcast_ref::<IpMulticastInteraction>();
-        let multicast_mapping = maybe_multicast_mapping.unwrap();
+    ) -> Result<
+        (
+            Vec<(crate::ir::interaction::PhysicalPortId, super::super::SourcePortMapping)>,
+            Vec<(crate::ir::interaction::PhysicalPortId, super::super::DestiantionPortMapping)>,
+        ),
+        crate::ir::interaction::InteractionError,
+    > {
+        let multicast_mapping = IpMulticastInteraction::as_concrete(interaction.mapping.as_ref())?;
 
         let mut subscribers = Vec::new();
         let mut publishers = Vec::new();
@@ -159,7 +156,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
             ));
         }
 
-        (publishers, subscribers)
+        Ok((publishers, subscribers))
     }
 }
 
@@ -177,9 +174,14 @@ impl super::InteractionDialect for IpMulticastDialect {
         &TRANSFORMATIONS
     }
 
-    fn plan_translation_to(&self, src: &super::DialectDescriptor, dst: &super::DialectDescriptor) -> Result<super::DialectDescriptor, ()> {
-        if src.base_type == super::physical_overlay::ID && dst.base_type == ID {
+    fn plan_translation_to(
+        &self,
+        src: &super::super::InteractionMapping,
+        dst: &super::DialectDescriptor,
+    ) -> Result<(super::DialectDescriptor, u64), super::super::InteractionError> {
+        if src.dialect_type.base_type == super::physical_overlay::ID && dst.base_type == ID {
             let constraints = src
+                .dialect_type
                 .constraints
                 .iter()
                 .filter_map(|c| match c {
@@ -192,24 +194,33 @@ impl super::InteractionDialect for IpMulticastDialect {
                 })
                 .collect();
 
-            return Ok(super::DialectDescriptor {
-                base_type: ID,
-                constraints: constraints,
-            });
+            return Ok((
+                super::DialectDescriptor {
+                    base_type: ID,
+                    constraints: constraints,
+                },
+                2,
+            ));
         }
 
-        Err(())
+        Err(super::super::InteractionError::UnsupportedTranslation(
+            src.dialect_type.clone(),
+            dst.clone(),
+        ))
     }
 
     fn execute_transformation_to(
         &self,
         src: &crate::ir::interaction::InteractionMapping,
         dest: &super::DialectDescriptor,
-    ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, ()> {
+    ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
         let mut state = self.state.blocking_lock();
 
         if src.dialect_type.base_type != super::physical_overlay::ID || dest.base_type != ID {
-            return Err(());
+            return Err(crate::ir::interaction::InteractionError::UnsupportedTranslation(
+                src.dialect_type.clone(),
+                dest.clone(),
+            ));
         }
 
         let overlay_src = super::physical_overlay::PhyscialOverlayInteraction::as_concrete(src.mapping.as_ref())?;
@@ -217,7 +228,7 @@ impl super::InteractionDialect for IpMulticastDialect {
         if let super::physical_overlay::DestinationMapping::Multicast(destinations) = &overlay_src.destination {
             // Keep behavior consistent for now
             if destinations.len() < 2 {
-                return Err(());
+                return Err(crate::ir::interaction::InteractionError::Inefficient);
             }
 
             for (_, active_multicast_link) in &mut state.active {
@@ -255,7 +266,7 @@ impl super::InteractionDialect for IpMulticastDialect {
                 }]);
             }
         }
-        Err(())
+        Err(crate::ir::interaction::InteractionError::LinkCapacity)
     }
 
     fn logical_utils(&self) -> Option<&dyn super::InteractionPortUtils<crate::ir::interaction::LogicalPortId>> {
@@ -270,10 +281,15 @@ impl super::InteractionDialect for IpMulticastDialect {
         &self,
         mapping: &crate::ir::interaction::InteractionMapping,
         nodes: &std::collections::HashMap<uuid::Uuid, &dyn crate::ir::Node>,
-    ) -> crate::ir::link::WorkflowLink {
+    ) -> super::super::LinkConfigurationResult {
         let mcast_link_id = edgeless_api::link::LinkType("MULTICAST".to_string());
 
-        let mcast_mapping = IpMulticastInteraction::as_concrete(mapping.mapping.as_ref()).unwrap();
+        let mcast_mapping = match IpMulticastInteraction::as_concrete(mapping.mapping.as_ref()) {
+            Ok(mcast_mapping) => mcast_mapping,
+            Err(e) => {
+                return super::super::LinkConfigurationResult::Err(e);
+            }
+        };
 
         let mut relevant_nodes = std::collections::BTreeSet::new();
 
@@ -285,21 +301,39 @@ impl super::InteractionDialect for IpMulticastDialect {
             relevant_nodes.insert(publisher.instance.node_id.clone());
         }
 
-        let relevant_nodes = relevant_nodes.into_iter().map(|n| {
-            (
-                n.clone(),
-                nodes.get(&n).unwrap().available_link_types().get(&mcast_link_id).unwrap().clone(),
-                self.config_for(mcast_mapping.link_id.clone(), n).unwrap(),
-                false,
-            )
-        });
+        let relevant_nodes: Result<Vec<_>, crate::ir::interaction::InteractionError> = relevant_nodes
+            .into_iter()
+            .map(|n| {
+                Ok((
+                    n.clone(),
+                    nodes
+                        .get(&n)
+                        .ok_or(crate::ir::interaction::InteractionError::LinkConfiguration(anyhow::anyhow!(
+                            "Corresponding node not found."
+                        )))?
+                        .available_link_types()
+                        .get(&mcast_link_id)
+                        .ok_or(crate::ir::interaction::InteractionError::LinkConfiguration(anyhow::anyhow!(
+                            "Corresponding link provider not found."
+                        )))?
+                        .clone(),
+                    self.config_for(mcast_mapping.link_id.clone(), n)?,
+                    false,
+                ))
+            })
+            .collect();
 
-        crate::ir::link::WorkflowLink {
+        let relevant_nodes = match relevant_nodes {
+            Ok(relevant_nodes) => relevant_nodes,
+            Err(e) => return crate::ir::interaction::LinkConfigurationResult::Err(e),
+        };
+
+        crate::ir::interaction::LinkConfigurationResult::Ok(crate::ir::link::WorkflowLink {
             id: mcast_mapping.link_id.clone(),
             class: mcast_link_id.clone(),
             materialized: false,
-            nodes: relevant_nodes.collect(),
-        }
+            nodes: relevant_nodes,
+        })
     }
 }
 
@@ -317,7 +351,11 @@ impl IpMulticastDialect {
         }
     }
 
-    pub fn config_for(&self, link: edgeless_api::link::LinkInstanceId, _node: edgeless_api::function_instance::NodeId) -> Option<Vec<u8>> {
+    pub fn config_for(
+        &self,
+        link: edgeless_api::link::LinkInstanceId,
+        _node: edgeless_api::function_instance::NodeId,
+    ) -> Result<Vec<u8>, crate::ir::interaction::InteractionError> {
         let state = self.state.blocking_lock();
 
         if let Some(active_link) = state.active.get(&link) {
@@ -325,9 +363,13 @@ impl IpMulticastDialect {
                 ip: active_link.multicast_ip,
                 port: 9999,
             };
-            Some(serde_json::to_string(&cfg).unwrap().into_bytes())
+            Ok(serde_json::to_string(&cfg)
+                .map_err(|e| crate::ir::interaction::InteractionError::LinkConfiguration(e.into()))?
+                .into_bytes())
         } else {
-            None
+            Err(crate::ir::interaction::InteractionError::LinkConfiguration(anyhow::anyhow!(
+                "Link not found."
+            )))
         }
     }
 }

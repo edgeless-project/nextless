@@ -9,12 +9,21 @@ pub mod physical_overlay;
 pub mod topic_pub_sub;
 
 pub trait InteractionDialect: Sync + Send {
+    #[allow(unused)]
     fn id(&self) -> DialectId;
     fn provides_transformations_to(&self) -> &'static [DialectId];
     fn provides_transformations_from(&self) -> &'static [DialectId];
 
-    fn plan_translation_to(&self, src: &DialectDescriptor, dst: &DialectDescriptor) -> Result<DialectDescriptor, ()>;
-    fn execute_transformation_to(&self, src: &super::InteractionMapping, dest: &DialectDescriptor) -> Result<Vec<super::InteractionMapping>, ()>;
+    fn plan_translation_to(
+        &self,
+        src: &super::InteractionMapping,
+        dst: &DialectDescriptor,
+    ) -> Result<(DialectDescriptor, u64), super::InteractionError>;
+    fn execute_transformation_to(
+        &self,
+        src: &super::InteractionMapping,
+        dest: &DialectDescriptor,
+    ) -> Result<Vec<super::InteractionMapping>, super::InteractionError>;
 
     fn logical_utils(&self) -> Option<&dyn InteractionPortUtils<super::LogicalPortId>>;
     fn physical_utils(&self) -> Option<&dyn InteractionPortUtils<super::PhysicalPortId>>;
@@ -23,7 +32,7 @@ pub trait InteractionDialect: Sync + Send {
         &self,
         mapping: &super::InteractionMapping,
         nodes: &std::collections::HashMap<uuid::Uuid, &dyn crate::ir::Node>,
-    ) -> crate::ir::link::WorkflowLink;
+    ) -> super::LinkConfigurationResult;
 }
 
 pub trait InteractionPortUtils<PortIdType> {
@@ -31,14 +40,17 @@ pub trait InteractionPortUtils<PortIdType> {
         &self,
         srcs: Vec<(PortIdType, super::SourcePortMapping)>,
         dests: Vec<(PortIdType, super::DestiantionPortMapping)>,
-    ) -> Vec<super::InteractionMapping>;
+    ) -> Result<Vec<super::InteractionMapping>, super::InteractionError>;
     fn interaction_to_ports(
         &self,
         interaction: super::InteractionMapping,
-    ) -> (
-        Vec<(PortIdType, super::SourcePortMapping)>,
-        Vec<(PortIdType, super::DestiantionPortMapping)>,
-    );
+    ) -> Result<
+        (
+            Vec<(PortIdType, super::SourcePortMapping)>,
+            Vec<(PortIdType, super::DestiantionPortMapping)>,
+        ),
+        super::InteractionError,
+    >;
 }
 
 pub struct DialectRegistry {
@@ -74,12 +86,12 @@ impl DialectRegistry {
         dialect_id: &DialectDescriptor,
         srcs: Vec<(super::LogicalPortId, super::SourcePortMapping)>,
         dests: Vec<(super::LogicalPortId, super::DestiantionPortMapping)>,
-    ) -> Result<Vec<super::InteractionMapping>, ()> {
-        let dialect: &dyn InteractionDialect = self.registry.get(&dialect_id.base_type.0.to_string()).ok_or(())?.as_ref();
+    ) -> Result<Vec<super::InteractionMapping>, super::InteractionError> {
+        let dialect = self.get_dialect(&dialect_id)?;
 
-        let port_converter = dialect.logical_utils().ok_or(())?;
+        let port_converter = dialect.logical_utils().ok_or(super::InteractionError::UnexpectedDialect)?;
 
-        Ok(port_converter.ports_to_interaction(srcs, dests))
+        port_converter.ports_to_interaction(srcs, dests)
     }
 
     pub fn logical_interaction_to_ports(
@@ -90,13 +102,13 @@ impl DialectRegistry {
             Vec<(super::LogicalPortId, super::SourcePortMapping)>,
             Vec<(super::LogicalPortId, super::DestiantionPortMapping)>,
         ),
-        (),
+        super::InteractionError,
     > {
-        let dialect: &dyn InteractionDialect = self.registry.get(&interaction.dialect_type.base_type.0.to_string()).ok_or(())?.as_ref();
+        let dialect = self.get_dialect(&interaction.dialect_type)?;
 
-        let port_converter = dialect.logical_utils().ok_or(())?;
+        let port_converter = dialect.logical_utils().ok_or(super::InteractionError::UnexpectedDialect)?;
 
-        Ok(port_converter.interaction_to_ports(interaction))
+        port_converter.interaction_to_ports(interaction)
     }
 
     pub fn physical_ports_to_interaction(
@@ -104,12 +116,12 @@ impl DialectRegistry {
         dialect_id: &DialectDescriptor,
         srcs: Vec<(super::PhysicalPortId, super::SourcePortMapping)>,
         dests: Vec<(super::PhysicalPortId, super::DestiantionPortMapping)>,
-    ) -> Result<Vec<super::InteractionMapping>, ()> {
-        let dialect: &dyn InteractionDialect = self.registry.get(&dialect_id.base_type.0.to_string()).ok_or(())?.as_ref();
+    ) -> Result<Vec<super::InteractionMapping>, super::InteractionError> {
+        let dialect = self.get_dialect(&dialect_id)?;
 
-        let port_converter = dialect.physical_utils().ok_or(())?;
+        let port_converter = dialect.physical_utils().ok_or(super::InteractionError::UnexpectedDialect)?;
 
-        Ok(port_converter.ports_to_interaction(srcs, dests))
+        port_converter.ports_to_interaction(srcs, dests)
     }
 
     pub fn physical_interaction_to_ports(
@@ -120,31 +132,42 @@ impl DialectRegistry {
             Vec<(super::PhysicalPortId, super::SourcePortMapping)>,
             Vec<(super::PhysicalPortId, super::DestiantionPortMapping)>,
         ),
-        (),
+        super::InteractionError,
     > {
-        let dialect: &dyn InteractionDialect = self.registry.get(&interaction.dialect_type.base_type.0.to_string()).ok_or(())?.as_ref();
+        let dialect = self.get_dialect(&interaction.dialect_type)?;
 
-        let port_converter = dialect.physical_utils().ok_or(())?;
+        let port_converter = dialect.physical_utils().ok_or(super::InteractionError::UnexpectedDialect)?;
 
-        Ok(port_converter.interaction_to_ports(interaction))
+        port_converter.interaction_to_ports(interaction)
     }
 
-    pub fn plan_translation(&mut self, source: &DialectDescriptor, dest: &DialectDescriptor) -> Result<DialectDescriptor, ()> {
-        let source_dialect: &dyn InteractionDialect = self.registry.get(&source.base_type.0.to_string()).ok_or(())?.as_ref();
-        let destination_dialect: &dyn InteractionDialect = self.registry.get(&dest.base_type.0.to_string()).ok_or(())?.as_ref();
+    pub fn plan_translation(
+        &mut self,
+        source: &super::InteractionMapping,
+        dest: &DialectDescriptor,
+    ) -> Result<(DialectDescriptor, u64), super::InteractionError> {
+        let source_dialect: &dyn InteractionDialect = self.get_dialect(&source.dialect_type)?;
+        let destination_dialect: &dyn InteractionDialect = self.get_dialect(&dest)?;
 
         if source_dialect.provides_transformations_to().contains(&dest.base_type) {
             return source_dialect.plan_translation_to(source, dest);
-        } else if destination_dialect.provides_transformations_from().contains(&source.base_type) {
+        } else if destination_dialect
+            .provides_transformations_from()
+            .contains(&source.dialect_type.base_type)
+        {
             return destination_dialect.plan_translation_to(source, dest);
         }
 
-        Err(())
+        Err(super::InteractionError::UnsupportedTranslation(source.dialect_type.clone(), dest.clone()))
     }
 
-    pub fn try_translate(&mut self, source: &super::InteractionMapping, dest: &DialectDescriptor) -> Result<Vec<super::InteractionMapping>, ()> {
-        let source_dialect: &dyn InteractionDialect = self.registry.get(&source.dialect_type.base_type.0.to_string()).ok_or(())?.as_ref();
-        let destination_dialect: &dyn InteractionDialect = self.registry.get(&dest.base_type.0.to_string()).ok_or(())?.as_ref();
+    pub fn try_translate(
+        &mut self,
+        source: &super::InteractionMapping,
+        dest: &DialectDescriptor,
+    ) -> Result<Vec<super::InteractionMapping>, super::InteractionError> {
+        let source_dialect: &dyn InteractionDialect = self.get_dialect(&source.dialect_type)?;
+        let destination_dialect: &dyn InteractionDialect = self.get_dialect(&dest)?;
 
         if source_dialect.provides_transformations_to().contains(&dest.base_type) {
             return source_dialect.execute_transformation_to(source, dest);
@@ -155,7 +178,21 @@ impl DialectRegistry {
             return destination_dialect.execute_transformation_to(source, dest);
         }
 
-        Err(())
+        Err(super::InteractionError::UnsupportedTranslation(source.dialect_type.clone(), dest.clone()))
+    }
+
+    pub fn link_config(
+        &self,
+        mapping: &super::InteractionMapping,
+        nodes: &std::collections::HashMap<uuid::Uuid, &dyn crate::ir::Node>,
+    ) -> super::LinkConfigurationResult {
+        let dialect: &dyn InteractionDialect = if let Some(dialect) = self.registry.get(&mapping.dialect_type.base_type.0.to_string()) {
+            dialect.as_ref()
+        } else {
+            return super::LinkConfigurationResult::Err(super::InteractionError::UnknownDialect(mapping.dialect_type.base_type.0.to_string()));
+        };
+
+        dialect.link_config(mapping, nodes)
     }
 
     pub async fn instantiate_link_data_plane(
@@ -165,6 +202,13 @@ impl DialectRegistry {
     ) -> Result<(), String> {
         // TODO: This exists for compatibility with the older Link Model and will be used to instantitate the global state of a link (i.e. SDN),
         Ok(())
+    }
+
+    fn get_dialect<'a, 'b>(&'a self, id: &'b DialectDescriptor) -> Result<&'a dyn InteractionDialect, super::InteractionError> {
+        self.registry
+            .get(&id.base_type.0.to_string())
+            .ok_or(super::InteractionError::UnknownDialect(id.base_type.0.to_string()))
+            .map(|i| i.as_ref())
     }
 }
 
@@ -179,13 +223,35 @@ pub trait PhysicalInteraction {
 }
 
 trait AsConcreteInteraction {
-    fn as_concrete(a: &dyn Interaction) -> Result<&Self, ()>;
+    fn as_concrete(a: &dyn Interaction) -> Result<&Self, super::InteractionError>;
 }
 
 impl<T: Interaction> AsConcreteInteraction for T {
-    fn as_concrete(a: &dyn Interaction) -> Result<&Self, ()> {
+    fn as_concrete(a: &dyn Interaction) -> Result<&Self, super::InteractionError> {
         let as_any = a as &dyn std::any::Any;
-        as_any.downcast_ref().ok_or(())
+        as_any.downcast_ref().ok_or(super::InteractionError::UnexpectedDialect)
+    }
+}
+
+trait AsConcreteSourcePort {
+    fn as_concrete(a: &dyn SourcePort) -> Result<&Self, super::InteractionError>;
+}
+
+impl<T: SourcePort> AsConcreteSourcePort for T {
+    fn as_concrete(a: &dyn SourcePort) -> Result<&Self, super::InteractionError> {
+        let as_any = a as &dyn std::any::Any;
+        as_any.downcast_ref().ok_or(super::InteractionError::UnexpectedDialect)
+    }
+}
+
+trait AsConcreteDestinationPort {
+    fn as_concrete(a: &dyn DestinationPort) -> Result<&Self, super::InteractionError>;
+}
+
+impl<T: DestinationPort> AsConcreteDestinationPort for T {
+    fn as_concrete(a: &dyn DestinationPort) -> Result<&Self, super::InteractionError> {
+        let as_any = a as &dyn std::any::Any;
+        as_any.downcast_ref().ok_or(super::InteractionError::UnexpectedDialect)
     }
 }
 
@@ -220,8 +286,10 @@ pub struct DialectDescriptor {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DialectConstraint {
     IpMulticast(ip_multicast::IpMulticastConstraint),
+    #[allow(unused)]
     LogicalOverlay(logical_overlay::LogicalOverlayConstraint),
     PhysicalOverlay(physical_overlay::PhysicalOverlayConstraint),
+    #[allow(unused)]
     TopicPubSub(topic_pub_sub::TopicPubSubConstraint),
 }
 
