@@ -28,8 +28,17 @@ pub enum DestinationMapping {
     Multicast(Vec<crate::ir::interaction::LogicalPortId>),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub enum LogicalOverlayConstraint {}
+// #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+// pub enum LogicalOverlayConstraint {}
+
+// impl super::DialectConstraint for LogicalOverlayConstraint {
+//     fn as_container(self) -> super::DialectConstraintContainer {
+//         super::DialectConstraintContainer {
+//             dialect: ID,
+//             constraint: Box::new(self),
+//         }
+//     }
+// }
 
 pub struct LogicalOverlayDialect {}
 

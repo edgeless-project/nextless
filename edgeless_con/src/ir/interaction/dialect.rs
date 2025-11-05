@@ -274,23 +274,116 @@ pub trait InteractionHelpers: std::any::Any {
     fn dyn_eq(&self, other: &dyn InteractionHelpers) -> bool;
 }
 
+pub trait DialectConstraint: Debug + Send + DialectConstraintHelpers {
+    fn as_container(self) -> DialectConstraintContainer;
+}
+
+trait AsConcreteDialectConstraint {
+    fn from_container(a: &DialectConstraintContainer) -> Result<&Self, super::InteractionError>;
+}
+
+impl<T: DialectConstraint> AsConcreteDialectConstraint for T {
+    fn from_container(a: &DialectConstraintContainer) -> Result<&Self, super::InteractionError> {
+        let as_any = a.constraint.as_ref() as &dyn std::any::Any;
+        as_any.downcast_ref().ok_or(super::InteractionError::UnexpectedDialect)
+    }
+}
+
+// https://stackoverflow.com/a/30353928
+// https://quinedot.github.io/rust-learning/dyn-trait-eq.html
+pub trait DialectConstraintHelpers: std::any::Any {
+    fn clone_box(&self) -> Box<dyn DialectConstraint>;
+    fn dyn_eq(&self, other: &dyn DialectConstraintHelpers) -> bool;
+    fn dyn_partial_cmp(&self, other: &dyn DialectConstraintHelpers) -> Option<std::cmp::Ordering>;
+    fn dyn_cmp(&self, other: &dyn DialectConstraintHelpers) -> std::cmp::Ordering;
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct DialectId(&'static str);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DialectDescriptor {
     pub base_type: DialectId,
-    pub constraints: std::collections::BTreeSet<DialectConstraint>,
+    pub constraints: std::collections::BTreeSet<DialectConstraintContainer>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum DialectConstraint {
-    IpMulticast(ip_multicast::IpMulticastConstraint),
-    #[allow(unused)]
-    LogicalOverlay(logical_overlay::LogicalOverlayConstraint),
-    PhysicalOverlay(physical_overlay::PhysicalOverlayConstraint),
-    #[allow(unused)]
-    TopicPubSub(topic_pub_sub::TopicPubSubConstraint),
+impl<T> DialectConstraintHelpers for T
+where
+    T: 'static + DialectConstraint + Clone + PartialEq + Eq + PartialOrd + Ord,
+{
+    fn clone_box(&self) -> Box<dyn DialectConstraint> {
+        Box::new(self.clone())
+    }
+
+    // https://quinedot.github.io/rust-learning/dyn-trait-eq.html
+    fn dyn_eq(&self, other: &dyn DialectConstraintHelpers) -> bool {
+        let other_any = other as &dyn std::any::Any;
+        let other_slf = other_any.downcast_ref::<Self>();
+        if let Some(other) = other_slf {
+            self.eq(other)
+        } else {
+            false
+        }
+    }
+
+    fn dyn_partial_cmp(&self, other: &dyn DialectConstraintHelpers) -> Option<std::cmp::Ordering> {
+        if self.type_id() != other.type_id() {
+            return Some(self.type_id().cmp(&other.type_id()));
+        }
+
+        let other_any = other as &dyn std::any::Any;
+        let other_slf = other_any.downcast_ref::<Self>().unwrap();
+
+        Some(self.cmp(other_slf))
+    }
+
+    fn dyn_cmp(&self, other: &dyn DialectConstraintHelpers) -> std::cmp::Ordering {
+        if self.type_id() != other.type_id() {
+            return self.type_id().cmp(&other.type_id());
+        }
+
+        let other_any = other as &dyn std::any::Any;
+        let other_slf = other_any.downcast_ref::<Self>().unwrap();
+
+        self.cmp(other_slf)
+    }
+}
+impl Clone for Box<dyn DialectConstraint> {
+    fn clone(&self) -> Box<dyn DialectConstraint> {
+        self.clone_box()
+    }
+}
+
+impl PartialEq for Box<dyn DialectConstraint> {
+    fn eq(&self, other: &Self) -> bool {
+        self.dyn_eq(other.as_ref())
+    }
+}
+
+impl Eq for Box<dyn DialectConstraint> {}
+
+impl PartialOrd for Box<dyn DialectConstraint> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.dyn_partial_cmp(other.as_ref())
+    }
+}
+
+impl Ord for Box<dyn DialectConstraint> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.dyn_cmp(other.as_ref())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialOrd, Ord)]
+pub struct DialectConstraintContainer {
+    dialect: DialectId,
+    constraint: Box<dyn DialectConstraint>,
+}
+
+impl PartialEq for DialectConstraintContainer {
+    fn eq(&self, other: &Self) -> bool {
+        &self.dialect == &other.dialect && &self.constraint == &other.constraint
+    }
 }
 
 impl<T> DestinationPortHelpers for T

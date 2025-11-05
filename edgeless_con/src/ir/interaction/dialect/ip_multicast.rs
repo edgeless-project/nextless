@@ -1,13 +1,24 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use crate::ir::interaction::dialect::{AsConcreteDestinationPort, AsConcreteInteraction, AsConcreteSourcePort};
+use crate::ir::interaction::dialect::{
+    AsConcreteDestinationPort, AsConcreteDialectConstraint, AsConcreteInteraction, AsConcreteSourcePort, DialectConstraint,
+};
 
 pub static ID: super::DialectId = super::DialectId("IP_MULTICAST");
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IpMulticastConstraint {
     Cluster(uuid::Uuid),
+}
+
+impl super::DialectConstraint for IpMulticastConstraint {
+    fn as_container(self) -> super::DialectConstraintContainer {
+        super::DialectConstraintContainer {
+            dialect: ID.clone(),
+            constraint: Box::new(self),
+        }
+    }
 }
 
 pub struct IpMulticastDialect {
@@ -184,13 +195,16 @@ impl super::InteractionDialect for IpMulticastDialect {
                 .dialect_type
                 .constraints
                 .iter()
-                .filter_map(|c| match c {
-                    super::DialectConstraint::PhysicalOverlay(physical_overlay_constraint) => match physical_overlay_constraint {
-                        super::physical_overlay::PhysicalOverlayConstraint::Cluster(uuid) => {
-                            Some(super::DialectConstraint::IpMulticast(IpMulticastConstraint::Cluster(uuid.clone())))
+                .filter_map(|c| {
+                    if let Ok(physical_overlay_constraint) = super::physical_overlay::PhysicalOverlayConstraint::from_container(&c) {
+                        match physical_overlay_constraint {
+                            super::physical_overlay::PhysicalOverlayConstraint::Cluster(uuid) => {
+                                Some(IpMulticastConstraint::Cluster(uuid.clone()).as_container())
+                            }
                         }
-                    },
-                    _ => None,
+                    } else {
+                        None
+                    }
                 })
                 .collect();
 

@@ -10,6 +10,15 @@ pub enum PhysicalOverlayConstraint {
     Cluster(uuid::Uuid),
 }
 
+impl super::DialectConstraint for PhysicalOverlayConstraint {
+    fn as_container(self) -> super::DialectConstraintContainer {
+        super::DialectConstraintContainer {
+            dialect: ID,
+            constraint: Box::new(self),
+        }
+    }
+}
+
 pub struct PhysicalOverlayDialect {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -5,6 +5,8 @@
 // SPDX-FileCopyrightText: © 2024 Roman Kolcun <roman.kolcun@cl.cam.ac.uk>
 // SPDX-License-Identifier: MIT
 
+use crate::ir::interaction::dialect::DialectConstraint;
+
 #[derive(Clone)]
 pub struct WorkerNode {
     agent_url: String,
@@ -194,9 +196,10 @@ impl crate::ir::Node for WorkerNode {
 
         dialects.push(crate::ir::interaction::dialect::DialectDescriptor {
             base_type: crate::ir::interaction::dialect::physical_overlay::ID,
-            constraints: std::collections::BTreeSet::from([crate::ir::interaction::dialect::DialectConstraint::PhysicalOverlay(
-                crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(self.cluster_id.clone()),
-            )]),
+            constraints: std::collections::BTreeSet::from([crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(
+                self.cluster_id.clone(),
+            )
+            .as_container()]),
         });
 
         if self
@@ -205,9 +208,10 @@ impl crate::ir::Node for WorkerNode {
         {
             dialects.push(crate::ir::interaction::dialect::DialectDescriptor {
                 base_type: crate::ir::interaction::dialect::ip_multicast::ID,
-                constraints: std::collections::BTreeSet::from([crate::ir::interaction::dialect::DialectConstraint::IpMulticast(
-                    crate::ir::interaction::dialect::ip_multicast::IpMulticastConstraint::Cluster(self.cluster_id.clone()),
-                )]),
+                constraints: std::collections::BTreeSet::from([crate::ir::interaction::dialect::ip_multicast::IpMulticastConstraint::Cluster(
+                    self.cluster_id.clone(),
+                )
+                .as_container()]),
             });
         }
 

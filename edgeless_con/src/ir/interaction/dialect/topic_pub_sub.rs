@@ -33,8 +33,17 @@ struct Subscriber {
     filter: String,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub enum TopicPubSubConstraint {}
+// #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+// pub enum TopicPubSubConstraint {}
+
+// impl super::DialectConstraint for TopicPubSubConstraint {
+//     fn as_container(self) -> super::DialectConstraintContainer {
+//         super::DialectConstraintContainer {
+//             dialect: ID,
+//             constraint: Box::new(self),
+//         }
+//     }
+// }
 
 pub struct TopicPubSubDialect {}
 
