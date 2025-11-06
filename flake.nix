@@ -16,7 +16,7 @@
     nixpkgs.url = "nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     fenix = {
-      url = "github:nix-community/fenix";
+      url = "github:nix-community/fenix/monthly";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -26,8 +26,8 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         toolchain = with fenix.packages.${system}; combine [
-          stable.toolchain
-          targets.wasm32-unknown-unknown.stable.rust-std
+          latest.toolchain
+          targets.wasm32-unknown-unknown.latest.rust-std
         ];
       in {
         packages = {
@@ -128,7 +128,7 @@
             openssl.dev
             pkg-config
             protobuf
-            mold
+            # mold
             gcc
             binaryen #wasm-opt
             curl # libcurl used in the cli. Not sure why it is not needed in the CLI.
