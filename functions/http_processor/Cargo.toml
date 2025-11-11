@@ -17,6 +17,7 @@ name = "http_processor"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
+include = ["src/**/*", "function.json", "*.star"]
 
 [lib]
 name = "http_processor"
@@ -29,6 +30,20 @@ log = "0.4"
 edgeless_http = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_http" }
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
+edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
+allocator-api2 = { version = "0.2.8", default-features = false, features = [
+    "alloc",
+] }
+
 
 [features]
+default = ["input_new_req", "output_log_value"]
 input_new_req = []
+output_log_value = []
+
+[patch."https://github.com/edgeless-project/nextless.git"]
+edgeless_http = { path = "/Users/raphael/code/nextless/edgeless_http" }
+edgeless_function_core = { path = "/Users/raphael/code/nextless/edgeless_function_core" }
+edgeless_function = { path = "/Users/raphael/code/nextless/edgeless_function" }
+edgeless_actor_abi = { path = "/Users/raphael/code/nextless/edgeless_actor_abi" }
+# edgeless_function_types = { path = "/Users/raphael/code/nextless/edgeless_function_types" }

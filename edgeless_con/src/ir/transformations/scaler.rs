@@ -52,7 +52,16 @@ impl super::StatelessTransformation for Scaler {
                 }
             });
 
+            log::info!("Processing: {processing_rate}, Message: {message_rate}");
+
             let should_scale_up = message_rate > 1.1 * processing_rate;
+
+            let insta_scale = if let Some(min_instances) = f.annotations.get("min_instances").and_then(|val| val.parse::<usize>().ok()) {
+                f.instances.len() < min_instances
+            } else {
+                false
+            };
+
             // let should_scale_down = processing_rate < number_of_existing_instances as f64;
             let wait_period_exceeded = if let Some(last_start) = last_start {
                 last_start.elapsed() > std::time::Duration::from_secs(60)
@@ -60,7 +69,7 @@ impl super::StatelessTransformation for Scaler {
                 false
             };
 
-            if can_scale_up && should_scale_up && wait_period_exceeded {
+            if can_scale_up && ((should_scale_up && wait_period_exceeded) || insta_scale) {
                 log::info!("Attempting to Scale Up. Message Rate:{message_rate} Processing Rate:{processing_rate}");
                 f.instances
                     .push(std::cell::RefCell::new(super::super::PhysicalComponentState::request_new_instance()));

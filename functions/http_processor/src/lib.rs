@@ -4,6 +4,16 @@
 use edgeless_function::*;
 use edgeless_http::*;
 
+extern "C" {
+    fn eval_sleep(delay_ms: u64);
+}
+
+fn fake_work(delay_ms: u64) {
+    unsafe {
+        eval_sleep(delay_ms);
+    }
+}
+
 struct ProcessorFun;
 
 edgeless_function::generate!(ProcessorFun);
@@ -11,11 +21,14 @@ edgeless_function::generate!(ProcessorFun);
 impl HttpProcessorAPI<'_> for ProcessorFun {
     type EDGELESS_HTTP_REQUEST = edgeless_http::EdgelessHTTPRequest;
     type EDGELESS_HTTP_RESPONSE = edgeless_http::EdgelessHTTPResponse;
+    type STRING = String;
 
     fn handle_call_new_req(_src: InstanceId, req: EdgelessHTTPRequest) -> EdgelessHTTPResponse {
         log::info!("HTTP_Processor: 'Call' called, MSG: {:?}", req);
 
         if req.path == "/hello" {
+            fake_work(100);
+            cast_log_value(&"Test".to_string());
             EdgelessHTTPResponse {
                 status: 200,
                 body: Some(Vec::<u8>::from("World")),

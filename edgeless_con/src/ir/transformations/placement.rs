@@ -264,6 +264,7 @@ fn find_candidates_for_actor<'b>(
     // For urgent requests (e.g. the first instance), attempt to use an existing image.
     // This can fail as the normal mode will always be executed if the urgen mode fails.
     if urgent {
+        log::debug!("Urgent Mode");
         for node in nodes.values() {
             let node_candidates = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance, true);
             if let Some(node_candidate) = select_node_candidate(node_candidates, true, true, image_cache) {
@@ -272,6 +273,7 @@ fn find_candidates_for_actor<'b>(
         }
 
         if !candiates.is_empty() {
+            log::debug!("Found 'Urgent' Image");
             return candiates;
         }
     }
@@ -294,6 +296,10 @@ fn find_candidates_for_actor<'b>(
         if let Some(node_candidate) = select_node_candidate(node_candidates, false, true, image_cache) {
             candiates.push(node_candidate)
         }
+    }
+
+    if !candiates.is_empty() {
+        log::debug!("Found 'Any' Image");
     }
 
     candiates
@@ -321,14 +327,13 @@ fn select_node_candidate<'b>(
 
             match existing {
                 image_cache::CacheResult::NotFound => {
-                    log::info!("Not Found: {image_ident:?}");
+                    log::info!("No image found: {image_ident:?}. Returning source image.");
                     if !only_available {
                         return Some(c);
                     }
                 }
                 image_cache::CacheResult::PartialMatch(partial_match) => {
                     if allow_imperfect {
-                        log::info!("Partial Image");
                         let mut image_options: Vec<_> = partial_match
                             .same_runtime_feature_subset(&image_ident)
                             .same_or_more_ports(&image_ident)
@@ -354,9 +359,12 @@ fn select_node_candidate<'b>(
                             return Some(new_candidate);
                         }
                     }
+                    if !only_available {
+                        log::debug!("Partial match failed; Returning source image.");
+                        return Some(c);
+                    }
                 }
                 image_cache::CacheResult::FullMatch(image) => {
-                    log::info!("Full Image");
                     let mut new_candidate = c.clone();
                     new_candidate.dest_image = actor::ImageState::Existing(image.clone());
                     return Some(new_candidate);

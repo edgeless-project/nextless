@@ -41,6 +41,7 @@ impl super::StatefulTransformation<crate::ir::support::image_cache::ImageCache> 
                         }
                         support::image_cache::CacheResult::PartialMatch(_partial_match) => {
                             log::info!("Compile Ignoring Partial Match for Image.");
+                            build_new_image(&function, actor_instance, image_ident, store);
                         }
                         support::image_cache::CacheResult::FullMatch(actor_image) => actor_instance.image = actor::ImageState::Existing(actor_image),
                     }

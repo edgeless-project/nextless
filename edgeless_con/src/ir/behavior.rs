@@ -19,7 +19,7 @@ pub enum BehaviorError {
     UnsupportedFeatureTranslation(dialect::DialectId, dialect::DialectId, String),
     #[error("Features not supported by target: {0}")]
     UnsupportedFeatures(String),
-    #[error("Translation Failed.")]
+    #[error("Translation Failed. {0:#}")]
     TranslationError(#[from] anyhow::Error),
     #[error("Cannot Optimize Ports for {0:?}")]
     UnsupportedOptimization(dialect::DialectId),

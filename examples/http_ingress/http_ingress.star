@@ -1,5 +1,6 @@
 load("../../functions/http_processor/http_processor.star", "HTTPProcessor")
 load("../../resources/http_ingress.star", "HTTPIngress")
+load("../../resources/file_log.star", "FileLog")
 
 ingress = edgeless_resource(
     id = "http-ingress-1-1",
@@ -13,15 +14,30 @@ ingress = edgeless_resource(
 processor = edgeless_actor(
     id = "http_processor",
     klass = HTTPProcessor,
-    annotations = {}
+    annotations = {
+        "min_instances": "10",
+        "max_instances": "10",
+    }
 
 )
 
-ingress.new_request >> processor.new_req
+
+logger = edgeless_resource(
+    id = "my-log",
+    klass = FileLog,
+    configurations = {
+        "filename": "my-local-file.log",
+        "add-timestamp": "true"
+    }
+)
+
+
+ingress.new_request >> any([processor.new_req])
+processor.log_value >>  logger.line
 
 wf = edgeless_workflow(
     "http_ingress_example",
-    [ingress, processor],
+    [ingress, processor, logger],
     annotations = {}
 )
 

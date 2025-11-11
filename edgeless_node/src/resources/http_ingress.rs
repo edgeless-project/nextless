@@ -9,18 +9,25 @@ use std::str::FromStr;
 struct ResourceDesc {
     host: String,
     allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
+    dataplane: edgeless_dataplane::handle::DataplaneHandle,
 }
 
 struct IngressState {
-    interests: Vec<HTTPIngressInterest>,
     active_resources: std::collections::HashMap<InstanceId, ResourceDesc>,
-    dataplane: edgeless_dataplane::handle::DataplaneHandle,
+    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
 }
 
 #[derive(Clone)]
 struct IngressService {
     listen_addr: String,
     interests: std::sync::Arc<tokio::sync::Mutex<IngressState>>,
+}
+
+#[derive(Clone)]
+struct IngressResource {
+    #[allow(unused)]
+    own_node_id: uuid::Uuid,
+    configuration_state: std::sync::Arc<tokio::sync::Mutex<IngressState>>,
 }
 
 impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressService {
@@ -34,8 +41,6 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
         let cloned = self.interests.clone();
         let cloned_addr = self.listen_addr.clone();
         Box::pin(async move {
-            let mut lck = cloned.lock().await;
-
             let (parts, body) = req.into_parts();
 
             let host = match parts.headers.get(hyper::header::HOST) {
@@ -48,13 +53,19 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
             let span = opentelemetry::global::tracer("ingress_resource").start("ingress_event");
             let request_context = opentelemetry::Context::current_with_span(span);
 
-            if let Some((host, target, target_port)) = lck.interests.iter().find_map(|intr| {
-                if host == intr.host && intr.allow.contains(&method) {
-                    Some((intr.host.clone(), intr.target, intr.target_port.clone()))
-                } else {
-                    None
-                }
-            }) {
+            let rq = {
+                let lck = cloned.lock().await;
+
+                lck.active_resources.iter().find_map(|(_id, intr)| {
+                    if host == intr.host && intr.allow.contains(&method) {
+                        Some((intr.host.clone(), intr.dataplane.clone()))
+                    } else {
+                        None
+                    }
+                })
+            };
+
+            if let Some((host, mut dataplane)) = rq {
                 let msg = edgeless_http::EdgelessHTTPRequest {
                     host: host.to_string(),
                     protocol: edgeless_http::EdgelessHTTPProtocol::Unknown,
@@ -74,7 +85,11 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         .collect(),
                 };
                 let serialized_msg = serde_json::to_vec(&msg)?;
-                let res = lck.dataplane.call(target, target_port, &serialized_msg, request_context.clone()).await;
+
+                let res = dataplane
+                    .call_alias("new_request".to_string(), &serialized_msg, request_context.clone())
+                    .await;
+
                 if let edgeless_dataplane::core::CallRet::Reply(data) = res {
                     let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_slice(&data)?;
                     let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
@@ -108,16 +123,12 @@ pub async fn ingress_task(
     ingress_id: edgeless_api::function_instance::InstanceId,
     ingress_url: String,
 ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>> {
-    let mut provider = dataplane_provider;
     let (_, host, port) = edgeless_api::util::parse_http_host(&ingress_url).unwrap();
     let addr = std::net::SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
 
-    let dataplane = provider.get_handle_for(ingress_id, None).await;
-
     let ingress_state = std::sync::Arc::new(tokio::sync::Mutex::new(IngressState {
-        interests: Vec::<HTTPIngressInterest>::new(),
         active_resources: std::collections::HashMap::new(),
-        dataplane,
+        dataplane_provider,
     }));
 
     let cloned_interests = ingress_state.clone();
@@ -159,13 +170,6 @@ pub async fn ingress_task(
     })
 }
 
-#[derive(Clone)]
-struct IngressResource {
-    #[allow(unused)]
-    own_node_id: uuid::Uuid,
-    configuration_state: std::sync::Arc<tokio::sync::Mutex<IngressState>>,
-}
-
 #[async_trait::async_trait]
 impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for IngressResource {
     async fn start(
@@ -191,25 +195,22 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 })
                 .collect();
 
+            let mut handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id, None).await;
+
+            handle
+                .update_mapping(instance_specification.input_mapping, instance_specification.output_mapping)
+                .await;
+
+            log::info!("Start HTTP Ingress");
+
             lck.active_resources.insert(
                 instance_specification.resource_id,
                 ResourceDesc {
+                    dataplane: handle,
                     host: host.clone(),
                     allow: allow.clone(),
                 },
             );
-            if let Some(edgeless_api::common::Output::Single(target, port_id)) = instance_specification
-                .output_mapping
-                .get(&edgeless_api::function_instance::PortId("new_request".to_string()))
-            {
-                lck.interests.push(HTTPIngressInterest {
-                    resource_id: instance_specification.resource_id,
-                    host: host.to_string(),
-                    allow,
-                    target: *target,
-                    target_port: port_id.clone(),
-                });
-            }
 
             Ok(edgeless_api::common::StartComponentResponse::InstanceId(
                 instance_specification.resource_id,
@@ -225,49 +226,19 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         let mut lck = self.configuration_state.lock().await;
-        lck.interests.retain(|item| item.resource_id != resource_id);
+        lck.active_resources.remove(&resource_id);
         Ok(())
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        log::info!("{:?}", update.output_mapping);
-        let target = match update
-            .output_mapping
-            .get(&edgeless_api::function_instance::PortId("new_request".to_string()))
-        {
-            Some(val) => val.clone(),
-            None => {
-                return Err(anyhow::anyhow!("Missing mapping of channel: new_request"));
-            }
-        };
         let mut lck = self.configuration_state.lock().await;
-        let (host, allow) = match lck.active_resources.get(&update.function_id) {
-            Some(val) => (val.host.clone(), val.allow.clone()),
+
+        match lck.active_resources.get_mut(&update.function_id) {
+            Some(val) => val.dataplane.update_mapping(update.input_mapping, update.output_mapping).await,
             None => {
                 return Err(anyhow::anyhow!("Patching a non-existing resource: {}", update.function_id));
             }
         };
-
-        if let edgeless_api::common::Output::Single(target, port_id) = target {
-            lck.interests.push(HTTPIngressInterest {
-                resource_id: update.function_id,
-                host,
-                allow,
-                target,
-                target_port: port_id,
-            });
-
-            Ok(())
-        } else {
-            return Err(anyhow::anyhow!("Unsupported Output Type"));
-        }
+        Ok(())
     }
-}
-
-struct HTTPIngressInterest {
-    resource_id: edgeless_api::function_instance::InstanceId,
-    host: String,
-    allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
-    target: edgeless_api::function_instance::InstanceId,
-    target_port: edgeless_api::function_instance::PortId,
 }

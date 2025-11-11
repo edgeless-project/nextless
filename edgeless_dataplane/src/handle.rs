@@ -70,7 +70,7 @@ pub struct DataplaneHandle {
     >,
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
-    next_id: u64,
+    next_id: std::sync::Arc<std::sync::atomic::AtomicU64>,
     #[allow(unused)]
     telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
 }
@@ -154,7 +154,7 @@ impl DataplaneHandle {
             link_manager,
             links: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             receiver_overwrites,
-            next_id: 1,
+            next_id: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
             telemetry_handle,
         }
     }
@@ -396,8 +396,7 @@ impl DataplaneHandle {
         context: opentelemetry::Context,
     ) -> CallRet {
         let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
-        let channel_id = self.next_id;
-        self.next_id += 1;
+        let channel_id = self.next_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
         self.send_inner(

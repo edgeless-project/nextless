@@ -73,7 +73,9 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                     let return_statement = quote! {
                         let serialized = <<#parsed_ident as #trait_name>::#return_type_ident as edgeless_function_core::Serialize>::serialize(&res);
-                        return Ok(edgeless_function::CallRet::Reply(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(serialized.as_ref())));
+                        let mut buffer = allocator_api2::vec::Vec::new_in(&allocator_api2::alloc::Global as &dyn allocator_api2::alloc::Allocator);
+                        buffer.extend_from_slice(serialized.as_ref());
+                        return Ok(edgeless_actor_abi::CallRet::Reply(buffer));
                     };
 
                     (Some(return_type_ident), return_statement)

@@ -7,7 +7,7 @@ pub mod dialect;
 pub enum InteractionError {
     #[error("Interaction Dialect \"{0}\" is unknown to the system.")]
     UnknownDialect(String),
-    #[error("Translation Failed.")]
+    #[error("Translation Failed: {0:#}")]
     TranslationError(#[source] anyhow::Error),
     #[error("{0:?} cannot be translated into {1:?}.")]
     UnsupportedTranslation(dialect::DialectDescriptor, dialect::DialectDescriptor),
@@ -17,7 +17,7 @@ pub enum InteractionError {
     Inefficient,
     #[error("Link capacity exeeded.")]
     LinkCapacity,
-    #[error("Link configuration error.")]
+    #[error("Link configuration error: {0:#}")]
     LinkConfiguration(#[source] anyhow::Error),
 }
 
