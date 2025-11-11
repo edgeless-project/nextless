@@ -111,13 +111,11 @@
               gcc
               binaryen
             ];
+              # https://discourse.nixos.org/t/program-compiled-with-rust-cannot-find-libssl-so-3-at-runtime/27196
             postInstall = ''
               wrapProgram $out/bin/edgeless_con_d \
-                --set PATH ${pkgs.lib.makeBinPath [
-                  toolchain
-                  pkgs.gcc
-                  pkgs.binaryen
-                ]}
+                --set PATH ${pkgs.lib.makeBinPath [toolchain pkgs.gcc pkgs.binaryen]} \
+                --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath [pkgs.openssl]}
             '';
             };
         };
