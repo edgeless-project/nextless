@@ -99,7 +99,23 @@ impl super::ImplicitFeature for NativeDynamicDialectFeatures {
 
 impl std::fmt::Display for NativeDynamicDialectFeatures {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let formatted = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
-        f.write_str(&formatted)
+        match self {
+            NativeDynamicDialectFeatures::Amd64 => f.write_str("AMD64"),
+            NativeDynamicDialectFeatures::Aarch64 => f.write_str("AARCH64"),
+            NativeDynamicDialectFeatures::Aes => f.write_str("AES"),
+        }
+    }
+}
+
+impl std::str::FromStr for NativeDynamicDialectFeatures {
+    type Err = super::super::BehaviorError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "AMD64" => Ok(Self::Amd64),
+            "AARCH64" => Ok(Self::Aarch64),
+            "AES" => Ok(Self::Aes),
+            _ => Err(super::super::BehaviorError::UnknownFeature(s.to_string(), ID.0.to_string())),
+        }
     }
 }

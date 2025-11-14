@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use std::str::FromStr;
+
 pub static ID: super::DialectId = super::DialectId("WASM");
 
 pub struct WasmDialect {}
@@ -32,11 +34,7 @@ impl super::BehaviorDialect for WasmDialect {
     ) -> Result<std::collections::BTreeSet<super::DialectFeature>, crate::ir::behavior::BehaviorError> {
         feature_strings
             .iter()
-            .map(|f| {
-                serde_json::from_str::<WasmDialectFeatures>(f)
-                    .map_err(|_e| crate::ir::behavior::BehaviorError::UnknownFeature(f.to_string(), ID.0.to_string()))
-                    .map(super::DialectFeature::Wasm)
-            })
+            .map(|f| WasmDialectFeatures::from_str(f).map(super::DialectFeature::Wasm))
             .collect()
     }
 
@@ -92,7 +90,19 @@ impl super::ImplicitFeature for WasmDialectFeatures {
 
 impl std::fmt::Display for WasmDialectFeatures {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let formatted = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
-        f.write_str(&formatted)
+        match self {
+            WasmDialectFeatures::Wgpu => f.write_str("WGPU"),
+        }
+    }
+}
+
+impl std::str::FromStr for WasmDialectFeatures {
+    type Err = super::super::BehaviorError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "WGPU" => Ok(Self::Wgpu),
+            _ => Err(super::super::BehaviorError::UnknownFeature(s.to_string(), ID.0.to_string())),
+        }
     }
 }

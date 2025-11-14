@@ -300,7 +300,19 @@ fn port_features_for(image_ident: &crate::ir::behavior::BehaviorImageId) -> Vec<
 
 impl std::fmt::Display for RustDialectFeatures {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let formatted = serde_json::to_string(self).map_err(|_| std::fmt::Error)?;
-        f.write_str(&formatted)
+        match self {
+            RustDialectFeatures::Wgpu => f.write_str("WGPU"),
+        }
+    }
+}
+
+impl std::str::FromStr for RustDialectFeatures {
+    type Err = super::super::BehaviorError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "WGPU" => Ok(Self::Wgpu),
+            _ => Err(super::super::BehaviorError::UnknownFeature(s.to_string(), ID.0.to_string())),
+        }
     }
 }
