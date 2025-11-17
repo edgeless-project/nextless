@@ -400,7 +400,10 @@ pub fn webgpu_device_poll(
     #[allow(unused)] submission_index: u64,
 ) -> wasmtime::Result<u64> {
     let maintain = match poll_type {
-        2 => wgpu::PollType::Wait,
+        2 => wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: None,
+        },
         3 => wgpu::PollType::Poll,
         _ => {
             log::error!("Tries to Use Unsupported Poll Type: {poll_type}");

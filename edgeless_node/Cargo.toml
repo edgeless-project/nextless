@@ -52,7 +52,7 @@ chrono = "0.4.38"
 
 opentelemetry = "0.27"
 
-wgpu = { version = "25", features = ["serde"] }
+wgpu = { version = "27", features = ["serde"] }
 
 thiserror = "2"
 
