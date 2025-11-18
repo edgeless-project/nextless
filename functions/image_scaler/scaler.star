@@ -10,8 +10,8 @@ ImageScaler = edgeless_actor_class(
     inner_structure = [
         link("unscaled", ["scaled"])
     ],
-    code = file("image_scaler.wasm"),
-    code_type = "WASM_BASE"
+    code = file("image_scaler.tar.gz"),
+    code_type = "RUST_BASE"
 )
 
 el_main = ImageScaler

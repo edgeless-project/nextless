@@ -4,8 +4,8 @@ DetectionTester = edgeless_actor_class(
     outputs = [cast_output("test_image", "eft_vision_rawimage")],
     inputs = [cast_input("detection", "String")],
     inner_structure = [source("test_image"), sink("detection")],
-    code = file("detection_tester.wasm"),
-    code_type = "WASM_BASE"
+    code = file("detection_tester.tar.gz"),
+    code_type = "RUST_BASE"
 )
 
 el_main = DetectionTester
