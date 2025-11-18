@@ -15,6 +15,7 @@ pub struct RustDialect {}
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RustDialectFeatures {
     Wgpu,
+    NoStd,
 }
 
 impl super::BehaviorDialect for RustDialect {
@@ -119,29 +120,30 @@ impl RustDialect {
         let translated_features: std::collections::BTreeSet<crate::ir::behavior::dialect::DialectFeature> = source
             .features
             .iter()
-            .map(|f| match f {
+            .filter_map(|f| match f {
                 crate::ir::behavior::dialect::DialectFeature::Rust(rust_dialect_feature) => match rust_dialect_feature {
                     crate::ir::behavior::dialect::rust::RustDialectFeatures::Wgpu => {
                         if dest.features.contains(&crate::ir::behavior::dialect::DialectFeature::Wasm(
                             crate::ir::behavior::dialect::wasm::WasmDialectFeatures::Wgpu,
                         )) {
-                            Ok(crate::ir::behavior::dialect::DialectFeature::Wasm(
+                            Some(Ok(crate::ir::behavior::dialect::DialectFeature::Wasm(
                                 crate::ir::behavior::dialect::wasm::WasmDialectFeatures::Wgpu,
-                            ))
+                            )))
                         } else {
-                            Err(crate::ir::behavior::BehaviorError::UnsupportedFeatureTranslation(
+                            Some(Err(crate::ir::behavior::BehaviorError::UnsupportedFeatureTranslation(
                                 source.base_type,
                                 dest.base_type,
                                 "WGPU".to_string(),
-                            ))
+                            )))
                         }
                     }
+                    RustDialectFeatures::NoStd => None,
                 },
-                _ => Err(crate::ir::behavior::BehaviorError::UnsupportedFeatureTranslation(
+                _ => Some(Err(crate::ir::behavior::BehaviorError::UnsupportedFeatureTranslation(
                     source.base_type,
                     dest.base_type,
                     String::new(),
-                )),
+                ))),
             })
             .collect::<Result<std::collections::BTreeSet<crate::ir::behavior::dialect::DialectFeature>, crate::ir::behavior::BehaviorError>>()?;
 
@@ -166,20 +168,33 @@ impl RustDialect {
         assert!(source.base_type == ID);
         assert!(dest.base_type == super::native_dyanamic::ID);
 
+        if !source
+            .features
+            .contains(&crate::ir::behavior::dialect::DialectFeature::Rust(RustDialectFeatures::NoStd))
+        {
+            return Err(crate::ir::behavior::BehaviorError::UnsupportedTranslation(
+                source.base_type,
+                dest.base_type,
+            ));
+        }
+
         let translated_features: std::collections::BTreeSet<crate::ir::behavior::dialect::DialectFeature> = source
             .features
             .iter()
-            .map(|f| match f {
+            .filter_map(|f| match f {
                 crate::ir::behavior::dialect::DialectFeature::Rust(rust_dialect_feature) => match rust_dialect_feature {
-                    crate::ir::behavior::dialect::rust::RustDialectFeatures::Wgpu => Err(
-                        crate::ir::behavior::BehaviorError::UnsupportedFeatureTranslation(source.base_type, dest.base_type, "WGPU".to_string()),
-                    ),
+                    RustDialectFeatures::Wgpu => Some(Err(crate::ir::behavior::BehaviorError::UnsupportedFeatureTranslation(
+                        source.base_type,
+                        dest.base_type,
+                        "WGPU".to_string(),
+                    ))),
+                    RustDialectFeatures::NoStd => None,
                 },
-                _ => Err(crate::ir::behavior::BehaviorError::UnsupportedFeatureTranslation(
+                _ => Some(Err(crate::ir::behavior::BehaviorError::UnsupportedFeatureTranslation(
                     source.base_type,
                     dest.base_type,
                     String::new(),
-                )),
+                ))),
             })
             .collect::<Result<std::collections::BTreeSet<crate::ir::behavior::dialect::DialectFeature>, crate::ir::behavior::BehaviorError>>()?;
 
@@ -282,6 +297,7 @@ impl super::ImplicitFeature for RustDialectFeatures {
     fn enable_implicitly(&self) -> bool {
         match self {
             RustDialectFeatures::Wgpu => false,
+            RustDialectFeatures::NoStd => false,
         }
     }
 }
@@ -302,6 +318,7 @@ impl std::fmt::Display for RustDialectFeatures {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RustDialectFeatures::Wgpu => f.write_str("WGPU"),
+            RustDialectFeatures::NoStd => f.write_str("NO_STD"),
         }
     }
 }
@@ -312,6 +329,7 @@ impl std::str::FromStr for RustDialectFeatures {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "WGPU" => Ok(Self::Wgpu),
+            "NO_STD" => Ok(Self::NoStd),
             _ => Err(super::super::BehaviorError::UnknownFeature(s.to_string(), ID.0.to_string())),
         }
     }

@@ -5,7 +5,7 @@ Decryptor = edgeless_actor_class(
     outputs = [cast_output("data_out", "eft_eval_numbered_test_message")],
     inner_structure = [link("data_in", ["data_out"])],
     code = file("decryptor.tar.gz"),
-    code_type = "RUST_BASE"
+    code_type = "RUST_NO_STD"
 )
 
 el_main = Decryptor

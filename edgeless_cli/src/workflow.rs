@@ -163,6 +163,10 @@ fn api_behavior_for_actor_class(class: edgeless_config::actor_class::EdgelessAct
             base_type: "RUST".to_string(),
             features: vec!["WGPU".to_string()],
         },
+        "RUST_NO_STD" => edgeless_api::node_registration::RuntimeType {
+            base_type: "RUST".to_string(),
+            features: vec!["NO_STD".to_string()],
+        },
         _ => {
             panic!("Unusopported Dialect: {}", class.code_type.as_str())
         }
