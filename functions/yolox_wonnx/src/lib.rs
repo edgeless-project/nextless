@@ -17,7 +17,7 @@ edgeless_function::generate!(YoloXTest);
 
 static SESSION: std::sync::OnceLock<std::sync::Arc<std::sync::Mutex<wonnx::Session>>> = std::sync::OnceLock::new();
 
-impl YoloxExampleAPI<'_> for YoloXTest {
+impl YoloxNanoAPI<'_> for YoloXTest {
     type EFT_VISION_RAWIMAGE = edgeless_function_types::vision::RawImage;
     type STRING = String;
 

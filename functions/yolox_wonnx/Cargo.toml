@@ -28,7 +28,8 @@ crate-type = ["cdylib"]
 edgeless_function = { path = "../../edgeless_function" }
 edgeless_function_core = { path = "../../edgeless_function_core" }
 edgeless_function_gpu = { path = "../../edgeless_function_gpu" }
-edgeless_function_types = { path = "../../edgeless_function_types" }
+edgeless_function_types = { path = "../../edgeless_function_types", features = ["vision", "std"] }
+edgeless_actor_abi = { path = "../../edgeless_actor_abi" }
 wonnx = { git = "https://github.com/raphaelhetzel/wonnx.git", branch = "wgpu_custom", default-features = false, features = [
     "custom",
 ] }
