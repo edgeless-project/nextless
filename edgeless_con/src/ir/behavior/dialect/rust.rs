@@ -5,6 +5,8 @@
 // SPDX-FileCopyrightText: © 2024 Roman Kolcun <roman.kolcun@cl.cam.ac.uk>
 // SPDX-License-Identifier: MIT
 
+use std::str::FromStr;
+
 use crate::ir::behavior::dialect::ImplicitFeature;
 
 pub static ID: super::DialectId = super::DialectId("RUST");
@@ -39,7 +41,7 @@ impl super::BehaviorDialect for RustDialect {
         feature_strings
             .iter()
             .map(|f| {
-                serde_json::from_str::<RustDialectFeatures>(f)
+                RustDialectFeatures::from_str(f)
                     .map_err(|_e| crate::ir::behavior::BehaviorError::UnknownFeature(f.to_string(), ID.0.to_string()))
                     .map(super::DialectFeature::Rust)
             })
