@@ -208,7 +208,15 @@ impl GPUWrapper {
             .ok_or(WGPUError::NotFound)?
             .get_adapter()?
             .adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
+            // https://github.com/gfx-rs/wgpu/blob/trunk/examples/standalone/01_hello_compute/src/main.rs#L69
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_defaults(),
+                experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                memory_hints: wgpu::MemoryHints::MemoryUsage,
+                trace: wgpu::Trace::Off,
+            })
             .await
             .unwrap();
 
