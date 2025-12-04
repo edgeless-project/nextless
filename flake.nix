@@ -91,7 +91,7 @@
             ];
             postInstall = ''
               wrapProgram $out/bin/edgeless_node_d \
-                --prefix LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath [pkgs.vulkan-loader]}
+                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [pkgs.vulkan-loader]}
             '';
           };
           nextless_controller = (pkgs.makeRustPlatform {
