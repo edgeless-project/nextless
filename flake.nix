@@ -80,10 +80,19 @@
             src = pkgs.lib.cleanSource ./.;
             nativeBuildInputs = with pkgs; [
               openssl.dev
+              vulkan-loader
               perl
               pkg-config
               protobuf
+              makeWrapper
             ];
+            buildInputs = with pkgs; [
+              vulkan-loader
+            ];
+            postInstall = ''
+              wrapProgram $out/bin/edgeless_node_d \
+                --prefix LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath [pkgs.vulkan-loader]}
+            '';
           };
           nextless_controller = (pkgs.makeRustPlatform {
             cargo = toolchain;
