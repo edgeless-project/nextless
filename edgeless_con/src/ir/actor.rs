@@ -14,6 +14,7 @@ pub struct LogicalActor {
 #[derive(Default)]
 pub struct ActorConstraints {
     pub max_instances: Option<usize>,
+    pub min_instances: Option<usize>,
     pub domain_id_match_any: Option<Vec<edgeless_api::function_instance::NodeId>>,
     pub node_id_match_any: Option<Vec<edgeless_api::function_instance::NodeId>>,
     pub label_match_all: Vec<String>,
@@ -174,7 +175,12 @@ impl ActorConstraints {
     pub fn from_annotations(annotations: &std::collections::HashMap<String, String>) -> Self {
         let mut max_instances = None;
         if let Some(val) = annotations.get("max_instances") {
-            max_instances = Some(val.parse::<usize>().unwrap_or_default());
+            max_instances = val.parse::<usize>().ok()
+        }
+
+        let mut min_instances = None;
+        if let Some(annotation) = annotations.get("min_instances") {
+            min_instances = annotation.parse::<usize>().ok()
         }
 
         let mut node_id_match_any = None;
@@ -199,6 +205,7 @@ impl ActorConstraints {
 
         Self {
             max_instances,
+            min_instances,
             node_id_match_any,
             label_match_all,
             resource_match_all,
