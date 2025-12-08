@@ -462,7 +462,7 @@ impl DataplaneHandle {
                 return;
             }
         }
-        log::info!("Unprocessed Message: {:?} {:?}->{:?}", msg, self.slf, target);
+        log::debug!("Unprocessed Message: {:?} {:?}->{:?}", msg, self.slf, target);
     }
 }
 

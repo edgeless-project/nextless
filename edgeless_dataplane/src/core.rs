@@ -28,13 +28,37 @@ pub enum CallRet {
     Err,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Message {
     Cast(Vec<u8>),
     Call(Vec<u8>),
     CallRet(Vec<u8>),
     CallNoRet,
     Err,
+}
+
+impl std::fmt::Debug for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Message::Cast(data) => f.write_fmt(format_args!(
+                "Cast(HEAD: {:?}, LEN: {})",
+                &data[..std::cmp::min(data.len(), 20)],
+                data.len()
+            )),
+            Message::Call(data) => f.write_fmt(format_args!(
+                "Call(HEAD: {:?}, LEN: {})",
+                &data[..std::cmp::min(data.len(), 20)],
+                data.len()
+            )),
+            Message::CallRet(data) => f.write_fmt(format_args!(
+                "CallReply(HEAD: {:?}, LEN: {})",
+                &data[..std::cmp::min(data.len(), 20)],
+                data.len()
+            )),
+            Message::CallNoRet => f.write_str("CallReplyEmpty"),
+            Message::Err => f.write_str("CallReplyErr"),
+        }
+    }
 }
 
 impl Message {
