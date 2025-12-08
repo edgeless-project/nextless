@@ -132,11 +132,13 @@
 
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
+            vulkan-loader
             openssl.dev
             pkg-config
             protobuf
             # mold
             gcc
+            libgcc
             binaryen #wasm-opt
             curl # libcurl used in the cli. Not sure why it is not needed in the CLI.
             # While i would prefer to use fenix here, we depend on the ESP toolchain and rust-toolchain.toml
