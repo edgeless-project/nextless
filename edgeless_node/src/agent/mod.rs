@@ -29,8 +29,24 @@ enum AgentRequest {
 
 pub struct Agent {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
+}
+
+pub struct AgentTask {
     #[allow(unused)]
     node_id: uuid::Uuid,
+    actor_runtimes: std::collections::HashMap<edgeless_api::node_registration::RuntimeType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
+    resource_providers: std::collections::HashMap<String, ResourceDesc>,
+    proxy: Box<dyn ProxyInstanceAPI>,
+    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+
+    // After spawning a new function, the function´s class is only used to determine which runner to start it on.
+    // When stopping, only the stop_function_id is provided which does not allow to know which runner it is
+    // currently deployed on. Here, we implement a instance_id -> function_class HashMap
+    actor_instance_runtime_map: std::collections::HashMap<edgeless_api::function_instance::InstanceId, String>,
+    resource_instance_provider_map: std::collections::HashMap<edgeless_api::function_instance::InstanceId, String>,
+
+    sysinfo: sysinfo::System,
+    main_pid: sysinfo::Pid,
 }
 
 pub struct ResourceDesc {
@@ -52,301 +68,23 @@ impl Agent {
             log::info!("new runner, class_type: {class_type}");
         }
 
+        let mut agent_task = AgentTask {
+            node_id,
+            actor_runtimes: runners,
+            resource_providers: resources,
+            proxy: proxy,
+            dataplane_provider: data_plane_provider,
+            actor_instance_runtime_map: std::collections::HashMap::new(),
+            resource_instance_provider_map: std::collections::HashMap::new(),
+            sysinfo: sysinfo::System::new(),
+            main_pid: sysinfo::Pid::from_u32(std::process::id()),
+        };
+
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, runners, resources, data_plane_provider, proxy).await;
+            agent_task.main_task(receiver).await;
         });
 
-        (Agent { sender, node_id }, main_task)
-    }
-
-    async fn main_task(
-        receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>,
-        mut runners: std::collections::HashMap<edgeless_api::node_registration::RuntimeType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
-        resources: std::collections::HashMap<String, ResourceDesc>,
-        data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
-        mut proxy: Box<dyn ProxyInstanceAPI>,
-    ) {
-        let mut receiver = std::pin::pin!(receiver);
-        let mut data_plane_provider = data_plane_provider;
-
-        // key: provider_id
-        // value: class_type
-        //        client (resource configuration API)
-        let mut resource_providers = resources;
-        // key: fid
-        // value: provider_id
-        let mut resource_instances = std::collections::HashMap::<edgeless_api::function_instance::InstanceId, String>::new();
-
-        // After spawning a new function, the function´s class is only used to determine which runner to start it on.
-        // When stopping, only the stop_function_id is provided which does not allow to know which runner it is
-        // currently deployed on. Here, we implement a instance_id -> function_class HashMap
-        let mut component_id_to_class_map = std::collections::HashMap::<edgeless_api::function_instance::InstanceId, String>::new();
-
-        // Internal data structures to query system/process information.
-        let mut sys = sysinfo::System::new();
-        let my_pid = sysinfo::Pid::from_u32(std::process::id());
-
-        log::info!("Starting Edgeless Agent");
-        while let Some(req) = receiver.next().await {
-            match req {
-                AgentRequest::Spawn(spawn_req) => {
-                    log::debug!("Agent Spawn {spawn_req:?}");
-                    let code_size = spawn_req.code.function_class_code.len();
-                    let actor_class = spawn_req.code.function_class_id.clone();
-                    let actor_id = spawn_req.instance_id.function_id;
-                    let runner = spawn_req.code.function_class_type.clone();
-                    log::info!("Actor Spawn: ID: {actor_id}, Size: {code_size}. Class: {actor_class}, Runner: {runner}");
-
-                    // Save function_class for further interaction.
-                    // We can assume that the Optional<instance_id> is present.
-                    if spawn_req.instance_id.is_none() {
-                        log::error!("No instance_id provided for SpawnFunctionRequest!");
-                        continue;
-                    }
-                    component_id_to_class_map.insert(spawn_req.instance_id, spawn_req.code.function_class_type.clone());
-
-                    // Get runner for function_class of spawn_req
-                    match runners.iter_mut().find(|(k, _)| k.base_type == spawn_req.code.function_class_type) {
-                        Some((_, r)) => {
-                            // Forward the start request to the correct runner
-                            match r.start(*spawn_req).await {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    log::error!("Unhandled Start Error: {err}");
-                                    continue;
-                                }
-                            }
-                        }
-                        None => {
-                            log::warn!("Could not find runner for {}", spawn_req.code.function_class_type);
-                            continue;
-                        }
-                    }
-                }
-                AgentRequest::Stop(stop_function_id) => {
-                    log::debug!("Agent Stop {stop_function_id:?}");
-
-                    // Get function class by looking it up in the instanceId->functionClass map
-                    let function_class: String = match component_id_to_class_map.get(&stop_function_id) {
-                        Some(v) => v.clone(),
-                        None => {
-                            log::error!("Could not find function_class for instanceId {stop_function_id}");
-                            continue;
-                        }
-                    };
-
-                    // Get runner for function_class
-                    match runners.iter_mut().find(|(k, _)| k.base_type == function_class) {
-                        Some((_, r)) => {
-                            // Forward the stop request to the correct runner
-                            match r.stop(stop_function_id).await {
-                                Ok(_) => {
-                                    // Successfully stopped - now delete the component_id -> function_class mapping
-                                    component_id_to_class_map.remove(&stop_function_id);
-                                    log::info!("Stopped function {stop_function_id} and cleared memory.");
-                                }
-                                Err(err) => {
-                                    log::error!("Unhandled Stop Error: {err}");
-                                    continue;
-                                }
-                            }
-                        }
-                        None => {
-                            log::error!("Could not find runner for {function_class}");
-                            continue;
-                        }
-                    }
-                }
-
-                // PatchRequest contains function_id: ComponentId
-                AgentRequest::Patch(update) => {
-                    log::debug!("Agent UpdatePeers {update:?}");
-
-                    // Get function class by looking it up in the instanceId->functionClass map
-                    let function_class: String = match component_id_to_class_map.get(&update.function_id) {
-                        Some(v) => v.clone(),
-                        None => {
-                            log::error!("Could not find function_class for instanceId {}", update.function_id);
-                            continue;
-                        }
-                    };
-
-                    // Get runner for function_class
-                    match runners.iter_mut().find(|(k, _)| k.base_type == function_class) {
-                        Some((_, r)) => {
-                            // Forward the patch request to the correct runner
-                            match r.patch(update).await {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    log::error!("Unhandled Patch Error: {err}");
-                                }
-                            }
-                        }
-                        None => {
-                            log::error!("Could not find runner for {function_class}");
-                            continue;
-                        }
-                    }
-                }
-                AgentRequest::UpdatePeers(request) => {
-                    log::debug!("Agent UpdatePeers {request:?}");
-                    match request {
-                        UpdatePeersRequest::Add(node_id, invocation_url) => {
-                            data_plane_provider
-                                .add_peer(EdgelessDataplanePeerSettings { node_id, invocation_url })
-                                .await
-                        }
-                        UpdatePeersRequest::Del(node_id) => data_plane_provider.del_peer(node_id).await,
-                        UpdatePeersRequest::Clear => panic!("UpdatePeersRequest::Clear not implemented"),
-                    };
-                }
-                AgentRequest::SpawnResource(instance_specification, responder) => {
-                    if let Some((provider_id, resource_desc)) = resource_providers
-                        .iter_mut()
-                        .find(|(_provider_id, resource_desc)| resource_desc.class_type == instance_specification.class_type)
-                    {
-                        let res = match resource_desc.client.start(instance_specification).await {
-                            Ok(val) => val,
-                            Err(err) => {
-                                responder
-                                    .send(Err(anyhow::anyhow!("Internal Resource Error {}", err)))
-                                    .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                                continue;
-                            }
-                        };
-                        if let edgeless_api::common::StartComponentResponse::InstanceId(id) = res {
-                            log::info!(
-                                "Started resource class_type {}, provider_id {}, node_id {}, fid {}",
-                                resource_desc.class_type,
-                                provider_id,
-                                id.node_id,
-                                id.function_id
-                            );
-                            resource_instances.insert(id, provider_id.clone());
-                            responder
-                                .send(Ok(edgeless_api::common::StartComponentResponse::InstanceId(id)))
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                        } else {
-                            responder.send(Ok(res)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                        }
-                    } else {
-                        responder
-                            .send(Ok(edgeless_api::common::StartComponentResponse::ResponseError(
-                                edgeless_api::common::ResponseError {
-                                    summary: "Error when creating a resource".to_string(),
-                                    detail: Some(format!("Provider for class_type does not exist: {}", instance_specification.class_type)),
-                                },
-                            )))
-                            .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                    }
-                }
-                AgentRequest::StopResource(resource_id, responder) => {
-                    if let Some(provider_id) = resource_instances.get(&resource_id) {
-                        if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
-                            log::info!(
-                                "Stopped resource class_type {}, provider_id {} node_id {}, fid {}",
-                                resource_desc.class_type,
-                                provider_id,
-                                resource_id.node_id,
-                                resource_id.function_id
-                            );
-                            responder
-                                .send(resource_desc.client.stop(resource_id).await)
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                            continue;
-                        } else {
-                            responder
-                                .send(Err(anyhow::anyhow!(
-                                    "Cannot stop a resource, provider not found with provider_id: {}",
-                                    provider_id
-                                )))
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                            continue;
-                        }
-                    }
-                    responder
-                        .send(Err(anyhow::anyhow!(
-                            "Cannot stop a resource, not found with fid: {}",
-                            resource_id.function_id
-                        )))
-                        .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                }
-                AgentRequest::PatchResource(update, responder) => {
-                    if let Some(provider_id) = resource_instances.get(&update.function_id) {
-                        if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
-                            log::info!("Patch resource provider_id {} fid {}", provider_id, update.function_id);
-                            responder
-                                .send(resource_desc.client.patch(update).await)
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                            continue;
-                        } else {
-                            responder
-                                .send(Err(anyhow::anyhow!(
-                                    "Cannot patch a resource, provider not found with provider_id: {}",
-                                    provider_id
-                                )))
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                            continue;
-                        }
-                    }
-                    responder
-                        .send(Err(anyhow::anyhow!(
-                            "Cannot patch a resource, not found with fid: {}",
-                            update.function_id
-                        )))
-                        .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                }
-                AgentRequest::HealthStatus(responder) => {
-                    // Refresh system/process information.
-                    sys.refresh_cpu_all();
-                    sys.refresh_memory();
-                    sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[my_pid]), true);
-
-                    let to_kb = |x| (x / 1024) as i32;
-                    let proc = sys.process(my_pid).unwrap();
-                    let health_status = edgeless_api::node_management::HealthStatus {
-                        cpu_usage: sys.global_cpu_usage() as i32,
-                        cpu_load: sys.cpus().iter().map(|x| x.cpu_usage() / 100_f32).sum::<f32>() as i32,
-                        mem_free: to_kb(sys.free_memory()),
-                        mem_used: to_kb(sys.used_memory()),
-                        mem_total: to_kb(sys.total_memory()),
-                        mem_available: to_kb(sys.available_memory()),
-                        proc_cpu_usage: proc.cpu_usage() as i32,
-                        proc_memory: to_kb(proc.memory()),
-                        proc_vmemory: to_kb(proc.virtual_memory()),
-                    };
-                    responder.send(Ok(health_status)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                }
-                AgentRequest::CreateLink(req) => {
-                    edgeless_api::link::LinkInstanceAPI::create(&mut data_plane_provider, req)
-                        .await
-                        .unwrap_or_else(|_| log::warn!("Unreported error while creating a link"));
-                }
-                AgentRequest::RemoveLink(id) => {
-                    edgeless_api::link::LinkInstanceAPI::remove(&mut data_plane_provider, id)
-                        .await
-                        .unwrap_or_else(|_| log::warn!("Unreported error while removing a link"));
-                }
-                AgentRequest::StartProxy(proxy_spec) => {
-                    proxy
-                        .start(proxy_spec)
-                        .await
-                        .unwrap_or_else(|_| log::warn!("Unreported error while starting proxy"));
-                }
-                AgentRequest::PatchProxy(proxy_spec) => {
-                    proxy
-                        .patch(proxy_spec)
-                        .await
-                        .unwrap_or_else(|_| log::warn!("Unreported error while patching proxy"));
-                }
-                AgentRequest::StopProxy(instance_id) => {
-                    proxy
-                        .stop(instance_id)
-                        .await
-                        .unwrap_or_else(|_| log::warn!("Unreported error while stopping proxy"));
-                }
-            }
-        }
+        (Agent { sender }, main_task)
     }
 
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::agent::AgentAPI + Send> {
@@ -357,6 +95,287 @@ impl Agent {
             link_instance_client: Box::new(LinkInstanceAPIClient { sender: self.sender.clone() }),
             proxy_instance_client: Box::new(ProxyInstanceAPIClient { sender: self.sender.clone() }),
         })
+    }
+}
+
+impl AgentTask {
+    async fn main_task(&mut self, receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>) {
+        let mut receiver = std::pin::pin!(receiver);
+
+        log::info!("Starting Edgeless Agent");
+
+        while let Some(req) = receiver.next().await {
+            self.handle_agent_request(req).await;
+        }
+
+        log::info!("Agent Exit");
+    }
+
+    async fn handle_agent_request(&mut self, req: AgentRequest) {
+        match req {
+            AgentRequest::Spawn(spawn_req) => self.start_actor(spawn_req).await,
+            AgentRequest::Stop(stop_function_id) => self.stop_actor(stop_function_id).await,
+            // PatchRequest contains function_id: ComponentId
+            AgentRequest::Patch(update) => self.patch_actor(update).await,
+            AgentRequest::UpdatePeers(request) => self.update_peers(request).await,
+            AgentRequest::SpawnResource(instance_specification, responder) => {
+                let reply = self.start_resource(instance_specification).await;
+                responder.send(reply).unwrap_or_else(|_| log::warn!("Responder Send Error"))
+            }
+            AgentRequest::StopResource(resource_id, responder) => {
+                let reply = self.stop_resource(resource_id).await;
+                responder.send(reply).unwrap_or_else(|_| log::warn!("Responder Send Error"))
+            }
+            AgentRequest::PatchResource(update, responder) => {
+                let reply = self.patch_resource(update).await;
+                responder.send(reply).unwrap_or_else(|_| log::warn!("Responder Send Error"))
+            }
+            AgentRequest::HealthStatus(responder) => {
+                let reply = self.healt_status().await;
+                responder.send(reply).unwrap_or_else(|_| log::warn!("Responder Send Error"))
+            }
+            AgentRequest::CreateLink(req) => {
+                edgeless_api::link::LinkInstanceAPI::create(&mut self.dataplane_provider, req)
+                    .await
+                    .unwrap_or_else(|_| log::warn!("Unreported error while creating a link"));
+            }
+            AgentRequest::RemoveLink(id) => {
+                edgeless_api::link::LinkInstanceAPI::remove(&mut self.dataplane_provider, id)
+                    .await
+                    .unwrap_or_else(|_| log::warn!("Unreported error while removing a link"));
+            }
+            AgentRequest::StartProxy(proxy_spec) => {
+                self.proxy
+                    .start(proxy_spec)
+                    .await
+                    .unwrap_or_else(|_| log::warn!("Unreported error while starting proxy"));
+            }
+            AgentRequest::PatchProxy(proxy_spec) => {
+                self.proxy
+                    .patch(proxy_spec)
+                    .await
+                    .unwrap_or_else(|_| log::warn!("Unreported error while patching proxy"));
+            }
+            AgentRequest::StopProxy(instance_id) => {
+                self.proxy
+                    .stop(instance_id)
+                    .await
+                    .unwrap_or_else(|_| log::warn!("Unreported error while stopping proxy"));
+            }
+        }
+    }
+
+    async fn start_actor(&mut self, spawn_req: Box<edgeless_api::function_instance::SpawnFunctionRequest>) {
+        log::debug!("Agent Spawn {spawn_req:?}");
+        let code_size = spawn_req.code.function_class_code.len();
+        let actor_class = spawn_req.code.function_class_id.clone();
+        let actor_id = spawn_req.instance_id.function_id;
+        let runner = spawn_req.code.function_class_type.clone();
+        log::info!("Actor Spawn: ID: {actor_id}, Size: {code_size}. Class: {actor_class}, Runner: {runner}");
+
+        // Save function_class for further interaction.
+        // We can assume that the Optional<instance_id> is present.
+        if spawn_req.instance_id.is_none() {
+            log::error!("No instance_id provided for SpawnFunctionRequest!");
+            return;
+        }
+        self.actor_instance_runtime_map
+            .insert(spawn_req.instance_id, spawn_req.code.function_class_type.clone());
+
+        // Get runner for function_class of spawn_req
+        match self
+            .actor_runtimes
+            .iter_mut()
+            .find(|(k, _)| k.base_type == spawn_req.code.function_class_type)
+        {
+            Some((_, r)) => {
+                // Forward the start request to the correct runner
+                match r.start(*spawn_req).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        log::error!("Unhandled Start Error: {err}");
+                        return;
+                    }
+                }
+            }
+            None => {
+                log::warn!("Could not find runner for {}", spawn_req.code.function_class_type);
+                return;
+            }
+        }
+    }
+
+    async fn stop_actor(&mut self, stop_function_id: edgeless_api::function_instance::InstanceId) {
+        log::debug!("Agent Stop {stop_function_id:?}");
+
+        // Get function class by looking it up in the instanceId->functionClass map
+        let function_class: String = match self.actor_instance_runtime_map.get(&stop_function_id) {
+            Some(v) => v.clone(),
+            None => {
+                log::error!("Could not find function_class for instanceId {stop_function_id}");
+                return;
+            }
+        };
+
+        // Get runner for function_class
+        match self.actor_runtimes.iter_mut().find(|(k, _)| k.base_type == function_class) {
+            Some((_, r)) => {
+                // Forward the stop request to the correct runner
+                match r.stop(stop_function_id).await {
+                    Ok(_) => {
+                        // Successfully stopped - now delete the component_id -> function_class mapping
+                        self.actor_instance_runtime_map.remove(&stop_function_id);
+                        log::info!("Stopped function {stop_function_id} and cleared memory.");
+                    }
+                    Err(err) => {
+                        log::error!("Unhandled Stop Error: {err}");
+                        return;
+                    }
+                }
+            }
+            None => {
+                log::error!("Could not find runner for {function_class}");
+                return;
+            }
+        }
+    }
+
+    async fn patch_actor(&mut self, update: edgeless_api::common::PatchRequest) {
+        log::debug!("Agent UpdatePeers {update:?}");
+
+        // Get function class by looking it up in the instanceId->functionClass map
+        let function_class: String = match self.actor_instance_runtime_map.get(&update.function_id) {
+            Some(v) => v.clone(),
+            None => {
+                log::error!("Could not find function_class for instanceId {}", update.function_id);
+                return;
+            }
+        };
+
+        // Get runner for function_class
+        match self.actor_runtimes.iter_mut().find(|(k, _)| k.base_type == function_class) {
+            Some((_, r)) => {
+                // Forward the patch request to the correct runner
+                match r.patch(update).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        log::error!("Unhandled Patch Error: {err}");
+                    }
+                }
+            }
+            None => {
+                log::error!("Could not find runner for {function_class}");
+                return;
+            }
+        }
+    }
+
+    async fn start_resource(
+        &mut self,
+        instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
+    ) -> Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>, anyhow::Error> {
+        if let Some((provider_id, resource_desc)) = self
+            .resource_providers
+            .iter_mut()
+            .find(|(_provider_id, resource_desc)| resource_desc.class_type == instance_specification.class_type)
+        {
+            let res = match resource_desc.client.start(instance_specification).await {
+                Ok(val) => val,
+                Err(err) => {
+                    return Err(anyhow::anyhow!("Internal Resource Error {}", err));
+                }
+            };
+            if let edgeless_api::common::StartComponentResponse::InstanceId(id) = res {
+                log::info!(
+                    "Started resource class_type {}, provider_id {}, node_id {}, fid {}",
+                    resource_desc.class_type,
+                    provider_id,
+                    id.node_id,
+                    id.function_id
+                );
+                self.resource_instance_provider_map.insert(id, provider_id.clone());
+                return Ok(edgeless_api::common::StartComponentResponse::InstanceId(id));
+            } else {
+                return Ok(res);
+            }
+        } else {
+            return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                edgeless_api::common::ResponseError {
+                    summary: "Error when creating a resource".to_string(),
+                    detail: Some(format!("Provider for class_type does not exist: {}", instance_specification.class_type)),
+                },
+            ));
+        }
+    }
+
+    async fn stop_resource(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> Result<(), anyhow::Error> {
+        if let Some(provider_id) = self.resource_instance_provider_map.get(&resource_id) {
+            if let Some(resource_desc) = self.resource_providers.get_mut(provider_id) {
+                log::info!(
+                    "Stopped resource class_type {}, provider_id {} node_id {}, fid {}",
+                    resource_desc.class_type,
+                    provider_id,
+                    resource_id.node_id,
+                    resource_id.function_id
+                );
+                return resource_desc.client.stop(resource_id).await;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Cannot stop a resource, provider not found with provider_id: {}",
+                    provider_id
+                ));
+            }
+        }
+        return Err(anyhow::anyhow!("Cannot stop a resource, not found with fid: {}", resource_id.function_id));
+    }
+
+    async fn patch_resource(&mut self, update: edgeless_api::common::PatchRequest) -> Result<(), anyhow::Error> {
+        if let Some(provider_id) = self.resource_instance_provider_map.get(&update.function_id) {
+            if let Some(resource_desc) = self.resource_providers.get_mut(provider_id) {
+                log::info!("Patch resource provider_id {} fid {}", provider_id, update.function_id);
+                return resource_desc.client.patch(update).await;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Cannot patch a resource, provider not found with provider_id: {}",
+                    provider_id
+                ));
+            }
+        }
+        return Err(anyhow::anyhow!("Cannot patch a resource, not found with fid: {}", update.function_id));
+    }
+
+    async fn healt_status(&mut self) -> Result<edgeless_api::node_management::HealthStatus, anyhow::Error> {
+        // Refresh system/process information.
+        self.sysinfo.refresh_cpu_all();
+        self.sysinfo.refresh_memory();
+        self.sysinfo.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[self.main_pid]), true);
+
+        let to_kb = |x| (x / 1024) as i32;
+        let proc = self.sysinfo.process(self.main_pid).unwrap();
+        return Ok(edgeless_api::node_management::HealthStatus {
+            cpu_usage: self.sysinfo.global_cpu_usage() as i32,
+            cpu_load: self.sysinfo.cpus().iter().map(|x| x.cpu_usage() / 100_f32).sum::<f32>() as i32,
+            mem_free: to_kb(self.sysinfo.free_memory()),
+            mem_used: to_kb(self.sysinfo.used_memory()),
+            mem_total: to_kb(self.sysinfo.total_memory()),
+            mem_available: to_kb(self.sysinfo.available_memory()),
+            proc_cpu_usage: proc.cpu_usage() as i32,
+            proc_memory: to_kb(proc.memory()),
+            proc_vmemory: to_kb(proc.virtual_memory()),
+        });
+    }
+
+    async fn update_peers(&mut self, request: UpdatePeersRequest) {
+        log::debug!("Agent UpdatePeers {request:?}");
+        match request {
+            UpdatePeersRequest::Add(node_id, invocation_url) => {
+                self.dataplane_provider
+                    .add_peer(EdgelessDataplanePeerSettings { node_id, invocation_url })
+                    .await
+            }
+            UpdatePeersRequest::Del(node_id) => self.dataplane_provider.del_peer(node_id).await,
+            UpdatePeersRequest::Clear => panic!("UpdatePeersRequest::Clear not implemented"),
+        };
     }
 }
 
