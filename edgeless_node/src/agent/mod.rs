@@ -1,7 +1,9 @@
+use std::time::Duration;
+
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_api::{node_management::UpdatePeersRequest, proxy_instance::ProxyInstanceAPI};
+use edgeless_api::{controller::ControllerAPI, proxy_instance::ProxyInstanceAPI};
 use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
@@ -31,8 +33,13 @@ pub struct Agent {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
 }
 
+pub struct NodeUrls {
+    pub agent_url: String,
+    pub invocation_url_grpc: Option<String>,
+    pub invocation_url_coap: Option<String>,
+}
+
 pub struct AgentTask {
-    #[allow(unused)]
     node_id: uuid::Uuid,
     actor_runtimes: std::collections::HashMap<edgeless_api::node_registration::RuntimeType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
     resource_providers: std::collections::HashMap<String, ResourceDesc>,
@@ -47,6 +54,11 @@ pub struct AgentTask {
 
     sysinfo: sysinfo::System,
     main_pid: sysinfo::Pid,
+
+    last_keepalive_timestamp: Option<tokio::time::Instant>,
+    controller_url: String,
+    capabilities: edgeless_api::node_registration::NodeCapabilities,
+    node_urls: NodeUrls,
 }
 
 pub struct ResourceDesc {
@@ -61,6 +73,9 @@ impl Agent {
         node_id: uuid::Uuid,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
         proxy: Box<dyn ProxyInstanceAPI>,
+        controller_url: String,
+        node_urls: NodeUrls,
+        capabilities: edgeless_api::node_registration::NodeCapabilities,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
@@ -78,6 +93,10 @@ impl Agent {
             resource_instance_provider_map: std::collections::HashMap::new(),
             sysinfo: sysinfo::System::new(),
             main_pid: sysinfo::Pid::from_u32(std::process::id()),
+            last_keepalive_timestamp: None,
+            controller_url,
+            capabilities,
+            node_urls,
         };
 
         let main_task = Box::pin(async move {
@@ -104,11 +123,36 @@ impl AgentTask {
 
         log::info!("Starting Edgeless Agent");
 
-        while let Some(req) = receiver.next().await {
-            self.handle_agent_request(req).await;
+        {
+            let initial_delay = tokio::time::Duration::from_millis(100);
+            log::info!("Delay initial registration by {initial_delay:?}");
+            tokio::time::sleep(initial_delay).await;
+            log::info!("Initial registration with controller");
+            self.register_with_controller().await;
         }
 
-        log::info!("Agent Exit");
+        let elapsed_since_last_contact = self
+            .last_keepalive_timestamp
+            .map(|last_contact| last_contact.elapsed())
+            .unwrap_or_default();
+
+        let keepalive_timeout_delay = std::cmp::max(Duration::from_secs(0), Duration::from_secs(10) - elapsed_since_last_contact);
+
+        loop {
+            match tokio::time::timeout(keepalive_timeout_delay, receiver.next()).await {
+                Ok(message) => {
+                    if let Some(req) = message {
+                        self.handle_agent_request(req).await;
+                    } else {
+                        log::info!("Agent Exit");
+                        return;
+                    }
+                }
+                Err(_timeout) => {
+                    self.handle_controller_loss().await;
+                }
+            }
+        }
     }
 
     async fn handle_agent_request(&mut self, req: AgentRequest) {
@@ -162,6 +206,84 @@ impl AgentTask {
                     .await
                     .unwrap_or_else(|_| log::warn!("Unreported error while stopping proxy"));
             }
+        }
+    }
+
+    async fn handle_controller_loss(&mut self) {
+        log::info!("Connection to Controller Lost");
+        self.last_keepalive_timestamp = None;
+
+        log::info!("Stop Orphan Actors");
+        for (actor_id, runtime_id) in &self.actor_instance_runtime_map {
+            if let Some((_, rt)) = self.actor_runtimes.iter_mut().find(|(k, _)| &k.base_type == runtime_id) {
+                if let Err(e) = rt.stop(actor_id.clone()).await {
+                    log::info!("Stop Orphan Actor Error: {e:?}");
+                }
+            }
+        }
+        self.actor_instance_runtime_map.clear();
+
+        log::info!("Stop Orphan Resources");
+        for (resource_id, provider_id) in &self.resource_instance_provider_map {
+            if let Some(provider) = self.resource_providers.get_mut(provider_id) {
+                if let Err(e) = provider.client.stop(resource_id.clone()).await {
+                    log::info!("Stop Orphan Resource Error: {e:?}");
+                }
+            }
+        }
+        self.actor_instance_runtime_map.clear();
+
+        self.register_with_controller().await;
+    }
+
+    async fn register_with_controller(&mut self) {
+        log::info!(
+            "Registering this node '{}' on e-ORC {}, capabilities: {}",
+            &self.node_id,
+            &self.controller_url,
+            self.capabilities
+        );
+
+        let mut controller_api_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&self.controller_url)
+            .await
+            .node_registration_api();
+
+        let registration_request = edgeless_api::node_registration::UpdateNodeRequest::Registration(
+            self.node_id,
+            self.node_urls.agent_url.clone(),
+            self.node_urls
+                .invocation_url_coap
+                .clone()
+                .or(self.node_urls.invocation_url_grpc.clone())
+                .unwrap(),
+            self.resource_providers
+                .iter()
+                .map(|(provider_id, resource)| edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type: resource.class_type.clone(),
+                    // TODO(raphaelhetzel) Fix (and add inputs) or remove
+                    outputs: vec![],
+                })
+                .collect(),
+            self.capabilities.clone(),
+            self.dataplane_provider
+                .link_providers()
+                .await
+                .into_iter()
+                .map(|(class, id)| edgeless_api::node_registration::LinkProviderSpecification { provider_id: id, class })
+                .collect(),
+        );
+
+        match controller_api_client.update_node(registration_request).await {
+            Ok(res) => match res {
+                edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) => {
+                    panic!("could not register to e-ORC {}: {}", &self.controller_url, err)
+                }
+                edgeless_api::node_registration::UpdateNodeResponse::Accepted => {
+                    log::info!("this node '{}' registered to e-ORC '{}'", &self.node_id, &self.controller_url)
+                }
+            },
+            Err(err) => panic!("channel error when registering to e-ORC {}: {}", &self.controller_url, err),
         }
     }
 
@@ -345,6 +467,8 @@ impl AgentTask {
     }
 
     async fn healt_status(&mut self) -> Result<edgeless_api::node_management::HealthStatus, anyhow::Error> {
+        self.last_keepalive_timestamp = Some(tokio::time::Instant::now());
+
         // Refresh system/process information.
         self.sysinfo.refresh_cpu_all();
         self.sysinfo.refresh_memory();
@@ -365,16 +489,16 @@ impl AgentTask {
         });
     }
 
-    async fn update_peers(&mut self, request: UpdatePeersRequest) {
+    async fn update_peers(&mut self, request: edgeless_api::node_management::UpdatePeersRequest) {
         log::debug!("Agent UpdatePeers {request:?}");
         match request {
-            UpdatePeersRequest::Add(node_id, invocation_url) => {
+            edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => {
                 self.dataplane_provider
                     .add_peer(EdgelessDataplanePeerSettings { node_id, invocation_url })
                     .await
             }
-            UpdatePeersRequest::Del(node_id) => self.dataplane_provider.del_peer(node_id).await,
-            UpdatePeersRequest::Clear => panic!("UpdatePeersRequest::Clear not implemented"),
+            edgeless_api::node_management::UpdatePeersRequest::Del(node_id) => self.dataplane_provider.del_peer(node_id).await,
+            edgeless_api::node_management::UpdatePeersRequest::Clear => panic!("UpdatePeersRequest::Clear not implemented"),
         };
     }
 }

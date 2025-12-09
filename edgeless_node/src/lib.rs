@@ -3,8 +3,6 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::controller::ControllerAPI;
-
 pub mod agent;
 pub mod base_runtime;
 pub mod proxy;
@@ -203,55 +201,6 @@ fn get_capabilities(
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
         runtimes,
-    }
-}
-
-pub async fn register_node(
-    settings: EdgelessNodeGeneralSettings,
-    capabilities: edgeless_api::node_registration::NodeCapabilities,
-    resource_provider_specifications: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
-    link_provider_specifications: Vec<edgeless_api::node_registration::LinkProviderSpecification>,
-) {
-    log::info!(
-        "Registering this node '{}' on e-ORC {}, capabilities: {}",
-        &settings.node_id,
-        &settings.controller_url,
-        capabilities
-    );
-    match edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&settings.controller_url)
-        .await
-        .node_registration_api()
-        .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
-            settings.node_id,
-            match settings.agent_url_announced.is_empty() {
-                true => settings.agent_url.clone(),
-                false => settings.agent_url_announced.clone(),
-            },
-            match settings.invocation_url_announced_coap.or(settings.invocation_url_coap) {
-                Some(url) => url.clone(),
-                None => {
-                    if settings.invocation_url_announced.is_empty() {
-                        settings.invocation_url.clone()
-                    } else {
-                        settings.invocation_url_announced.clone()
-                    }
-                }
-            },
-            resource_provider_specifications,
-            capabilities,
-            link_provider_specifications,
-        ))
-        .await
-    {
-        Ok(res) => match res {
-            edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) => {
-                panic!("could not register to e-ORC {}: {}", &settings.controller_url, err)
-            }
-            edgeless_api::node_registration::UpdateNodeResponse::Accepted => {
-                log::info!("this node '{}' registered to e-ORC '{}'", &settings.node_id, &settings.controller_url)
-            }
-        },
-        Err(err) => panic!("channel error when registering to e-ORC {}: {}", &settings.controller_url, err),
     }
 }
 
@@ -501,27 +450,39 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the agent.
     let runtimes = runners.keys().cloned().collect::<Vec<_>>();
-    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id, data_plane.clone(), proxy_manager);
+    let (mut agent, agent_task) = agent::Agent::new(
+        runners,
+        resources,
+        settings.general.node_id,
+        data_plane.clone(),
+        proxy_manager,
+        settings.general.controller_url.clone(),
+        agent::NodeUrls {
+            agent_url: if !settings.general.agent_url_announced.is_empty() {
+                settings.general.agent_url_announced.clone()
+            } else {
+                settings.general.agent_url.clone()
+            },
+            invocation_url_grpc: if !settings.general.invocation_url_announced.is_empty() {
+                Some(settings.general.invocation_url_announced.clone())
+            } else if !settings.general.invocation_url.is_empty() {
+                Some(settings.general.invocation_url.clone())
+            } else {
+                None
+            },
+            invocation_url_coap: settings
+                .general
+                .invocation_url_announced_coap
+                .clone()
+                .or(settings.general.invocation_url_coap.clone()),
+        },
+        get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
+    );
     async_tasks.push(tokio::task::spawn(agent_task));
 
     let cloned_agent_url = settings.general.agent_url.clone();
     async_tasks.push(tokio::task::spawn(async move {
         edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), cloned_agent_url).await
-    }));
-
-    async_tasks.push(tokio::task::spawn(async move {
-        register_node(
-            settings.general,
-            get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
-            resource_provider_specifications,
-            data_plane
-                .link_providers()
-                .await
-                .into_iter()
-                .map(|(class, id)| edgeless_api::node_registration::LinkProviderSpecification { provider_id: id, class })
-                .collect(),
-        )
-        .await
     }));
 
     // Wait for all the tasks to complete.
