@@ -78,7 +78,7 @@ impl WorkflowInstance {
     pub(crate) async fn patch(&mut self, req: edgeless_api::common::PatchRequest) {
         if let WorkflowInstanceState::Active { sender, .. } = &mut self.inner {
             sender.send(WorkflowManagementEvent::PatchExternal(req)).unwrap_or_else(|_| {
-                log::warn!("Dead Workflow Instance");
+                tracing::warn!("Tried to patch dead workflow instance.");
                 self.inner = WorkflowInstanceState::Stopped;
             });
         }
@@ -88,7 +88,7 @@ impl WorkflowInstance {
         if let WorkflowInstanceState::Active { sender, .. } = &mut self.inner {
             sender
                 .send(WorkflowManagementEvent::NodesRemoved(removed_nodes))
-                .unwrap_or_else(|_| log::warn!("Dead Workflow Instance"));
+                .unwrap_or_else(|_| tracing::warn!("Tried to remove node from dead workflow instance."));
         }
     }
 
@@ -96,7 +96,7 @@ impl WorkflowInstance {
         if let WorkflowInstanceState::Active { sender, .. } = &mut self.inner {
             sender
                 .send(WorkflowManagementEvent::NodesAdded(added_nodes))
-                .unwrap_or_else(|_| log::warn!("Dead Workflow Instance"));
+                .unwrap_or_else(|_| tracing::warn!("Tried to add node to dead workflow instance."));
         }
     }
 
@@ -105,7 +105,7 @@ impl WorkflowInstance {
         if let WorkflowInstanceState::Active { sender, task } = std::mem::replace(&mut self.inner, WorkflowInstanceState::Stopped) {
             sender
                 .send(WorkflowManagementEvent::Stop)
-                .unwrap_or_else(|_| log::warn!("Dead Workflow Instance"));
+                .unwrap_or_else(|_| tracing::warn!("Tried to stop dead workflow instance."));
 
             task.await.map_err(|_| WorkflowError::TaskJoinFailed)?
         } else {
@@ -136,6 +136,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         }
     }
 
+    #[tracing::instrument(name = "controller_management_event", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn handle_management_event(&mut self, event: WorkflowManagementEvent) -> Result<(), WorkflowError> {
         match event {
             WorkflowManagementEvent::PatchExternal(patch_request) => self.patch(&patch_request).await,
@@ -145,6 +146,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         }
     }
 
+    #[tracing::instrument(name = "controller_workflow_launch", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn launch(
         &mut self,
         on_start_completed: impl FnOnce(anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>) + Send,
@@ -209,7 +211,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             })
         };
         if let Err(errs) = self.materialize(required_changes).await {
-            log::info!("Failures while stopping workflow: {}", errs.join(";"));
+            tracing::info!("Failures materializing workflow patch: {}.", errs.join(";"));
         };
         Ok(())
     }
@@ -224,7 +226,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             })
         };
         if let Err(errs) = self.materialize(required_changes).await {
-            log::error!("Failures Handling Node Removal: {}", errs.join(";"));
+            tracing::error!("Failures materializing node removal: {}.", errs.join(";"));
         }
         Ok(())
     }
@@ -239,11 +241,12 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     async fn stop(&mut self) -> WorkflowResult {
         let changes = self.wf.stop();
         if let Err(errs) = self.materialize(changes).await {
-            log::info!("Failures while stopping workflow: {}", errs.join(";"));
+            tracing::info!("Failures materializing workflow stop: {}.", errs.join(";"));
         };
         Ok(())
     }
 
+    #[tracing::instrument(name = "controller_workflow_optimize", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn optimize(&mut self) -> WorkflowResult {
         let required_changes = {
             let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
@@ -254,12 +257,13 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             })
         };
         if let Err(errs) = self.materialize(required_changes).await {
-            log::error!("Failures Handling Periodic Optimization: {}", errs.join(";"));
+            tracing::error!("Failures materializing periodic optimization: {}.", errs.join(";"));
         }
         // TODO: Decide on how to handle these errors
         Ok(())
     }
 
+    #[tracing::instrument(name = "materialize", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn materialize(
         &mut self,
         // wf_id: edgeless_api::workflow_instance::WorkflowId,
@@ -400,8 +404,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         // [TODO] Issue#95
         // The state_specification configuration should be
         // read from the function annotations.
-        log::debug!("state specifications currently forced to NodeLocal");
-        log::info!("{output_mapping:?}");
+        tracing::debug!("State specifications currently forced to NodeLocal.");
 
         self.image_repository.update(image.image.image_hash(), image.image.clone()).await;
 
@@ -439,10 +442,13 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         match response {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    log::warn!("function instance {wf_id}:{f_name} creation rejected: {error}");
+                    tracing::warn!("Function instance {wf_id}:{f_name} creation rejected: {error}");
                     Err(format!("function instance creation rejected: {error} "))
                 }
-                edgeless_api::common::StartComponentResponse::InstanceId(_id) => Ok(()),
+                edgeless_api::common::StartComponentResponse::InstanceId(id) => {
+                    tracing::info!("Workflow {} function {} started with fid {}", wf_id, &f_name, &id);
+                    Ok(())
+                }
             },
             Err(err) => Err(format!("failed interaction when creating a function instance: {err}")),
         }
@@ -489,11 +495,11 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         match response {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    log::warn!("resource start rejected: {error}");
+                    tracing::warn!("Resource start rejected: {error}");
                     Err(format!("resource start rejected: {error} "))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    log::info!("workflow {} resource {} started with fid {}", wf_id, &r_name, &id);
+                    tracing::info!("Workflow {} resource {} started with fid {}", wf_id, &r_name, &id);
                     Ok(())
                 }
             },
@@ -680,13 +686,13 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 continue;
             }
 
-            let maybe_overlay_mapping = any_mapping.downcast_ref::<crate::ir::interaction::dialect::ip_multicast::IpMulticastSourcePort>();
-            if let Some(overlay_mapping) = maybe_overlay_mapping {
+            let maybe_multicast_mapping = any_mapping.downcast_ref::<crate::ir::interaction::dialect::ip_multicast::IpMulticastSourcePort>();
+            if let Some(overlay_mapping) = maybe_multicast_mapping {
                 api_output_mapping.insert(port, edgeless_api::common::Output::Link(overlay_mapping.link_id.clone()));
                 continue;
             }
 
-            log::warn!("Unknown Mapping!");
+            tracing::warn!("Output mapping uses unsupported dialect: {:?}!", output_port.dialect_type.base_type);
         }
 
         for (port, output_port) in input_mapping {
@@ -705,7 +711,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 continue;
             }
 
-            log::warn!("Unknown Mapping!");
+            tracing::warn!("Input mapping uses unsupported dialect: {:?}!", output_port.dialect_type.base_type);
         }
 
         (api_output_mapping, api_input_mapping)

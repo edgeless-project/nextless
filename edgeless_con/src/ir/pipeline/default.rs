@@ -33,37 +33,41 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
         peer_clusters: &crate::ir::Clusters,
         global_state: &DefaultTransformationPipelineState<P::GlobalState>,
     ) {
-        self.logical_pipeline.apply_all(
-            workflow,
-            nodes,
-            peer_clusters,
-            &super::default_logical::LogicalPipelineState {
-                logical_interaction_normalizer_state:
-                    &crate::ir::transformations::logical_interaction_normalizer::LogicalInteractionNormalizerState {
-                        dialect_registry: global_state.interaction_dialect_registry.clone(),
-                    },
-            },
-        );
-        self.orchestration.apply_all(
-            workflow,
-            nodes,
-            peer_clusters,
-            &crate::ir::transformations::placement::PlacementState::<P> {
-                strategy_state: &global_state.placement_strategy_state,
-                image_chache: &global_state.image_cache,
-            },
-        );
-        self.physical_pipeline.apply_all(
-            workflow,
-            nodes,
-            peer_clusters,
-            &super::default_physical::PhysicalPipelineState {
-                pipe_generator_state: &crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
-                    global_state.interaction_dialect_registry.clone(),
-                ),
-                compiler_state: &global_state.image_cache,
-            },
-        );
+        tracing::info_span!("logical_pipeline").in_scope(|| {
+            self.logical_pipeline.apply_all(
+                workflow,
+                nodes,
+                peer_clusters,
+                &super::default_logical::LogicalPipelineState {
+                    logical_interaction_normalizer_state:
+                        &crate::ir::transformations::logical_interaction_normalizer::LogicalInteractionNormalizerState {
+                            dialect_registry: global_state.interaction_dialect_registry.clone(),
+                        },
+                },
+            )
+        });
+        tracing::info_span!("physical_pipeline").in_scope(|| {
+            self.orchestration.apply_all(
+                workflow,
+                nodes,
+                peer_clusters,
+                &crate::ir::transformations::placement::PlacementState::<P> {
+                    strategy_state: &global_state.placement_strategy_state,
+                    image_chache: &global_state.image_cache,
+                },
+            );
+            self.physical_pipeline.apply_all(
+                workflow,
+                nodes,
+                peer_clusters,
+                &super::default_physical::PhysicalPipelineState {
+                    pipe_generator_state: &crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
+                        global_state.interaction_dialect_registry.clone(),
+                    ),
+                    compiler_state: &global_state.image_cache,
+                },
+            );
+        });
     }
 
     fn apply_dynamic(
@@ -73,25 +77,27 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
         peer_clusters: &crate::ir::Clusters,
         global_state: &DefaultTransformationPipelineState<P::GlobalState>,
     ) {
-        self.orchestration.apply_all(
-            workflow,
-            nodes,
-            peer_clusters,
-            &crate::ir::transformations::placement::PlacementState::<P> {
-                strategy_state: &global_state.placement_strategy_state,
-                image_chache: &global_state.image_cache,
-            },
-        );
-        self.physical_pipeline.apply_all(
-            workflow,
-            nodes,
-            peer_clusters,
-            &super::default_physical::PhysicalPipelineState {
-                pipe_generator_state: &crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
-                    global_state.interaction_dialect_registry.clone(),
-                ),
-                compiler_state: &global_state.image_cache,
-            },
-        );
+        tracing::info_span!("physical_pipeline").in_scope(|| {
+            self.orchestration.apply_all(
+                workflow,
+                nodes,
+                peer_clusters,
+                &crate::ir::transformations::placement::PlacementState::<P> {
+                    strategy_state: &global_state.placement_strategy_state,
+                    image_chache: &global_state.image_cache,
+                },
+            );
+            self.physical_pipeline.apply_all(
+                workflow,
+                nodes,
+                peer_clusters,
+                &super::default_physical::PhysicalPipelineState {
+                    pipe_generator_state: &crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
+                        global_state.interaction_dialect_registry.clone(),
+                    ),
+                    compiler_state: &global_state.image_cache,
+                },
+            );
+        });
     }
 }

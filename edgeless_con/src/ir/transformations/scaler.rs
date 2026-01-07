@@ -13,6 +13,7 @@ const UPDATE_RATE_SECS: u64 = 30;
 
 // Probably should only be called "LoadScaler"
 impl super::StatelessTransformation for Scaler {
+    #[tracing::instrument(name = "scaler", skip_all)]
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         for (logical_function_id, f) in workflow.functions.iter_mut() {
             let mut f = f.borrow_mut();
@@ -28,7 +29,7 @@ impl super::StatelessTransformation for Scaler {
             let missing_instance_count = f.constraints.min_instances.unwrap_or(1) - active_instance_count;
 
             if missing_instance_count > 0 {
-                log::trace!("Function {logical_function_id}: Spawning {missing_instance_count} instances to reach min_instances");
+                tracing::info!("Function {logical_function_id}: Spawning {missing_instance_count} instances to reach min_instances");
                 for _i in 0..missing_instance_count {
                     f.instances
                         .push(std::cell::RefCell::new(super::super::PhysicalComponentState::request_new_instance()));
@@ -68,7 +69,7 @@ impl super::StatelessTransformation for Scaler {
                 }
             });
 
-            log::info!("Processing: {processing_rate}, Message: {message_rate}");
+            tracing::trace!("Function {logical_function_id}: Processing Rate: {processing_rate}, Message Rate: {message_rate}");
 
             let should_scale_up = message_rate > 1.1 * processing_rate;
 
@@ -80,7 +81,7 @@ impl super::StatelessTransformation for Scaler {
             };
 
             if can_scale_up && should_scale_up && wait_period_exceeded {
-                log::info!("Attempting to Scale Up. Message Rate:{message_rate} Processing Rate:{processing_rate}");
+                tracing::info!("Attempting to Scale Up. Message Rate:{message_rate} Processing Rate:{processing_rate}");
                 f.instances
                     .push(std::cell::RefCell::new(super::super::PhysicalComponentState::request_new_instance()));
             }

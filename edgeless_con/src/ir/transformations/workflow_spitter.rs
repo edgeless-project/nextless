@@ -12,6 +12,7 @@ impl WorkflowSplitter {
 }
 
 impl super::StatelessTransformation for WorkflowSplitter {
+    #[tracing::instrument(name = "workflow_splitter", skip_all)]
     fn apply(&mut self, _workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         // TODO
     }

@@ -8,6 +8,7 @@ pub use super::super::*;
 pub struct DeadComponentRemoval {}
 
 impl super::StatelessTransformation for DeadComponentRemoval {
+    #[tracing::instrument(name = "dead_component_removal", skip_all)]
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mut changed = true;
         while changed {
@@ -62,7 +63,7 @@ impl DeadComponentRemoval {
                     }
                 }
 
-                log::info!("Optimizer wants to remove output: {}", output_id.0);
+                tracing::debug!("Optimizer wants to remove output: {}", output_id.0);
                 let mut to_remove = match &mapping.destination {
                     interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => {
                         vec![(
@@ -154,7 +155,7 @@ impl DeadComponentRemoval {
                             }
                         }
 
-                        log::info!("Optimizer wants to remove input: {}", input_id.0);
+                        tracing::debug!("Optimizer wants to remove input: {}", input_id.0);
 
                         output_links_to_remove.append(
                             &mut input_spec

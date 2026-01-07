@@ -26,17 +26,19 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         }
     }
 
+    #[tracing::instrument(name = "engine_initial_spawn", skip_all, fields(workflow_id = self.wf.id.to_string()))]
     pub fn initial_spawn(
         &mut self,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
         global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
-        log::info!("Initial Spawn");
+        tracing::info!("Initial Spawn");
         self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters, global_state);
         self.materialize()
     }
 
+    #[tracing::instrument(name = "engine_periodic_optimize", skip_all, fields(workflow_id = self.wf.id.to_string()))]
     pub fn periodic_optimize(
         &mut self,
         nodes: &crate::ir::Nodes,
@@ -47,6 +49,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         self.materialize()
     }
 
+    #[tracing::instrument(name = "engine_node_removal", skip_all, fields(workflow_id = self.wf.id.to_string()))]
     pub fn node_removal(
         &mut self,
         removed_node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>,
@@ -62,6 +65,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         }
     }
 
+    #[tracing::instrument(name = "engine_patch_external_links", skip_all, fields(workflow_id = self.wf.id.to_string()))]
     pub fn patch_external_links(
         &mut self,
         update: edgeless_api::common::PatchRequest,
@@ -88,6 +92,7 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         Vec::new()
     }
 
+    #[tracing::instrument(name = "calculate_required_changes", skip_all)]
     fn materialize(&mut self) -> Vec<super::RequiredChange> {
         let mut changes = Vec::new();
 

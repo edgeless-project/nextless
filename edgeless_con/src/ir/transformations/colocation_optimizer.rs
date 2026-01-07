@@ -14,11 +14,12 @@ const REQUIRED_LINK_COST_DELTA: u8 = 10;
 const INTEREST_PERIOD: std::time::Duration = std::time::Duration::from_secs(60);
 
 impl super::StatelessTransformation for ColocationOptimizer {
+    #[tracing::instrument(name = "colocation_optimizer", skip_all)]
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         'each_component: for (c_id, c) in workflow.components() {
             let component = c.borrow_mut();
             let port_weights = crate::ir::support::materialized_port_scoring::port_weights(&*component, INTEREST_PERIOD).unwrap_or_default();
-            log::info!("Migration Port Weights {c_id}: {port_weights:?}");
+            tracing::debug!("Migration Port Weights {c_id}: {port_weights:?}");
 
             if port_weights.is_empty() {
                 continue 'each_component;
@@ -28,7 +29,7 @@ impl super::StatelessTransformation for ColocationOptimizer {
                 for instance in component.instances().iter() {
                     if let Ok(mut maybe_c) = instance.try_borrow_mut() {
                         if let crate::ir::PhysicalComponentState::Materialized(ci) = &*maybe_c {
-                            log::info!(
+                            tracing::debug!(
                                 "Migration Single Port {c_id}: {:?}, {:?}",
                                 ci.creation_time().elapsed(),
                                 crate::ir::support::materialized_port_scoring::trafic_locality(ci.as_ref(), INTEREST_PERIOD)
@@ -36,7 +37,7 @@ impl super::StatelessTransformation for ColocationOptimizer {
                             if (ci.creation_time().elapsed() > INTEREST_PERIOD)
                                 && crate::ir::support::materialized_port_scoring::trafic_locality(ci.as_ref(), INTEREST_PERIOD) < 95
                             {
-                                log::info!("Detected suboptimal placement (single_port). Will now attempt migration.");
+                                tracing::info!("Detected suboptimal placement (single_port). Will now attempt migration.");
                                 maybe_c.plan_migration();
                             }
                         }
@@ -59,7 +60,7 @@ impl super::StatelessTransformation for ColocationOptimizer {
                                 .into_iter()
                                 .collect();
 
-                        log::info!("Migration Multi Port. Weight: {port_weights:?}; Cost: {port_link_costs:?}");
+                        tracing::debug!("Migration Multi Port. Weight: {port_weights:?}; Cost: {port_link_costs:?}");
                         // Migrate if one port is more than REQUIRED_WEIGHT_DELTA percent more frequent than the following port
                         // AND the link of the frequent port is more than REQUIRED_LINK_COST_DEKTA expensive than the less frequent port.
                         for i in 0..port_weights.len() - 1 {
@@ -69,7 +70,7 @@ impl super::StatelessTransformation for ColocationOptimizer {
                                 let frequent_port_link_cost = *port_link_costs.get(&port_weights[i].0).unwrap();
                                 let infrequent_port_link_cost = *port_link_costs.get(&port_weights[i + 1].0).unwrap();
                                 if frequent_port_link_cost > infrequent_port_link_cost + REQUIRED_LINK_COST_DELTA {
-                                    log::info!("Detected suboptimal placement (multi_port). Will now attempt migration.");
+                                    tracing::info!("Detected suboptimal placement (multi_port). Will now attempt migration.");
                                     maybe_c.plan_migration();
                                     continue 'each_component;
                                 }

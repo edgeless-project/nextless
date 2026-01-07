@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 use clap::Parser;
-
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 #[derive(Debug, clap::Parser)]
 #[command(long_about = None)]
 struct Args {
@@ -13,7 +13,38 @@ struct Args {
 }
 
 fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    let env_filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+        .from_env()
+        .expect("Bad RUST_LOG value");
+    let fmt_layer = tracing_subscriber::fmt::layer().with_filter(env_filter);
+
+    // https://broch.tech/posts/rust-tracing-opentelemetry/
+    #[cfg(feature = "otel")]
+    {
+        use opentelemetry::trace::TracerProvider;
+        use opentelemetry_otlp::WithExportConfig;
+
+        let otlp_exporter = opentelemetry_otlp::SpanExporter::builder()
+            .with_http()
+            .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+            .build()
+            .unwrap();
+        let otel_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+            .with_batch_exporter(otlp_exporter)
+            .with_resource(opentelemetry_sdk::Resource::builder().with_service_name("edgeless_controller").build())
+            .build();
+
+        let tracer = otel_provider.tracer("edgeless_controller");
+        let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        tracing_subscriber::registry().with(fmt_layer).with(otel_layer).init();
+    }
+
+    #[cfg(not(feature = "otel"))]
+    {
+        tracing_subscriber::registry().with(fmt_layer).init();
+    }
 
     let args = Args::parse();
     if !args.template.is_empty() {

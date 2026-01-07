@@ -61,13 +61,12 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     if let Some(req) = req {
                         match req {
                             super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
-                                // log::info!("{:?}", spawn_workflow_request);
                                 self.start_workflow(spawn_workflow_request, move |r| {
-                                    log::info!("Send Response");
+                                    tracing::debug!("Send Start Workflow Response");
                                     match reply_sender.send(r) {
                                         Ok(_) => {}
                                         Err(err) => {
-                                            log::error!("Unhandled: {err:?}");
+                                            tracing::error!("Unhandled Send Reply Error: {err:?}");
                                         }
                                     }
                                 }).await;
@@ -81,7 +80,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                                 match reply_sender.send(reply) {
                                     Ok(_) => {}
                                     Err(err) => {
-                                        log::error!("Unhandled: {err:?}");
+                                        tracing::error!("Unhandled Send Reply Error: {err:?}");
                                     }
                                 }
                             }
@@ -93,7 +92,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                                 match reply_sender.send(reply) {
                                     Ok(_) => {}
                                     Err(err) => {
-                                        log::error!("Unhandled: {err:?}");
+                                        tracing::error!("Unhandled Send Reply Error: {err:?}");
                                     }
                                 }
                             },
@@ -150,13 +149,13 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     async fn stop_workflow(&mut self, wf_id: &edgeless_api::workflow_instance::WorkflowId) {
         let mut workflow = match self.active_workflows.remove(wf_id) {
             None => {
-                log::error!("trying to tear-down a workflow that does not exist: {wf_id}");
+                tracing::info!("trying to tear-down a workflow that does not exist: {wf_id}");
                 return;
             }
             Some(val) => val,
         };
         if let Err(e) = workflow.stop().await {
-            log::error!("Could Not Stop Workflow: {e:?}")
+            tracing::error!("Could Not Stop Workflow: {e:?}")
         }
     }
 
@@ -202,7 +201,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         capabilities: edgeless_api::node_registration::NodeCapabilities,
         link_providers: Vec<edgeless_api::node_registration::LinkProviderSpecification>,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        log::info!("Node Registration: {node_id}, {agent_url}, {invocation_url}");
+        tracing::info!("Node Registration: {node_id}, {agent_url}, {invocation_url}");
         if let Some(node) = self.nodes.get(&node_id) {
             if node.agent_url() == agent_url && node.invocation_url() == invocation_url {
                 return Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted);
@@ -280,7 +279,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
 
         // Second, remove all those nodes from the map of clients.
         for node_id in to_be_disconnected.iter() {
-            log::info!("disconnected node not replying to keep-alive: {}", &node_id);
+            tracing::info!("Disconnected node not replying to keep-alive: {}", &node_id);
             let val = self.nodes.remove(node_id);
             assert!(val.is_some());
         }
@@ -295,7 +294,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 {
                     Ok(_) => {}
                     Err(err) => {
-                        log::error!("Unhandled: {err}");
+                        tracing::error!("Unhandled Update Peers Error: {err}");
                     }
                 }
             }

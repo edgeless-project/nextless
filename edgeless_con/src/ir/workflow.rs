@@ -26,7 +26,7 @@ impl ActiveWorkflow {
         cluster_id: uuid::Uuid,
     ) -> Self {
         if !request.annotations.is_empty() {
-            log::warn!("Workflow annotations ({}) are currently ignored", request.annotations.len());
+            tracing::warn!("Workflow annotations ({}) are currently ignored", request.annotations.len());
         }
 
         ActiveWorkflow {

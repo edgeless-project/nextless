@@ -372,7 +372,7 @@ impl PhysicalComponentState {
         let new = match old {
             PhysicalComponentState::Requested => PhysicalComponentState::Planned(instance),
             _ => {
-                log::error!("Tried to plan creation of component in state other than 'requested'");
+                tracing::error!("Tried to plan creation of component in state other than 'requested'");
                 old
             }
         };
@@ -384,7 +384,7 @@ impl PhysicalComponentState {
         let new = match old {
             PhysicalComponentState::Planned(inner) => PhysicalComponentState::Materialized(inner),
             _ => {
-                log::error!("Tried to mark function in state other than 'planned' as materialized");
+                tracing::error!("Tried to mark function in state other than 'planned' as materialized");
                 old
             }
         };
@@ -400,7 +400,7 @@ impl PhysicalComponentState {
             },
             PhysicalComponentState::MigratingAway { old, new } => PhysicalComponentState::StopPlanned { old, replacement: Some(new) },
             _ => {
-                log::error!("Tried to request stop of function that is not in a running state.");
+                tracing::error!("Tried to request stop of function that is not in a running state.");
                 old
             }
         };
@@ -412,7 +412,7 @@ impl PhysicalComponentState {
             PhysicalComponentState::Materialized(inner) => PhysicalComponentState::MigratingAway { old: inner, new: new_id },
             PhysicalComponentState::MigrationRequested(inner) => PhysicalComponentState::MigratingAway { old: inner, new: new_id },
             _ => {
-                log::error!("Tried to mark function that is not currently running normaly as migrating.");
+                tracing::error!("Tried to mark function that is not currently running normaly as migrating.");
                 old
             }
         };
@@ -427,7 +427,7 @@ impl PhysicalComponentState {
                 replacement,
             },
             _ => {
-                log::error!("Tried to mark function in wrong state stopped");
+                tracing::error!("Tried to mark function in wrong state stopped");
                 old
             }
         };
@@ -439,7 +439,7 @@ impl PhysicalComponentState {
         let new = match old {
             PhysicalComponentState::Materialized(inner) => PhysicalComponentState::Lost(inner),
             _ => {
-                log::error!("Tried to mark non-active function as lost");
+                tracing::error!("Tried to mark non-active function as lost");
                 old
             }
         };
@@ -451,7 +451,7 @@ impl PhysicalComponentState {
         let new = match old {
             PhysicalComponentState::Lost(old) => PhysicalComponentState::LostReplaced { old, replacement },
             _ => {
-                log::error!("Tried to mark function that is not lost as lost_replaced");
+                tracing::error!("Tried to mark function that is not lost as lost_replaced");
                 old
             }
         };
@@ -463,7 +463,7 @@ impl PhysicalComponentState {
         let new = match old {
             PhysicalComponentState::Dead(old) => PhysicalComponentState::DeadReplaced { old, replacement },
             _ => {
-                log::error!("Tried to mark function that is not dead as dead_replaced");
+                tracing::error!("Tried to mark function that is not dead as dead_replaced");
                 old
             }
         };
@@ -475,7 +475,7 @@ impl PhysicalComponentState {
         let new = match old {
             PhysicalComponentState::Materialized(inner) => PhysicalComponentState::MigrationRequested(inner),
             _ => {
-                log::error!("Tried to migrate function in wrong state");
+                tracing::error!("Tried to migrate function in wrong state");
                 old
             }
         };
@@ -487,7 +487,7 @@ impl PhysicalComponentState {
         let new = match old {
             PhysicalComponentState::MigrationRequested(inner) => PhysicalComponentState::Materialized(inner),
             _ => {
-                log::error!("Tried to abort migration on a component that is not in the migration state.");
+                tracing::error!("Tried to abort migration on a component that is not in the migration state.");
                 old
             }
         };

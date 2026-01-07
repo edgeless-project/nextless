@@ -104,7 +104,7 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for ControllerNodeRegi
         &mut self,
         request: edgeless_api::node_registration::UpdateNodeRequest,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        log::debug!("NodeRegistrationAPI::update_node() {:?}", request);
+        tracing::debug!("NodeRegistrationAPI::update_node() {:?}", request);
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>();
         if let Err(err) = self.sender.send(super::ControllerRequest::UpdateNode(request, reply_sender)).await {
             return Err(anyhow::anyhow!("Controller channel error when updating a node: {}", err.to_string()));

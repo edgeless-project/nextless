@@ -16,6 +16,7 @@ impl Compiler {
 }
 
 impl super::StatefulTransformation<crate::ir::support::image_cache::ImageCache> for Compiler {
+    #[tracing::instrument(name = "compiler", skip_all)]
     fn apply(
         &mut self,
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
@@ -40,7 +41,7 @@ impl super::StatefulTransformation<crate::ir::support::image_cache::ImageCache> 
                             build_new_image(&function, actor_instance, image_ident, store);
                         }
                         support::image_cache::CacheResult::PartialMatch(_partial_match) => {
-                            log::info!("Compile Ignoring Partial Match for Image.");
+                            tracing::info!("Compile Ignoring Partial Match for Image.");
                             build_new_image(&function, actor_instance, image_ident, store);
                         }
                         support::image_cache::CacheResult::FullMatch(actor_image) => actor_instance.image = actor::ImageState::Existing(actor_image),
@@ -65,7 +66,7 @@ fn build_new_image(
             store.insert_blocking(image);
         }
         Err(e) => {
-            log::warn!("Failed Compiling Image:\n{e}");
+            tracing::warn!("Failed Compiling Image:\n{e}");
         }
     }
 }

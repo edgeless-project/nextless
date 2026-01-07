@@ -250,14 +250,14 @@ impl RustDialect {
                 crate::ir::behavior::dialect::DialectFeature::Native(native_runtime_feature) => match native_runtime_feature {
                     crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Amd64 => {
                         if target.is_some() {
-                            log::error!("Multiple Target Architectures!")
+                            tracing::error!("Multiple target architectures!")
                         }
                         target = Some(edgeless_build::native::NativeTarget::AMD64);
                         None
                     }
                     crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Aarch64 => {
                         if target.is_some() {
-                            log::error!("Multiple Target Architectures!")
+                            tracing::error!("Multiple target architectures!")
                         }
                         target = Some(edgeless_build::native::NativeTarget::AARCH64);
                         None
@@ -267,7 +267,7 @@ impl RustDialect {
                     }
                 },
                 _ => {
-                    log::error!("Called native build with invalid feature");
+                    tracing::error!("Called native build with invalid features.");
                     None
                 }
             })

@@ -14,9 +14,12 @@ path = "src/lib.rs"
 name = "edgeless_con_d"
 path = "src/bin/edgeless_con_d.rs"
 
+[features]
+# default = ["otel"]
+otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
+
 [dependencies]
-log = "0.4"
-env_logger = "0.10"
+
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 anyhow = "1.0"
@@ -32,3 +35,10 @@ toml = "0.7"
 rand = { version = "0.8" }
 prometheus-http-query = "0.8.3"
 thiserror = {version = "2" }
+
+tracing = { version = "0.1" }
+tracing-subscriber = {version = "0.3", features = ["env-filter"]}
+opentelemetry = {version  = "0.31", optional = true }
+opentelemetry_sdk = { version = "0.31", optional = true }
+opentelemetry-otlp = { version = "0.31", optional = true }
+tracing-opentelemetry = {version = "0.32", optional = true }

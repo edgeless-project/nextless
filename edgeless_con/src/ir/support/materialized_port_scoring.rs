@@ -114,7 +114,6 @@ pub fn dynamic_port_link_cost(
                     };
 
                     port_cost += (rate / port_total) * link_cost;
-                    log::info!("{}: {} {}", o_port.0, link_cost, port_cost);
                 }
                 total_port_cost += port_cost;
                 data.push((o_port.clone(), port_cost));

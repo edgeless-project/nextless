@@ -144,7 +144,7 @@ impl crate::ir::Node for WorkerNode {
                         .filter_map(|feature| match feature.as_str() {
                             "WGPU" => Some(crate::ir::behavior::dialect::wasm::WasmDialectFeatures::Wgpu),
                             _ => {
-                                log::warn!("Node announced unknown feature");
+                                tracing::warn!("Node announced unknown feature");
                                 None
                             }
                         })
@@ -159,7 +159,7 @@ impl crate::ir::Node for WorkerNode {
                         .filter_map(|feature| match feature.as_str() {
                             "AES" => Some(crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Aes),
                             _ => {
-                                log::warn!("Node announced unknown feature");
+                                tracing::warn!("Node announced unknown feature");
                                 None
                             }
                         })
@@ -169,7 +169,7 @@ impl crate::ir::Node for WorkerNode {
                         "x86_64" => crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Amd64,
                         "aarch64" => crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Aarch64,
                         _ => {
-                            log::info!("Unsupported Arch");
+                            tracing::warn!("Unsupported Arch");
                             return None;
                         }
                     });

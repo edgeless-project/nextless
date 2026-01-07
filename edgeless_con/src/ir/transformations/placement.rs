@@ -35,6 +35,7 @@ pub struct PlacementState<'a, P: strategy::PlacementStrategy> {
 }
 
 impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<PlacementState<'a, P>> for DefaultPlacement<P> {
+    #[tracing::instrument(name = "placement", skip_all)]
     fn apply(
         &mut self,
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
@@ -56,11 +57,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         if let Some(new_instance) = new_instance {
                             *i = new_instance;
                         } else {
-                            log::info!(
-                                "Placement;Requested Instance: Found no viable node for {} in {}",
-                                &f_id,
-                                workflow.id.workflow_id
-                            );
+                            tracing::info!("Requested Instance: Found no viable node for {} in {}", &f_id, workflow.id.workflow_id);
                         }
                     }
                     PhysicalComponentState::MigrationRequested(c) => {
@@ -68,16 +65,16 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             if new_id.node_id == c.id().node_id {
-                                log::info!(
-                                    "Placement;MigratingInstance: Node would be equal {}({}). {}",
+                                tracing::info!(
+                                    "Migrating Instance: Node would be equal {}({}). {}",
                                     f_id,
                                     c.id(),
                                     function.instances.len()
                                 );
                                 i.abort_migration();
                             } else {
-                                log::info!(
-                                    "Placement;MigratingInstance: Found Replacement node for {} in {} ({}); Will migrate: {} -> {}",
+                                tracing::info!(
+                                    "MigratingInstance: Found Replacement node for {} in {} ({}); Will migrate: {} -> {}",
                                     &f_id,
                                     workflow.id.workflow_id,
                                     c.id(),
@@ -88,7 +85,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                                 i.mark_migrating_away(new_id);
                             }
                         } else {
-                            log::info!("No Instance Found");
+                            tracing::debug!("Migration: Could not spawn replacement instance. Aborting.");
                             i.abort_migration();
                         }
                     }
@@ -255,7 +252,7 @@ fn find_candidates_for_actor<'b>(
 ) -> Vec<Candidate<'b>> {
     image_cache.insert_blocking(actor.image.main_image.clone());
     for extra in actor.image.extra_images.clone() {
-        log::debug!("Storing Extra Image in Cache: {:?}", extra.behavior_image_id);
+        tracing::debug!("Storing Extra Image in Cache: {:?}", extra.behavior_image_id);
         image_cache.insert_blocking(extra);
     }
 
@@ -264,7 +261,7 @@ fn find_candidates_for_actor<'b>(
     // For urgent requests (e.g. the first instance), attempt to use an existing image.
     // This can fail as the normal mode will always be executed if the urgen mode fails.
     if urgent {
-        log::debug!("Urgent Mode");
+        tracing::debug!("Urgent Mode");
         for node in nodes.values() {
             let node_candidates = feasibility::feasible_node_runtime_candidates(actor, *node, new_instance, true);
             if let Some(node_candidate) = select_node_candidate(node_candidates, true, true, image_cache) {
@@ -273,7 +270,7 @@ fn find_candidates_for_actor<'b>(
         }
 
         if !candiates.is_empty() {
-            log::debug!("Found 'Urgent' Image");
+            tracing::debug!("Found 'Urgent' Image");
             return candiates;
         }
     }
@@ -299,7 +296,7 @@ fn find_candidates_for_actor<'b>(
     }
 
     if !candiates.is_empty() {
-        log::debug!("Found 'Any' Image");
+        tracing::debug!("Found 'Any' Image");
     }
 
     candiates
@@ -327,8 +324,9 @@ fn select_node_candidate<'b>(
 
             match existing {
                 image_cache::CacheResult::NotFound => {
-                    log::info!("No image found: {image_ident:?}. Returning source image.");
+                    tracing::debug!("No fully matching image found: {image_ident:?}.");
                     if !only_available {
+                        tracing::debug!("Returning source image.");
                         return Some(c);
                     }
                 }
@@ -360,7 +358,7 @@ fn select_node_candidate<'b>(
                         }
                     }
                     if !only_available {
-                        log::debug!("Partial match failed; Returning source image.");
+                        tracing::debug!("Partial match failed; Returning source image.");
                         return Some(c);
                     }
                 }

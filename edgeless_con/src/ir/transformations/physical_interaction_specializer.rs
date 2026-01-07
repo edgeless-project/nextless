@@ -24,6 +24,7 @@ impl PhysicalInteractionSpecializerState {
 }
 
 impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for PhysicalInteractionSpecializer {
+    #[tracing::instrument(name = "physical_interaction_specializer", skip_all)]
     fn apply(
         &mut self,
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
@@ -38,7 +39,7 @@ impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for Phys
         let mut reg = global_state.dialect_registry.blocking_lock();
 
         let Ok(interactions) = collect_physical_interactions(workflow, &mut reg) else {
-            log::warn!("Failure Collecting Interactions");
+            tracing::warn!("Failure Collecting Interactions");
             return;
         };
 
@@ -46,7 +47,7 @@ impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for Phys
             .into_iter()
             .flat_map(|i| {
                 try_map_interaction(&i, nodes, &mut reg).unwrap_or_else(|e| {
-                    log::debug!("Failed to map interaction: {e}; Falling back to original mapping");
+                    tracing::debug!("Failed to map interaction: {e}; Falling back to original mapping");
                     vec![i]
                 })
             })
@@ -60,16 +61,16 @@ impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for Phys
                     workflow.links.entry(workflow_link.id.clone()).or_insert(workflow_link);
                 }
                 interaction::LinkConfigurationResult::NoConfig => {
-                    log::debug!("No Link Configuration Required");
+                    tracing::debug!("No Link Configuration Required");
                 }
                 interaction::LinkConfigurationResult::Err(link_configuration_error) => {
-                    log::warn!("Link Configuration Error {link_configuration_error}");
+                    tracing::warn!("Link Configuration Error {link_configuration_error}");
                 }
             }
         }
 
         if let Err(e) = distribute_physical_interactions(mapped_interactions, workflow, &mut reg) {
-            log::warn!("Failure distributing physical interactions: {e}");
+            tracing::warn!("Failure distributing physical interactions: {e}");
         }
     }
 }
@@ -123,7 +124,7 @@ fn try_map_interaction(
 
             reg.plan_translation(&src, &d)
                 .map_err(|e| {
-                    log::debug!("Interaction translation plan failed: {:?} -> {:?}", src.dialect_type.base_type, base);
+                    tracing::debug!("Interaction translation plan failed: {:?} -> {:?}", src.dialect_type.base_type, base);
                     e
                 })
                 .ok()
@@ -138,7 +139,7 @@ fn try_map_interaction(
         if let Ok(translation) = translation {
             return Ok(translation);
         } else {
-            log::debug!(
+            tracing::debug!(
                 "Interaction translation failed: {:?} -> {:?}",
                 src.dialect_type.base_type,
                 target.base_type

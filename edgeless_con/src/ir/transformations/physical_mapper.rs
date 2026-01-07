@@ -15,6 +15,7 @@ impl PhysicalConnectionMapper {
 }
 
 impl super::StatelessTransformation for PhysicalConnectionMapper {
+    #[tracing::instrument(name = "physical_mapper", skip_all)]
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let components = workflow
             .components()
@@ -51,7 +52,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                         let mut instances = components.get(target_component).unwrap().clone();
 
                         if instances.len() > 1 {
-                            log::info!("Temporarily breaking single target assumption!");
+                            tracing::debug!("Temporarily breaking DestinationMapping::Unicast single target assumption!");
                             for c_instance in &physical_instances {
                                 if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
                                     c_instance.physical_ports().physical_output_mapping.insert(

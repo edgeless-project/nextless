@@ -303,6 +303,6 @@ fn single_value_helper(client: &prometheus_http_query::Client, query: String) ->
             return Some(val.first()?.sample().value());
         }
     }
-    log::debug!("Prometheus Quert Failed: {query}");
+    tracing::warn!("Prometheus Query Failed: {query}");
     None
 }

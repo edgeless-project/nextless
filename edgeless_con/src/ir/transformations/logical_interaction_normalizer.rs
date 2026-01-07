@@ -18,6 +18,7 @@ impl LogicalInteractionNormalizer {
 }
 
 impl super::StatefulTransformation<LogicalInteractionNormalizerState> for LogicalInteractionNormalizer {
+    #[tracing::instrument(name = "logical_interaction_normalizer", skip_all)]
     fn apply(
         &mut self,
         workflow: &mut crate::ir::workflow::ActiveWorkflow,
@@ -28,7 +29,7 @@ impl super::StatefulTransformation<LogicalInteractionNormalizerState> for Logica
         let mut reg = global_state.dialect_registry.blocking_lock();
 
         let Ok(interactions) = collect_logical_interactions(workflow, &mut reg) else {
-            log::warn!("Failed collecting logical interactions.");
+            tracing::warn!("Failed collecting logical interactions.");
             return;
         };
 
@@ -46,14 +47,14 @@ impl super::StatefulTransformation<LogicalInteractionNormalizerState> for Logica
                         constraints: std::collections::BTreeSet::new(),
                     },
                 ) else {
-                    log::warn!("Cannot Plan Translation to Logical Overlay: {:?}", i.dialect_type.base_type);
+                    tracing::warn!("Cannot Plan Translation to Logical Overlay: {:?}", i.dialect_type.base_type);
                     return Vec::new();
                 };
 
                 let translated_interactions = reg.try_translate(&i, &target_dialect);
 
                 let Ok(translated_interactions) = translated_interactions else {
-                    log::warn!("Cannot Translate to Logical Overlay: {:?}", i.dialect_type.base_type);
+                    tracing::warn!("Cannot Translate to Logical Overlay: {:?}", i.dialect_type.base_type);
                     return Vec::new();
                 };
 
@@ -62,7 +63,7 @@ impl super::StatefulTransformation<LogicalInteractionNormalizerState> for Logica
             .collect();
 
         if let Err(e) = distribute_logical_interactions(mapped_interactions, workflow, &mut reg) {
-            log::warn!("Failure distributing logical interactions: {e}")
+            tracing::warn!("Failure distributing logical interactions: {e}")
         }
     }
 }
