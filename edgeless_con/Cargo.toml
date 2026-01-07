@@ -15,7 +15,7 @@ name = "edgeless_con_d"
 path = "src/bin/edgeless_con_d.rs"
 
 [features]
-# default = ["otel"]
+default = ["otel"]
 otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
 
 [dependencies]

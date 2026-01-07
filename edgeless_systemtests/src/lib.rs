@@ -32,6 +32,7 @@ mod tests {
             controller_url: controller_url.clone(),
             prometheus_url: None, // orchestrators: vec![],
             placement_strategy: "random".to_string(),
+            opentelemetry_export: None,
         }));
         tokio::spawn(task);
         handles.push(handle);

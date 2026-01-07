@@ -7,17 +7,23 @@ mod ir;
 pub mod prometheus_telemetry_provider;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessConSettings {
+    pub controller_url: String,
+    pub prometheus_url: Option<String>,
+    pub placement_strategy: String,
+    pub opentelemetry_export: Option<OpenTelemetryExportConfig>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConOrcConfig {
     pub domain_id: String,
     pub orchestrator_url: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct EdgelessConSettings {
-    pub controller_url: String,
-    pub prometheus_url: Option<String>,
-    pub placement_strategy: String,
-    // pub orchestrators: Vec<EdgelessConOrcConfig>,
+pub struct OpenTelemetryExportConfig {
+    pub enabled: bool,
+    pub endpoint: String,
 }
 
 pub async fn edgeless_con_main(settings: EdgelessConSettings) {
