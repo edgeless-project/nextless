@@ -78,7 +78,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         format!("coap://127.0.0.1:{udp_port}")
     };
 
-    let controller_url = next_url();
+    let controller_grpc_listen_url = next_url();
 
     // At first generate endpoints for invocation_urls and orc_agent_urls
     let mut node_invocation_urls: HashMap<Uuid, String> = HashMap::new();
@@ -94,8 +94,9 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
 
     // Controller
     let con_conf = edgeless_con::EdgelessConSettings {
-        controller_url,
-        prometheus_url: Some("http://127.0.0.1:9090".to_string()),
+        controller_grpc_listen_url,
+        controller_coap_listen_url: None,
+        prometheus_url: None,
         placement_strategy: "weighted_random".to_string(),
         opentelemetry_export: None,
     };
@@ -115,7 +116,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 invocation_url_coap: Some(node_coap_invocation_urls.get(node_id).expect("").clone()), // we are sure that it is there
                 invocation_url_announced_coap: Some("".to_string()),
                 metrics_url: next_url(),
-                controller_url: con_conf.controller_url.clone(),
+                controller_url: con_conf.controller_grpc_listen_url.clone(),
             },
             wasmtime_runtime: Some(edgeless_node::EdgelessNodeWasmtimeRuntimeSettings { enabled: true, wgpu: None }),
             native_runtime: None,

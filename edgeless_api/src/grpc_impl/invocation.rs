@@ -177,8 +177,8 @@ impl InvocationAPIServer {
                         Ok(_) => {
                             log::debug!("Clean Exit");
                         }
-                        Err(_) => {
-                            log::error!("GRPC Server Failure");
+                        Err(e) => {
+                            log::error!("GRPC Server Failure: {e}");
                         }
                     }
                 }

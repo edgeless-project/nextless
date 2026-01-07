@@ -8,7 +8,9 @@ pub mod prometheus_telemetry_provider;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConSettings {
-    pub controller_url: String,
+    #[serde(alias = "controller_url")]
+    pub controller_grpc_listen_url: String,
+    pub controller_coap_listen_url: Option<String>,
     pub prometheus_url: Option<String>,
     pub placement_strategy: String,
     pub opentelemetry_export: Option<OpenTelemetryExportConfig>,
@@ -27,17 +29,16 @@ pub struct OpenTelemetryExportConfig {
 }
 
 pub async fn edgeless_con_main(settings: EdgelessConSettings) {
-    tracing::info!("Starting Edgeless Controller at {}", settings.controller_url);
+    tracing::info!("Starting Edgeless Controller");
     tracing::debug!("Settings: {settings:?}");
 
     let (mut controller, controller_task) = controller::Controller::new_from_config(settings.clone()).await;
 
     let server_task =
-        edgeless_api::grpc_impl::controller::WorkflowInstanceAPIServer::run(controller.get_api_client(), settings.controller_url.clone());
+        edgeless_api::grpc_impl::controller::WorkflowInstanceAPIServer::run(controller.get_api_client(), settings.controller_grpc_listen_url.clone());
 
-    // TODO(fix handling here.)
-    let coap_server_task = if let Some(url) = Some("coap://0.0.0.0:7001") {
-        if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(url) {
+    let coap_server_task = if let Some(url) = settings.controller_coap_listen_url {
+        if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
             if proto != edgeless_api::util::Proto::COAP {
                 tracing::warn!("Wrong protocol for the CoAP node register ({url}): assuming coap://");
             }
@@ -63,9 +64,14 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
 
 pub fn edgeless_con_default_conf() -> String {
     String::from(
-        r##"controller_url = "http://127.0.0.1:7001"
+        r##"controller_grpc_listen_url = "http://127.0.0.1:7001"
+            controller_coap_listen_url = "coap://127.0.0.1:7001"
             prometheus_url = "http://127.0.0.1:9090"
             placement_strategy = "random"
+
+            [opentelemetry_export]
+            enabled = false
+            endpoint = "http://localhost:4318/v1/traces"
 "##,
     )
 }

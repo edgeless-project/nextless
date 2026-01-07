@@ -29,8 +29,9 @@ mod tests {
         };
 
         let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
-            controller_url: controller_url.clone(),
-            prometheus_url: None, // orchestrators: vec![],
+            controller_grpc_listen_url: controller_url.clone(),
+            controller_coap_listen_url: None,
+            prometheus_url: None,
             placement_strategy: "random".to_string(),
             opentelemetry_export: None,
         }));
