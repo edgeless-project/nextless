@@ -26,7 +26,12 @@ impl super::StatelessTransformation for Scaler {
                 }
             }
 
-            let missing_instance_count = f.constraints.min_instances.unwrap_or(1) - active_instance_count;
+            let min_instances = f.constraints.min_instances.unwrap_or(1);
+            let missing_instance_count = if min_instances > active_instance_count {
+                min_instances - active_instance_count
+            } else {
+                0
+            };
 
             if missing_instance_count > 0 {
                 tracing::info!("Function {logical_function_id}: Spawning {missing_instance_count} instances to reach min_instances");
