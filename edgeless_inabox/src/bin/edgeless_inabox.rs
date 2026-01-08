@@ -50,7 +50,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
+    let async_runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
     let mut async_tasks = vec![];
 
     edgeless_inabox::edgeless_inabox_main(&async_runtime, &mut async_tasks, config)?;
