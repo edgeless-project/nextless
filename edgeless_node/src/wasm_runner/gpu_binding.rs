@@ -190,8 +190,6 @@ impl GPUWrapper {
             .await
             .map_err(|_| WGPUError::AdapterCreation)?;
 
-        log::info!("{:?}", adapter.get_info());
-
         self.resources.insert(id, GpuResource::Adapter(WGPUAdapter { id, adapter }));
         Ok(id)
     }
@@ -452,7 +450,7 @@ impl GPUWrapper {
         let buffer = self.resources.get(&buffer_id).ok_or(WGPUError::NotFound)?.get_buffer()?;
 
         buffer.buffer.map_async(mode, std::ops::Range { start, end }, |_| {
-            log::info!("Unimplemented Callback Called");
+            tracing::debug!("Unimplemented callback called");
         });
         Ok(())
     }
@@ -627,7 +625,7 @@ impl GPUWrapper {
 
     pub fn drop_resource(&mut self, resource_id: u64) -> Result<(), WGPUError> {
         if self.resources.remove(&resource_id).is_none() {
-            log::debug!("Dropped something that does not exist");
+            tracing::debug!("Dropped something that does not exist");
         }
         Ok(())
     }

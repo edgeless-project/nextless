@@ -119,7 +119,7 @@ pub async fn cast(
         Ok(_) => {}
         Err(_) => {
             // We ignore casts to unknown targets.
-            log::warn!("Cast to unknown target: {target}");
+            tracing::warn!("Cast to unknown target: {target}");
         }
     };
 
@@ -208,7 +208,7 @@ pub async fn slf(mut caller: wasmtime::Caller<'_, GuestAPI>, out_node_id_ptr: i3
 }
 
 pub async fn wgpu_instance_new(mut caller: wasmtime::Caller<'_, GuestAPI>) -> wasmtime::Result<u64> {
-    log::info!("new Instance");
+    tracing::debug!("New Instance");
     Ok(caller.data_mut().wgpu_wrapper.new_instance())
 }
 
@@ -226,10 +226,9 @@ pub async fn wgpu_instance_poll_all(mut caller: wasmtime::Caller<'_, GuestAPI>, 
 }
 
 pub async fn webgpu_instance_adapter_create(mut caller: wasmtime::Caller<'_, GuestAPI>, instance_id: u64) -> wasmtime::Result<u64> {
-    log::info!("New Adapter");
+    tracing::debug!("Create Adapter");
     let ret = caller.data_mut().wgpu_wrapper.new_adapter(instance_id).await;
 
-    log::info!("{ret:?}");
     ret.map_err(|_| wasmtime::Error::msg("WGPU Adapter Create Failure"))
 }
 
@@ -250,7 +249,7 @@ pub async fn webgpu_adapter_device_create(
 ) -> wasmtime::Result<u32> {
     let mem = get_memory(&mut caller)?;
 
-    log::info!("Attempt Device");
+    tracing::debug!("Create Device");
 
     let (device, queue) = caller
         .data_mut()
@@ -259,7 +258,7 @@ pub async fn webgpu_adapter_device_create(
         .await
         .map_err(|_| wasmtime::Error::msg("New Device Error"))?;
 
-    log::info!("Device Worked");
+    tracing::debug!("System was able to create a Device.");
 
     super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_device_id, &device.to_le_bytes())?;
     super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_queue_id, &queue.to_le_bytes())?;
@@ -406,7 +405,7 @@ pub fn webgpu_device_poll(
         },
         3 => wgpu::PollType::Poll,
         _ => {
-            log::error!("Tries to Use Unsupported Poll Type: {poll_type}");
+            tracing::warn!("Actor attempted to use unsupported poll type: {poll_type}");
             return Err(wasmtime::Error::msg("Bad Poll Type"));
         }
     };
@@ -466,7 +465,7 @@ pub fn webgpu_queue_submit(
 }
 
 pub fn webgpu_queue_get_timestamp_period(mut _caller: wasmtime::Caller<'_, GuestAPI>, _queue_id: u64) -> wasmtime::Result<f32> {
-    log::error!("Unimplemented webgpu_queue_get_timestamp_period called");
+    tracing::warn!("Unimplemented handler 'webgpu_queue_get_timestamp_period' called");
     Err(wasmtime::Error::msg("Unimplemented webgpu_queue_get_timestamp_period called"))
 }
 

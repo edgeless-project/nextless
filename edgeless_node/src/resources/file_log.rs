@@ -34,7 +34,7 @@ impl FileLogResource {
 
         let mut outfile = std::fs::OpenOptions::new().create(true).append(true).open(filename)?;
 
-        log::info!("FileLogResource created, writing to file: {filename}");
+        tracing::info!("FileLogResource created, writing to file: {filename}");
 
         let handle = tokio::spawn(async move {
             loop {
@@ -74,7 +74,7 @@ impl FileLogResource {
                 };
 
                 if target_port != edgeless_api::function_instance::PortId("line".to_string()) {
-                    log::warn!("FileLog: Bad Port {target_port:?}");
+                    tracing::debug!("FileLog: Bad Port {target_port:?}");
                     continue;
                 }
 
@@ -83,9 +83,8 @@ impl FileLogResource {
                     false => message_data,
                 };
 
-                log::debug!("{line}");
                 if let Err(e) = writeln!(outfile, "{line}") {
-                    log::error!("Could not write to file the message '{line}': {e}");
+                    tracing::error!("Could not write to file the message '{line}': {e}");
                 }
 
                 if need_reply {

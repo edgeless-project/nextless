@@ -55,7 +55,7 @@ pub(crate) fn level_from_i32(lvl: i32) -> edgeless_telemetry::telemetry_events::
         4 => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Debug,
         5 => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Trace,
         _ => {
-            log::warn!("Function used unknown Log Level");
+            tracing::debug!("Actor used unknown log level: {lvl}");
             edgeless_telemetry::telemetry_events::TelemetryLogLevel::Error
         }
     }

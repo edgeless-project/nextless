@@ -114,7 +114,7 @@ impl DataplaneHandle {
                                 continue;
                             }
                             Err(_) => {
-                                log::error!("Tried to use expired overwrite send handle.");
+                                tracing::warn!("Tried to use expired overwrite send handle.");
                             }
                         }
                     }
@@ -165,7 +165,6 @@ impl DataplaneHandle {
     /// This is NOT used for processing replies to return values.
     pub async fn receive_next(&mut self) -> DataplaneEvent {
         loop {
-            // log::info!("Q: {}", self.receiver.lock().await.len());
             if let Some(DataplaneEvent {
                 source_id,
                 source_port,
@@ -187,7 +186,7 @@ impl DataplaneHandle {
                         context,
                     };
                 }
-                log::error!("Unprocesses other message {message:?}");
+                tracing::error!("Unprocesses other message type: {message:?}");
             }
         }
     }
@@ -197,10 +196,10 @@ impl DataplaneHandle {
         new_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
         new_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
     ) {
-        log::debug!("Got Update: Outputs: {new_output_mapping:?}; Inputs: {new_input_mapping:?}");
+        tracing::debug!("Got Update: Outputs: {new_output_mapping:?}; Inputs: {new_input_mapping:?}");
         let ((removed_inputs, removed_outputs), (added_inputs, added_outputs)) =
             self.alias_mapping.update(new_input_mapping, new_output_mapping).await;
-        log::debug!(
+        tracing::debug!(
             "Update Processed: RemovedI: {removed_inputs:?}; RemovedO: {removed_outputs:?}; AddedI: {added_inputs:?}, AddedO: {added_outputs:?}"
         );
 
@@ -237,9 +236,9 @@ impl DataplaneHandle {
                 .lock()
                 .await
                 .insert(link_id.clone(), std::sync::Arc::new(tokio::sync::Mutex::new(link)));
-            log::info!("Added Link: {}", link_id.0);
+            tracing::info!("Added Link: {}", link_id.0);
         } else {
-            log::error!("Could not get Requested Link");
+            tracing::warn!("Could not get Requested Link");
         }
     }
 
@@ -363,8 +362,7 @@ impl DataplaneHandle {
                 }
             }
         } else {
-            log::warn!("Unknown alias.");
-            // Err(GuestAPIError::UnknownAlias)
+            tracing::debug!("Unknown alias.");
             CallRet::Err
         }
     }
@@ -373,7 +371,7 @@ impl DataplaneHandle {
         if let Some(link) = self.links.lock().await.get(link_id) {
             link.lock().await.handle(self.slf, msg).await;
         } else {
-            log::info!("Link not found: {}", link_id.0);
+            tracing::warn!("Link not found: {}", link_id.0);
         }
     }
 
@@ -486,7 +484,7 @@ impl DataplaneHandle {
                 return;
             }
         }
-        log::debug!("Unprocessed Message: {:?} {:?}->{:?}", msg, self.slf, target);
+        tracing::debug!("Unprocessed Message: {:?} {:?}->{:?}", msg, self.slf, target);
     }
 }
 
@@ -533,7 +531,7 @@ impl DataplaneProvider {
 
         if let Some(invocation_url_coap) = invocation_url_coap {
             let (_, coap_ip, coap_port) = edgeless_api::util::parse_http_host(&invocation_url_coap.clone()).unwrap();
-            log::info!("Start COAP Invocation Server {coap_ip}:{port}");
+            tracing::info!("Start COAP Invocation Server {coap_ip}:{port}");
 
             let _coap_server = tokio::spawn(edgeless_api::coap_impl::invocation::CoapInvocationServer::run(
                 clone_provider.lock().await.incomming_api().await,
@@ -575,7 +573,7 @@ impl DataplaneProvider {
     }
 
     pub async fn add_peer(&mut self, peer: EdgelessDataplanePeerSettings) {
-        log::debug!("add_peer {peer:?}");
+        tracing::debug!("add_peer {peer:?}");
         self.remote_provider
             .lock()
             .await
@@ -584,7 +582,7 @@ impl DataplaneProvider {
     }
 
     pub async fn del_peer(&mut self, node_id: uuid::Uuid) {
-        log::debug!("del_peer {node_id:?}");
+        tracing::debug!("del_peer {node_id:?}");
         self.remote_provider.lock().await.del_peer(node_id).await;
     }
 
@@ -628,13 +626,13 @@ impl edgeless_api::link::LinkManager for DataplaneProvider {
 #[async_trait::async_trait]
 impl edgeless_api::link::LinkInstanceAPI for DataplaneProvider {
     async fn create(&mut self, req: edgeless_api::link::CreateLinkRequest) -> anyhow::Result<()> {
-        log::info!("Create Link Called");
+        tracing::debug!("Create Link Called");
 
         let mut lm = self.link_manager.lock().await;
         if let Some(link_provider) = lm.link_providers.get_mut(&req.provider) {
             let link = link_provider.create(req.clone()).await?;
             lm.links.insert(req.id, link);
-            log::info!("Added Link");
+            tracing::debug!("Added Link");
 
             return Ok(());
         }

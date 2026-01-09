@@ -248,7 +248,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
             edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, target_port, &payload, context),
             edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, target_port, &payload, channel_id, context),
             _ => {
-                log::debug!("Unprocessed Message");
+                tracing::warn!("process_message received unexpected message type.");
                 Ok(())
             }
         }
@@ -382,7 +382,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
             self.runtime_api
                 .send(super::runtime::RuntimeRequest::FunctionExit(self.instance_id, exit_status)),
         )
-        .unwrap_or_else(|_| log::error!("FunctionInstance outlived runner."));
+        .unwrap_or_else(|_| tracing::error!("Function instance client outlived runner."));
     }
 
     fn get_function_instance(

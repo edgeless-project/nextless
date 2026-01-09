@@ -101,7 +101,7 @@ impl TelemetryHandleAPI for TelemetryHandle {
         merged_tags.append(&mut event_tags);
 
         if self.sender.send(TelemetryProcessorInput::TelemetryEvent(event, merged_tags)).is_err() {
-            log::error!("Tried to observe telemetry while the receiver is stopped.")
+            tracing::error!("Tried to observe telemetry while the receiver is stopped.")
         }
     }
 

@@ -187,7 +187,6 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 "env",
                 "webgpu_adapter_device_create",
                 |store, (instance_id, out_device_id, out_queue_id)| {
-                    log::info!("D1");
                     Box::new(super::guest_api_binding::webgpu_adapter_device_create(
                         store,
                         instance_id,

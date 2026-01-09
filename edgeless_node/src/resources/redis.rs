@@ -33,7 +33,7 @@ impl RedisResource {
 
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
 
-        log::info!("RedisResource created, URL: {redis_url}");
+        tracing::info!("RedisResource created, URL: {redis_url}");
 
         let handle = tokio::spawn(async move {
             loop {
@@ -57,7 +57,7 @@ impl RedisResource {
                 };
 
                 if let Err(e) = connection.set::<&str, &str, std::string::String>(&redis_key, &message_data) {
-                    log::error!("Could not set key '{}' to value '{}': {}", redis_key, &message_data, e);
+                    tracing::debug!("Could not set key '{}' to value '{}': {}", redis_key, &message_data, e);
                 }
 
                 if need_reply {

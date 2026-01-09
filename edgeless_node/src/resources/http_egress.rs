@@ -46,7 +46,7 @@ impl EgressResource {
                 };
 
                 if target_port != edgeless_api::function_instance::PortId("new_request".to_string()) {
-                    log::warn!("HTTPEgress: Bad Port");
+                    tracing::warn!("HTTPEgress: Bad Port");
                     continue;
                 }
 
@@ -115,7 +115,7 @@ impl EgressResource {
             .filter_map(|(k, v)| match v.to_str() {
                 Ok(value) => Some((k.to_string(), value.to_string())),
                 _ => {
-                    log::warn!("Could not parse received header value");
+                    tracing::warn!("Could not parse received header value");
                     None
                 }
             })

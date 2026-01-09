@@ -80,7 +80,7 @@ impl Agent {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         for class_type in runners.keys() {
-            log::info!("new runner, class_type: {class_type}");
+            tracing::info!("Runner registered, class_type: {class_type}");
         }
 
         let mut agent_task = AgentTask {
@@ -121,13 +121,13 @@ impl AgentTask {
     async fn main_task(&mut self, receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>) {
         let mut receiver = std::pin::pin!(receiver);
 
-        log::info!("Starting Edgeless Agent");
+        tracing::info!("Starting Edgeless Agent");
 
         {
             let initial_delay = tokio::time::Duration::from_millis(100);
-            log::info!("Delay initial registration by {initial_delay:?}");
+            tracing::info!("Delay initial registration with Controller by {initial_delay:?}");
             tokio::time::sleep(initial_delay).await;
-            log::info!("Initial registration with controller");
+            tracing::info!("Initial registration with Controller");
             self.register_with_controller().await;
         }
 
@@ -144,7 +144,7 @@ impl AgentTask {
                     if let Some(req) = message {
                         self.handle_agent_request(req).await;
                     } else {
-                        log::info!("Agent Exit");
+                        tracing::info!("Agent Exit");
                         return;
                     }
                 }
@@ -164,70 +164,70 @@ impl AgentTask {
             AgentRequest::UpdatePeers(request) => self.update_peers(request).await,
             AgentRequest::SpawnResource(instance_specification, responder) => {
                 let reply = self.start_resource(instance_specification).await;
-                responder.send(reply).unwrap_or_else(|_| log::warn!("Responder Send Error"))
+                responder.send(reply).unwrap_or_else(|_| tracing::warn!("Responder Send Error"))
             }
             AgentRequest::StopResource(resource_id, responder) => {
                 let reply = self.stop_resource(resource_id).await;
-                responder.send(reply).unwrap_or_else(|_| log::warn!("Responder Send Error"))
+                responder.send(reply).unwrap_or_else(|_| tracing::warn!("Responder Send Error"))
             }
             AgentRequest::PatchResource(update, responder) => {
                 let reply = self.patch_resource(update).await;
-                responder.send(reply).unwrap_or_else(|_| log::warn!("Responder Send Error"))
+                responder.send(reply).unwrap_or_else(|_| tracing::warn!("Responder Send Error"))
             }
             AgentRequest::HealthStatus(responder) => {
                 let reply = self.healt_status().await;
-                responder.send(reply).unwrap_or_else(|_| log::warn!("Responder Send Error"))
+                responder.send(reply).unwrap_or_else(|_| tracing::warn!("Responder Send Error"))
             }
             AgentRequest::CreateLink(req) => {
                 edgeless_api::link::LinkInstanceAPI::create(&mut self.dataplane_provider, req)
                     .await
-                    .unwrap_or_else(|_| log::warn!("Unreported error while creating a link"));
+                    .unwrap_or_else(|_| tracing::warn!("Unreported error while creating a link"));
             }
             AgentRequest::RemoveLink(id) => {
                 edgeless_api::link::LinkInstanceAPI::remove(&mut self.dataplane_provider, id)
                     .await
-                    .unwrap_or_else(|_| log::warn!("Unreported error while removing a link"));
+                    .unwrap_or_else(|_| tracing::warn!("Unreported error while removing a link"));
             }
             AgentRequest::StartProxy(proxy_spec) => {
                 self.proxy
                     .start(proxy_spec)
                     .await
-                    .unwrap_or_else(|_| log::warn!("Unreported error while starting proxy"));
+                    .unwrap_or_else(|_| tracing::warn!("Unreported error while starting proxy"));
             }
             AgentRequest::PatchProxy(proxy_spec) => {
                 self.proxy
                     .patch(proxy_spec)
                     .await
-                    .unwrap_or_else(|_| log::warn!("Unreported error while patching proxy"));
+                    .unwrap_or_else(|_| tracing::warn!("Unreported error while patching proxy"));
             }
             AgentRequest::StopProxy(instance_id) => {
                 self.proxy
                     .stop(instance_id)
                     .await
-                    .unwrap_or_else(|_| log::warn!("Unreported error while stopping proxy"));
+                    .unwrap_or_else(|_| tracing::warn!("Unreported error while stopping proxy"));
             }
         }
     }
 
     async fn handle_controller_loss(&mut self) {
-        log::info!("Connection to Controller Lost");
+        tracing::warn!("Connection to controller lost!");
         self.last_keepalive_timestamp = None;
 
-        log::info!("Stop Orphan Actors");
+        tracing::info!("Stop orphan actors");
         for (actor_id, runtime_id) in &self.actor_instance_runtime_map {
             if let Some((_, rt)) = self.actor_runtimes.iter_mut().find(|(k, _)| &k.base_type == runtime_id) {
                 if let Err(e) = rt.stop(actor_id.clone()).await {
-                    log::info!("Stop Orphan Actor Error: {e:?}");
+                    tracing::warn!("Stop Orphan Actor Error: {e:?}");
                 }
             }
         }
         self.actor_instance_runtime_map.clear();
 
-        log::info!("Stop Orphan Resources");
+        tracing::info!("Stop orphan resources");
         for (resource_id, provider_id) in &self.resource_instance_provider_map {
             if let Some(provider) = self.resource_providers.get_mut(provider_id) {
                 if let Err(e) = provider.client.stop(resource_id.clone()).await {
-                    log::info!("Stop Orphan Resource Error: {e:?}");
+                    tracing::warn!("Stop Orphan Resource Error: {e:?}");
                 }
             }
         }
@@ -237,8 +237,8 @@ impl AgentTask {
     }
 
     async fn register_with_controller(&mut self) {
-        log::info!(
-            "Registering this node '{}' on e-ORC {}, capabilities: {}",
+        tracing::info!(
+            "Registering this node '{}' on controller with url '{}'. Capabilities: {}",
             &self.node_id,
             &self.controller_url,
             self.capabilities
@@ -277,28 +277,35 @@ impl AgentTask {
         match controller_api_client.update_node(registration_request).await {
             Ok(res) => match res {
                 edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) => {
-                    panic!("could not register to e-ORC {}: {}", &self.controller_url, err)
+                    // TODO add retry logic
+                    panic!("Could not register to e-ORC {}: {}", &self.controller_url, err)
                 }
                 edgeless_api::node_registration::UpdateNodeResponse::Accepted => {
-                    log::info!("this node '{}' registered to e-ORC '{}'", &self.node_id, &self.controller_url)
+                    tracing::info!(
+                        "This node '{}' registered to controller with url '{}'",
+                        &self.node_id,
+                        &self.controller_url
+                    )
                 }
             },
-            Err(err) => panic!("channel error when registering to e-ORC {}: {}", &self.controller_url, err),
+            // TODO add retry logic
+            Err(err) => panic!(
+                "Channel error when registering to controller with url '{}': {}",
+                &self.controller_url, err
+            ),
         }
     }
 
     async fn start_actor(&mut self, spawn_req: Box<edgeless_api::function_instance::SpawnFunctionRequest>) {
-        log::debug!("Agent Spawn {spawn_req:?}");
         let code_size = spawn_req.code.function_class_code.len();
         let actor_class = spawn_req.code.function_class_id.clone();
         let actor_id = spawn_req.instance_id.function_id;
         let runner = spawn_req.code.function_class_type.clone();
-        log::info!("Actor Spawn: ID: {actor_id}, Size: {code_size}. Class: {actor_class}, Runner: {runner}");
+        tracing::info!("Actor spawn: ID: {actor_id}, Size: {code_size}. Class: {actor_class}, Runner: {runner}");
 
-        // Save function_class for further interaction.
         // We can assume that the Optional<instance_id> is present.
         if spawn_req.instance_id.is_none() {
-            log::error!("No instance_id provided for SpawnFunctionRequest!");
+            tracing::error!("No instance_id provided for SpawnFunctionRequest!");
             return;
         }
         self.actor_instance_runtime_map
@@ -315,26 +322,26 @@ impl AgentTask {
                 match r.start(*spawn_req).await {
                     Ok(_) => {}
                     Err(err) => {
-                        log::error!("Unhandled Start Error: {err}");
+                        tracing::error!("Unhandled start error: {err}");
                         return;
                     }
                 }
             }
             None => {
-                log::warn!("Could not find runner for {}", spawn_req.code.function_class_type);
+                tracing::warn!("Could not find runner for {}", spawn_req.code.function_class_type);
                 return;
             }
         }
     }
 
     async fn stop_actor(&mut self, stop_function_id: edgeless_api::function_instance::InstanceId) {
-        log::debug!("Agent Stop {stop_function_id:?}");
+        tracing::debug!("Agent stop {stop_function_id:?}");
 
         // Get function class by looking it up in the instanceId->functionClass map
         let function_class: String = match self.actor_instance_runtime_map.get(&stop_function_id) {
             Some(v) => v.clone(),
             None => {
-                log::error!("Could not find function_class for instanceId {stop_function_id}");
+                tracing::error!("Could not identify runtime hosting actor: {stop_function_id}.");
                 return;
             }
         };
@@ -347,29 +354,29 @@ impl AgentTask {
                     Ok(_) => {
                         // Successfully stopped - now delete the component_id -> function_class mapping
                         self.actor_instance_runtime_map.remove(&stop_function_id);
-                        log::info!("Stopped function {stop_function_id} and cleared memory.");
+                        tracing::info!("Stopped actor: {stop_function_id}.");
                     }
                     Err(err) => {
-                        log::error!("Unhandled Stop Error: {err}");
+                        tracing::error!("Unhandled stop actor error: {err}");
                         return;
                     }
                 }
             }
             None => {
-                log::error!("Could not find runner for {function_class}");
+                tracing::error!("Could not find runner for {function_class}");
                 return;
             }
         }
     }
 
     async fn patch_actor(&mut self, update: edgeless_api::common::PatchRequest) {
-        log::debug!("Agent UpdatePeers {update:?}");
+        tracing::debug!("Patch actor: {update:?}");
 
         // Get function class by looking it up in the instanceId->functionClass map
         let function_class: String = match self.actor_instance_runtime_map.get(&update.function_id) {
             Some(v) => v.clone(),
             None => {
-                log::error!("Could not find function_class for instanceId {}", update.function_id);
+                tracing::error!("Could not identify runtime hosting actor: {}.", update.function_id);
                 return;
             }
         };
@@ -381,12 +388,12 @@ impl AgentTask {
                 match r.patch(update).await {
                     Ok(_) => {}
                     Err(err) => {
-                        log::error!("Unhandled Patch Error: {err}");
+                        tracing::error!("Unhandled Patch Error: {err}");
                     }
                 }
             }
             None => {
-                log::error!("Could not find runner for {function_class}");
+                tracing::error!("Could not find runner for {function_class}");
                 return;
             }
         }
@@ -408,8 +415,8 @@ impl AgentTask {
                 }
             };
             if let edgeless_api::common::StartComponentResponse::InstanceId(id) = res {
-                log::info!(
-                    "Started resource class_type {}, provider_id {}, node_id {}, fid {}",
+                tracing::info!(
+                    "Started resource: class_type {}, provider_id {}, node_id {}, fid {}.",
                     resource_desc.class_type,
                     provider_id,
                     id.node_id,
@@ -433,8 +440,8 @@ impl AgentTask {
     async fn stop_resource(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> Result<(), anyhow::Error> {
         if let Some(provider_id) = self.resource_instance_provider_map.get(&resource_id) {
             if let Some(resource_desc) = self.resource_providers.get_mut(provider_id) {
-                log::info!(
-                    "Stopped resource class_type {}, provider_id {} node_id {}, fid {}",
+                tracing::info!(
+                    "Stopped resource: class_type {}, provider_id {} node_id {}, fid {}.",
                     resource_desc.class_type,
                     provider_id,
                     resource_id.node_id,
@@ -454,11 +461,11 @@ impl AgentTask {
     async fn patch_resource(&mut self, update: edgeless_api::common::PatchRequest) -> Result<(), anyhow::Error> {
         if let Some(provider_id) = self.resource_instance_provider_map.get(&update.function_id) {
             if let Some(resource_desc) = self.resource_providers.get_mut(provider_id) {
-                log::info!("Patch resource provider_id {} fid {}", provider_id, update.function_id);
+                tracing::info!("Patch resource: provider_id {} fid {}", provider_id, update.function_id);
                 return resource_desc.client.patch(update).await;
             } else {
                 return Err(anyhow::anyhow!(
-                    "Cannot patch a resource, provider not found with provider_id: {}",
+                    "Cannot patch a resource, no provider found with provider_id: {}",
                     provider_id
                 ));
             }
@@ -490,7 +497,7 @@ impl AgentTask {
     }
 
     async fn update_peers(&mut self, request: edgeless_api::node_management::UpdatePeersRequest) {
-        log::debug!("Agent UpdatePeers {request:?}");
+        tracing::debug!("Agent UpdatePeers {request:?}");
         match request {
             edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => {
                 self.dataplane_provider

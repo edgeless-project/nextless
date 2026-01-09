@@ -81,7 +81,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                             .filter_map(|(k, v)| match v.to_str() {
                                 Ok(header_value) => Some((k.to_string(), header_value.to_string())),
                                 Err(_) => {
-                                    log::warn!("Bad Header Value.");
+                                    tracing::debug!("Bad Header Value.");
                                     None
                                 }
                             })
@@ -144,7 +144,7 @@ pub async fn ingress_task(
             let (stream, _) = match listener.accept().await {
                 Ok(val) => val,
                 Err(_) => {
-                    log::error!("Accept Error");
+                    tracing::debug!("Accept Error");
                     continue;
                 }
             };
@@ -194,7 +194,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 .filter_map(|str_method| match edgeless_http::string_method_to_edgeless(str_method) {
                     Ok(val) => Some(val),
                     Err(_) => {
-                        log::warn!("Bad HTTP Method");
+                        tracing::debug!("Bad HTTP Method");
                         None
                     }
                 })
@@ -206,7 +206,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 .update_mapping(instance_specification.input_mapping, instance_specification.output_mapping)
                 .await;
 
-            log::info!("Start HTTP Ingress");
+            tracing::info!("Start HTTP Ingress");
 
             lck.active_resources.insert(
                 instance_specification.resource_id,

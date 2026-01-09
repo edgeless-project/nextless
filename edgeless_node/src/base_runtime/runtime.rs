@@ -63,7 +63,7 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
     }
 
     pub async fn run(&mut self) {
-        log::info!("Starting Edgeless Runner");
+        tracing::info!("Starting Edgeless Runner Task");
         while let Some(req) = self.receiver.next().await {
             match req {
                 RuntimeRequest::Start(spawn_request) => {
@@ -83,7 +83,7 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
     }
 
     async fn start_function(&mut self, spawn_request: edgeless_api::function_instance::SpawnFunctionRequest) {
-        log::info!("Start Function {:?} {:?}", spawn_request.instance_id, spawn_request.output_mapping);
+        tracing::info!("Start Actor {:?} {:?}", spawn_request.code.function_class_id, spawn_request.instance_id);
         let instance_id = spawn_request.instance_id;
         let cloned_req = spawn_request.clone();
         let telemetry_handle = self.telemetry_handle.fork(std::collections::BTreeMap::from([(
@@ -106,21 +106,21 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
     }
 
     async fn stop_function(&mut self, instance_id: edgeless_api::function_instance::InstanceId) {
-        log::info!("Stop Function {instance_id:?}");
+        tracing::info!("Stop Actor {instance_id:?}");
         if let Some(instance) = self.functions.get_mut(&instance_id) {
             instance.stop().await;
         }
     }
 
     async fn patch_function_links(&mut self, update_request: edgeless_api::common::PatchRequest) {
-        log::info!("Patch Function {:?}", update_request.function_id);
+        tracing::info!("Patch Actor {:?}", update_request.function_id);
         if let Some(instance) = self.functions.get_mut(&update_request.function_id) {
             instance.patch(update_request).await;
         }
     }
 
     async fn function_exit(&mut self, instance_id: edgeless_api::function_instance::InstanceId, status: Result<(), super::FunctionInstanceError>) {
-        log::info!("Function Exit Event: {instance_id:?} {status:?}");
+        tracing::info!("Function Exit Event: {instance_id:?} {status:?}");
         self.functions.remove(&instance_id);
     }
 }

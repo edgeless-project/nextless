@@ -247,7 +247,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                 self.process_call_message(source_id, target_port, &payload, channel_id, context).await
             }
             _ => {
-                log::debug!("Unprocessed Message");
+                tracing::debug!("Unprocessed Message");
                 Ok(())
             }
         }
@@ -380,7 +380,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.runtime_api
             .send(super::runtime::RuntimeRequest::FunctionExit(self.instance_id, exit_status))
             .await
-            .unwrap_or_else(|_| log::error!("FunctionInstance outlived runner."));
+            .unwrap_or_else(|_| tracing::error!("Function instance client outlived runner."));
     }
 
     fn get_function_instance(

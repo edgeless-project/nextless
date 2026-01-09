@@ -57,7 +57,7 @@ impl ProxyInstanceTask {
                         match internal_message.message {
                             edgeless_dataplane::core::Message::Cast(msg) => {
                                 if let Err(e) = self.external_dataplane.send_alias(internal_message.target_port.0, &msg, opentelemetry::Context::new()).await {
-                                    log::error!("Proxy External Send Error: {e}");
+                                    tracing::error!("Proxy External Send Error: {e}");
                                 }
                             },
                             edgeless_dataplane::core::Message::Call(msg) => {
@@ -66,7 +66,7 @@ impl ProxyInstanceTask {
                             },
                             _ => {
                                 // This should never happen
-                                log::error!("Unhandled Message in Proxy.")
+                                tracing::error!("Unhandled Message in Proxy.")
                             }
                         }
                         //
@@ -75,7 +75,7 @@ impl ProxyInstanceTask {
                         match external_message.message {
                             edgeless_dataplane::core::Message::Cast(msg) => {
                                 if let Err(e) = self.internal_dataplane.send_alias(external_message.target_port.0, &msg, opentelemetry::Context::new()).await {
-                                    log::error!("Proxy Internal Send Error: {e}");
+                                    tracing::error!("Proxy Internal Send Error: {e}");
                                 }
                             },
                             edgeless_dataplane::core::Message::Call(msg) => {
@@ -84,7 +84,7 @@ impl ProxyInstanceTask {
                             },
                             _ => {
                                 // This should never happen
-                                log::error!("Unhandled Message in Proxy.")
+                                tracing::error!("Unhandled Message in Proxy.")
                             }
                         }
                     },
@@ -176,7 +176,7 @@ impl ProxyManagerTask {
                             if let Some(instance) = self.instances.get(&proxy_spec.instance_id) {
                                 let res = instance.sender.send(ProxyInstanceRequest::Update(proxy_spec));
                                 if res.is_err() {
-                                    log::info!("Could not send message to proxy instance");
+                                    tracing::info!("Could not send message to proxy instance");
                                 }
                             }
                         }
@@ -185,7 +185,7 @@ impl ProxyManagerTask {
                         }
                     }
                 } else {
-                    log::info!("Proxy Stopped");
+                    tracing::info!("Proxy Stopped");
                     return;
                 }
             }

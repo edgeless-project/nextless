@@ -99,7 +99,7 @@ impl GuestAPIHost {
 
     pub async fn sync(&mut self, serialized_state: &str) -> Result<(), GuestAPIError> {
         self.state_handle.set(serialized_state.to_string()).await;
-        log::info!("Function State Sync: {serialized_state}");
+        tracing::debug!("Function State Sync: {serialized_state}");
         Ok(())
     }
 }

@@ -24,7 +24,6 @@ wasmi = []
 otel = ["dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
 
 [dependencies]
-log = "0.4"
 tokio = { version = "1", features = ["full"] }
 futures = { version = "0.3", features = ["executor"] }
 anyhow = "1.0"

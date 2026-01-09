@@ -81,7 +81,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
             {
                 Ok(_) => {}
                 Err(_) => {
-                    log::debug!("Remove old receiver.");
+                    tracing::debug!("Remove old receiver.");
                     self.receivers.remove(&event.target.function_id);
                 }
             }

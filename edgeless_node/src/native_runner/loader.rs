@@ -84,7 +84,8 @@ impl elfloader::ElfLoader for ActorLoader {
                     Ok(())
                 }
                 unknown_rel => {
-                    log::info!("Found unknown Relocation Entry: {unknown_rel:?}");
+                    tracing::warn!("Found unknown Relocation Entry: {unknown_rel:?}");
+                    //TODO This should be an error
                     Ok(())
                 }
             }
@@ -103,7 +104,7 @@ impl elfloader::ElfLoader for ActorLoader {
     }
 
     fn tls(&mut self, tdata_start: elfloader::VAddr, tdata_length: u64, total_size: u64, align: u64) -> Result<(), elfloader::ElfLoaderErr> {
-        log::error!("Unexpeted/Unimplemented use of Loader TLS. start: {tdata_start}, len: {tdata_length}, total: {total_size}, align: {align}");
+        tracing::error!("Unexpeted/Unimplemented use of Loader TLS. start: {tdata_start}, len: {tdata_length}, total: {total_size}, align: {align}");
         Err(elfloader::ElfLoaderErr::UnsupportedAbi)
     }
 }
