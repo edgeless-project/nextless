@@ -17,14 +17,14 @@ name = "edgeless_node_d"
 path = "src/bin/edgeless_node_d.rs"
 
 [features]
-default = ["wasmtime"]
+default = ["wasmtime", "otel"]
 # WASM runtime; You can only pick one!
 wasmtime = []
 wasmi = []
+otel = ["dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
 
 [dependencies]
 log = "0.4"
-env_logger = "0.10"
 tokio = { version = "1", features = ["full"] }
 futures = { version = "0.3", features = ["executor"] }
 anyhow = "1.0"
@@ -50,7 +50,12 @@ wasmi = { version = "0.40", default-features = false }
 base64 = "0.21.5"
 chrono = "0.4.38"
 
-opentelemetry = "0.27"
+tracing = { version = "0.1" }
+tracing-subscriber = {version = "0.3", features = ["env-filter"]}
+opentelemetry = {version  = "0.31" }
+opentelemetry_sdk = { version = "0.31", optional = true }
+opentelemetry-otlp = { version = "0.31", optional = true }
+tracing-opentelemetry = {version = "0.32" }
 
 wgpu = { version = "27", features = ["serde"] }
 

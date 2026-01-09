@@ -26,6 +26,9 @@ edgeless_api = { path = "../edgeless_api", features = ["grpc_impl"] }
 edgeless_link_multicast = { path = "../edgeless_link_multicast" }
 edgeless_telemetry = { path = "../edgeless_telemetry" }
 
-opentelemetry = "0.27"
+tracing = { version = "0.1" }
+tracing-subscriber = {version = "0.3", features = ["env-filter"]}
+opentelemetry = {version  = "0.31" }
+tracing-opentelemetry = {version = "0.32" }
 
 rand = "0.8"

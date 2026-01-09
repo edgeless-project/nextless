@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 use futures::{FutureExt, SinkExt};
-use opentelemetry::trace::{Span, TraceContextExt, Tracer};
+use opentelemetry::trace::TraceContextExt;
 use std::marker::PhantomData;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use super::{function_instance_runner_common, FunctionInstance, FunctionInstanceError};
+use super::{FunctionInstance, FunctionInstanceError};
 
 /// This is the main interface for executing/managing a function instance.
 /// Owning client for a single function instance task.
@@ -161,7 +163,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         // self.data_plane.set_tracer(self.tracing_context.lock().await.tracer.clone());
 
         let start = tokio::time::Instant::now();
-        let mut span = opentelemetry::global::tracer("actor_runtime").start("instantiate");
+        let span = tracing::trace_span!(
+            "instantiate",
+            node_id = self.instance_id.node_id.to_string(),
+            component_id = self.instance_id.function_id.to_string(),
+        );
 
         let runtime_configuration = std::collections::HashMap::new();
         self.function_instance = Some(
@@ -173,10 +179,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     .ok_or(super::FunctionInstanceError::Internal(anyhow::anyhow!("Guest API host already taken")))?,
                 &self.code,
             )
+            .instrument(span)
             .await?,
         );
-
-        span.end();
 
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
@@ -188,13 +193,16 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn init(&mut self) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
-        let mut span = opentelemetry::global::tracer("actor_runtime").start("init");
+        let span = tracing::info_span!(
+            "init",
+            node_id = self.instance_id.node_id.to_string(),
+            component_id = self.instance_id.function_id.to_string(),
+        );
 
         Self::get_function_instance(&mut self.function_instance)?
             .init(self.init_payload.as_deref(), self.serialized_state.as_ref().map(|s| s.as_bytes()))
+            .instrument(span)
             .await?;
-
-        span.end();
 
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInit(start.elapsed()),
@@ -205,7 +213,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     }
 
     async fn processing_loop(&mut self) -> Result<(), super::FunctionInstanceError> {
-        // let mut poison_pill_recv = Box::pin(self.poison_pill_receiver.recv()).fuse();
         loop {
             futures::select! {
                 // Given each function instance is an independent task, the runtime needs to send a poison pill to cleanly stop it (processed here)
@@ -214,10 +221,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
                 edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port, source_port: _, context: span_context} =  Box::pin(self.data_plane.receive_next()).fuse() => {
-                    // let mut context = opentelemetry::Context::new();
-                    // context = context.with_remote_span_context(span_context);
-                    // context = context.with_value(opentelemetry::KeyValue::new("actor.id", self.instance_id.to_string()));
-                    //  context);
                     self.process_message(
                         source_id,
                         channel_id,
@@ -258,16 +261,29 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         span_context: opentelemetry::trace::SpanContext,
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
-        let span = function_instance_runner_common::span(format!("process_cast_{}", target_port.0), span_context, Some(target_port.clone()));
-        let context = opentelemetry::Context::with_span(&opentelemetry::Context::new(), span);
-        self.tracing_context.lock().await.parent_context = context;
+        let span = tracing::trace_span!(
+            "actor_invocation",
+            target_port = target_port.0,
+            node_id = self.instance_id.node_id.to_string(),
+            component_id = self.instance_id.function_id.to_string(),
+            invocation_type = "cast",
+        );
+
+        if !span.is_disabled() {
+            let parent_context = if span_context.is_valid() {
+                opentelemetry::Context::new().with_remote_span_context(span_context)
+            } else {
+                opentelemetry::Context::new()
+            };
+            span.set_parent(parent_context).unwrap();
+        }
+        self.tracing_context.lock().await.parent_context = span.context();
 
         let exec_result = Self::get_function_instance(&mut self.function_instance)?
             .cast(&source_id, target_port.0.as_str(), payload)
+            .instrument(span)
             .await;
         let duration = start.elapsed();
-
-        // span.end();
 
         self.tracing_context.lock().await.parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
@@ -295,11 +311,26 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
 
-        let span = function_instance_runner_common::span(format!("process_call_{}", target_port.0), span_context, Some(target_port.clone()));
-        self.tracing_context.lock().await.parent_context = opentelemetry::Context::with_span(&opentelemetry::Context::new(), span);
+        let span = tracing::info_span!(
+            "actor_invocation",
+            target_port = target_port.0,
+            node_id = self.instance_id.node_id.to_string(),
+            component_id = self.instance_id.function_id.to_string(),
+            invocation_type = "call",
+        );
+        if !span.is_disabled() {
+            let parent_context = if span_context.is_valid() {
+                opentelemetry::Context::new().with_remote_span_context(span_context)
+            } else {
+                opentelemetry::Context::new()
+            };
+            span.set_parent(parent_context).unwrap();
+        }
+        self.tracing_context.lock().await.parent_context = span.context();
 
         let res = Self::get_function_instance(&mut self.function_instance)?
             .call(&source_id, target_port.0.as_str(), payload)
+            .instrument(span)
             .await;
         let duration = start.elapsed();
 

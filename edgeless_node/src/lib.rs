@@ -29,6 +29,8 @@ pub struct EdgelessNodeSettings {
     pub resources: Option<EdgelessNodeResourceSettings>,
     /// User-specific capabilities.
     pub user_node_capabilities: Option<NodeCapabilitiesUser>,
+    /// OpenTelemetry Export Settings
+    pub opentelemetry_export: Option<OpenTelemetryExportConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -49,6 +51,12 @@ pub struct NativeRuntimeSettings {
     /// True if the native runtime is enabled.
     pub enabled: bool,
     pub aes: Option<bool>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct OpenTelemetryExportConfig {
+    pub enabled: bool,
+    pub endpoint: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -149,6 +157,7 @@ impl EdgelessNodeSettings {
             native_runtime: None,
             resources: None,
             user_node_capabilities: None,
+            opentelemetry_export: None,
         }
     }
 }

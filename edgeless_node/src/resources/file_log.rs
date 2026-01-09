@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
+use opentelemetry::trace::TraceContextExt;
 use std::io::prelude::*;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[derive(Clone)]
 pub struct FileLogResourceProvider {
@@ -41,9 +43,24 @@ impl FileLogResource {
                     channel_id,
                     message,
                     target_port,
+                    context,
                     ..
                 } = dataplane_handle.receive_next().await;
 
+                // TODO Properly handle the async parts here.
+                // This is best done after creating a resource abstraction.
+                let s = tracing::trace_span!("file_log", el_span_kind = "sink_invocation");
+
+                if !s.is_disabled() {
+                    let parent_context = if context.is_valid() {
+                        opentelemetry::Context::new().with_remote_span_context(context)
+                    } else {
+                        opentelemetry::Context::new()
+                    };
+                    s.set_parent(parent_context).unwrap();
+                }
+
+                let _ = s.entered();
                 let mut need_reply = false;
                 let message_data = match message {
                     Message::Call(data) => {

@@ -144,6 +144,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 },
             }),
             user_node_capabilities: None,
+            opentelemetry_export: None,
         });
         first_node = false;
     }

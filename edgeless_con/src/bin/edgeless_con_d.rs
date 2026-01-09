@@ -60,8 +60,13 @@ fn setup_tracing_with_opentelemetry(otlp_endpoint: String) {
         .with_resource(opentelemetry_sdk::Resource::builder().with_service_name("edgeless_controller").build())
         .build();
 
+    let env_filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive("edgeless=trace".parse().unwrap())
+        .from_env()
+        .expect("Bad RUST_LOG value");
+
     let tracer = otel_provider.tracer("edgeless_controller");
-    let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+    let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer).with_filter(env_filter);
 
     tracing_subscriber::registry().with(get_fmt_layer()).with(otel_layer).init();
 }
@@ -72,7 +77,7 @@ fn setup_tracing_with_opentelemetry(_otlp_endpoint: String) {
 }
 
 // https://docs.rs/tracing-subscriber/latest/tracing_subscriber/layer/#runtime-configuration-with-layers
-fn get_fmt_layer<S>() -> Box<dyn Layer<S> + Send + Sync + 'static>
+fn get_fmt_layer<S>() -> Box<dyn tracing_subscriber::Layer<S> + Send + Sync + 'static>
 where
     S: tracing::Subscriber,
     for<'a> S: tracing_subscriber::registry::LookupSpan<'a>,

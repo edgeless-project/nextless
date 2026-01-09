@@ -66,6 +66,7 @@ mod tests {
                         redis_provider: None,
                     }),
                     user_node_capabilities: None,
+                    opentelemetry_export: None,
                 },
                 _ => edgeless_node::EdgelessNodeSettings::new_without_resources(&controller_url, address, next_port(), next_port(), next_port()),
             }));

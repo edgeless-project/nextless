@@ -27,4 +27,4 @@ serde_json = "1.0"
 openssl = { version = "0.10", features = ["vendored"] }
 edgeless_build = {path = "../edgeless_build" }
 edgeless_config = { path  = "../edgeless_config" }
-opentelemetry = "0.27"
+opentelemetry = {version  = "0.31" }

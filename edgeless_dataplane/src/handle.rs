@@ -4,6 +4,8 @@
 use futures::StreamExt;
 use opentelemetry::trace::TraceContextExt;
 use opentelemetry::trace::Tracer;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::core::*;
 use crate::node_local::*;
@@ -242,33 +244,43 @@ impl DataplaneHandle {
     }
 
     pub async fn send_alias(&mut self, target: String, msg: &[u8], context: opentelemetry::Context) -> anyhow::Result<()> {
-        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("send_{target}"), &context);
-        let context = opentelemetry::Context::current_with_span(call_handler_span);
         if target == "self" {
+            let span = tracing::trace_span!("self_message", el_span_kind = "workflow_invocation");
+            if !span.is_disabled() {
+                span.set_parent(context).unwrap();
+            }
             self.send_inner(
                 self.slf,
                 Message::Cast(msg.to_vec()),
                 edgeless_api::function_instance::PortId("INTERNAL".to_string()),
                 edgeless_api::function_instance::PortId("INTERNAL".to_string()),
                 0,
-                context,
+                span.context(),
             )
+            .instrument(span)
             .await;
             Ok(())
         } else if let Some(target_ouput) = self.alias_mapping.get_mapping(&target).await {
+            let span = tracing::trace_span!("cast_alias", el_span_kind = "cast_message", alias = target);
+            if !span.is_disabled() {
+                span.set_parent(context).unwrap();
+            }
             match target_ouput {
                 edgeless_api::common::Output::Single(instance_id, port_id) => {
+                    span.record("mapping_type", "unicast");
                     self.send_inner(
                         instance_id,
                         Message::Cast(msg.to_vec()),
                         port_id.clone(),
                         edgeless_api::function_instance::PortId(target.clone()),
                         0,
-                        context.clone(),
+                        span.context(),
                     )
+                    .instrument(span)
                     .await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
+                    span.record("mapping_type", "anycast");
                     let id = ids.choose(&mut rand::thread_rng());
                     if let Some((instance_id, port_id)) = id {
                         self.send_inner(
@@ -277,28 +289,36 @@ impl DataplaneHandle {
                             port_id.clone(),
                             edgeless_api::function_instance::PortId(target.clone()),
                             0,
-                            context.clone(),
+                            span.context(),
                         )
+                        .instrument(span)
                         .await;
                     } else {
                         return Err(anyhow::anyhow!("Unknown Alias"));
                     }
                 }
                 edgeless_api::common::Output::All(ids) => {
-                    for (instance_id, port_id) in ids {
-                        self.send_inner(
-                            instance_id,
-                            Message::Cast(msg.to_vec()),
-                            port_id.clone(),
-                            edgeless_api::function_instance::PortId(target.clone()),
-                            0,
-                            context.clone(),
-                        )
-                        .await;
+                    span.record("mapping_type", "multicast");
+                    let cloned_context = span.context();
+                    async {
+                        for (instance_id, port_id) in ids {
+                            self.send_inner(
+                                instance_id,
+                                Message::Cast(msg.to_vec()),
+                                port_id.clone(),
+                                edgeless_api::function_instance::PortId(target.clone()),
+                                0,
+                                cloned_context.clone(),
+                            )
+                            .await;
+                        }
                     }
+                    .instrument(span)
+                    .await
                 }
                 edgeless_api::common::Output::Link(link_id) => {
-                    self.send_to_link(&link_id, msg.to_vec()).await;
+                    span.record("mapping_type", "link");
+                    self.send_to_link(&link_id, msg.to_vec()).instrument(span).await;
                 }
             }
             Ok(())
@@ -308,35 +328,39 @@ impl DataplaneHandle {
     }
 
     pub async fn call_alias(&mut self, alias: String, msg: &[u8], context: opentelemetry::Context) -> CallRet {
-        let call_handler_span = opentelemetry::global::tracer("dataplane").start_with_context(format!("call_{alias}"), &context);
-        let context = opentelemetry::Context::current_with_span(call_handler_span);
+        let span = tracing::trace_span!("call_alias", el_span_kind = "call_message", alias = alias);
+        if !span.is_disabled() {
+            span.set_parent(context).unwrap();
+        }
+        let context = span.context();
         if alias == "self" {
+            span.record("mapping_type", "self_invocation");
             self.call_raw(self.slf, edgeless_api::function_instance::PortId("INTERNAL".to_string()), msg, context)
+                .instrument(span)
                 .await
-            // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.alias_mapping.get_mapping(&alias).await {
-            // return self.call_raw(target, msg).await;
             match target {
                 edgeless_api::common::Output::Single(instance_id, port_id) => {
-                    // self.data_plane.send(id, msg.to_string()).await;
-                    return self.call_raw(instance_id, port_id, msg, context).await;
+                    span.record("mapping_type", "unicast");
+                    return self.call_raw(instance_id, port_id, msg, context).instrument(span).await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
+                    span.record("mapping_type", "anycast");
                     let id = ids.choose(&mut rand::thread_rng());
                     if let Some((instance_id, port_id)) = id {
-                        // self.data_plane.send(id.clone(), msg.to_string()).await;
-                        return self.call_raw(*instance_id, port_id.clone(), msg, context).await;
+                        return self.call_raw(*instance_id, port_id.clone(), msg, context).instrument(span).await;
                     } else {
-                        // return Err(GuestAPIError::UnknownAlias);
                         CallRet::Err
                     }
                 }
                 edgeless_api::common::Output::All(_ids) => {
-                    // TODO(raphaelhetzel) introduce new error for this
-                    // return Err(GuestAPIError::UnknownAlias);
+                    span.record("mapping_type", "multicast");
                     CallRet::Err
                 }
-                edgeless_api::common::Output::Link(_) => CallRet::Err,
+                edgeless_api::common::Output::Link(_) => {
+                    span.record("mapping_type", "link");
+                    CallRet::Err
+                }
             }
         } else {
             log::warn!("Unknown alias.");

@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: MIT
 use edgeless_api::function_instance::InstanceId;
 use http_body_util::BodyExt;
-use opentelemetry::trace::{TraceContextExt, Tracer};
 use std::str::FromStr;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 struct ResourceDesc {
     host: String,
@@ -40,81 +41,85 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
     fn call(&self, req: hyper::Request<hyper::body::Incoming>) -> Self::Future {
         let cloned = self.interests.clone();
         let cloned_addr = self.listen_addr.clone();
-        Box::pin(async move {
-            let (parts, body) = req.into_parts();
 
-            let host = match parts.headers.get(hyper::header::HOST) {
-                Some(val) => val.to_str()?,
-                None => &cloned_addr,
-            };
-            let method = edgeless_http::hyper_method_to_edgeless(&parts.method)?;
-            let data = body.collect().await?.to_bytes();
+        let span = tracing::trace_span!("http_ingress_request", el_span_kind = "workflow_invocation");
+        let request_context = span.context();
 
-            let span = opentelemetry::global::tracer("ingress_resource").start("ingress_event");
-            let request_context = opentelemetry::Context::current_with_span(span);
+        Box::pin(
+            async move {
+                let (parts, body) = req.into_parts();
 
-            let rq = {
-                let lck = cloned.lock().await;
-
-                lck.active_resources.iter().find_map(|(_id, intr)| {
-                    if host == intr.host && intr.allow.contains(&method) {
-                        Some((intr.host.clone(), intr.dataplane.clone()))
-                    } else {
-                        None
-                    }
-                })
-            };
-
-            if let Some((host, mut dataplane)) = rq {
-                let msg = edgeless_http::EdgelessHTTPRequest {
-                    host: host.to_string(),
-                    protocol: edgeless_http::EdgelessHTTPProtocol::Unknown,
-                    method: method.clone(),
-                    path: parts.uri.to_string(),
-                    body: Some(Vec::from(data)),
-                    headers: parts
-                        .headers
-                        .iter()
-                        .filter_map(|(k, v)| match v.to_str() {
-                            Ok(header_value) => Some((k.to_string(), header_value.to_string())),
-                            Err(_) => {
-                                log::warn!("Bad Header Value.");
-                                None
-                            }
-                        })
-                        .collect(),
+                let host = match parts.headers.get(hyper::header::HOST) {
+                    Some(val) => val.to_str()?,
+                    None => &cloned_addr,
                 };
-                let serialized_msg = serde_json::to_vec(&msg)?;
+                let method = edgeless_http::hyper_method_to_edgeless(&parts.method)?;
+                let data = body.collect().await?.to_bytes();
 
-                let res = dataplane
-                    .call_alias("new_request".to_string(), &serialized_msg, request_context.clone())
-                    .await;
+                let rq = {
+                    let lck = cloned.lock().await;
 
-                if let edgeless_dataplane::core::CallRet::Reply(data) = res {
-                    let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_slice(&data)?;
-                    let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
-                        processor_response.body.unwrap_or_default(),
-                    )));
-                    *response_builder.status_mut() = hyper::StatusCode::from_u16(processor_response.status)?;
-                    {
-                        let headers = response_builder.headers_mut();
-                        for (header_key, header_val) in processor_response.headers {
-                            if let (Ok(key), Ok(value)) = (
-                                hyper::header::HeaderName::from_bytes(header_key.as_bytes()),
-                                hyper::header::HeaderValue::from_str(&header_val),
-                            ) {
-                                headers.append(key, value);
+                    lck.active_resources.iter().find_map(|(_id, intr)| {
+                        if host == intr.host && intr.allow.contains(&method) {
+                            Some((intr.host.clone(), intr.dataplane.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                };
+
+                if let Some((host, mut dataplane)) = rq {
+                    let msg = edgeless_http::EdgelessHTTPRequest {
+                        host: host.to_string(),
+                        protocol: edgeless_http::EdgelessHTTPProtocol::Unknown,
+                        method: method.clone(),
+                        path: parts.uri.to_string(),
+                        body: Some(Vec::from(data)),
+                        headers: parts
+                            .headers
+                            .iter()
+                            .filter_map(|(k, v)| match v.to_str() {
+                                Ok(header_value) => Some((k.to_string(), header_value.to_string())),
+                                Err(_) => {
+                                    log::warn!("Bad Header Value.");
+                                    None
+                                }
+                            })
+                            .collect(),
+                    };
+                    let serialized_msg = serde_json::to_vec(&msg)?;
+
+                    let res = dataplane
+                        .call_alias("new_request".to_string(), &serialized_msg, request_context.clone())
+                        .await;
+
+                    if let edgeless_dataplane::core::CallRet::Reply(data) = res {
+                        let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_slice(&data)?;
+                        let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
+                            processor_response.body.unwrap_or_default(),
+                        )));
+                        *response_builder.status_mut() = hyper::StatusCode::from_u16(processor_response.status)?;
+                        {
+                            let headers = response_builder.headers_mut();
+                            for (header_key, header_val) in processor_response.headers {
+                                if let (Ok(key), Ok(value)) = (
+                                    hyper::header::HeaderName::from_bytes(header_key.as_bytes()),
+                                    hyper::header::HeaderValue::from_str(&header_val),
+                                ) {
+                                    headers.append(key, value);
+                                }
                             }
                         }
+                        return Ok(response_builder);
                     }
-                    return Ok(response_builder);
                 }
-            }
 
-            let mut not_found = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from("Not Found")));
-            *not_found.status_mut() = hyper::StatusCode::NOT_FOUND;
-            Ok(not_found)
-        })
+                let mut not_found = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from("Not Found")));
+                *not_found.status_mut() = hyper::StatusCode::NOT_FOUND;
+                Ok(not_found)
+            }
+            .instrument(span),
+        )
     }
 }
 
