@@ -48,20 +48,40 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
 
             let num_active_instances = function.instances.iter().filter(|i| i.borrow().try_unpack_active().is_some()).count();
 
+            // Todo: Properly refactor this to allow for the instances
+            // to be mutable and the logical actor to be accesses read-only
+            let function_clone = crate::ir::actor::LogicalActor {
+                image: function.image.clone(),
+                annotations: function.annotations.clone(),
+                constraints: function.constraints.clone(),
+                logical_ports: function.logical_ports.clone(),
+                instances: Vec::new(),
+            };
+            let cloned_function_instance_len = function.instances.len();
+
             let mut new_instances = Vec::new();
-            for i in &function.instances {
+            function.instances.retain(|i| {
                 let mut i = i.borrow_mut();
                 match &mut *i {
                     PhysicalComponentState::Requested => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, true, num_active_instances < 1);
+                        let new_instance = self.spawn_new(
+                            workflow,
+                            f_id.clone(),
+                            &function_clone,
+                            nodes,
+                            global_state,
+                            true,
+                            num_active_instances < 1,
+                        );
                         if let Some(new_instance) = new_instance {
                             *i = new_instance;
                         } else {
                             tracing::info!("Requested Instance: Found no viable node for {} in {}", &f_id, workflow.id.workflow_id);
+                            return false;
                         }
                     }
                     PhysicalComponentState::MigrationRequested(c) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false, false);
+                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function_clone, nodes, global_state, false, false);
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             if new_id.node_id == c.id().node_id {
@@ -69,7 +89,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                                     "Migrating Instance: Node would be equal {}({}). {}",
                                     f_id,
                                     c.id(),
-                                    function.instances.len()
+                                    cloned_function_instance_len
                                 );
                                 i.abort_migration();
                             } else {
@@ -90,7 +110,15 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         }
                     }
                     PhysicalComponentState::Lost(_) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false, num_active_instances < 1);
+                        let new_instance = self.spawn_new(
+                            workflow,
+                            f_id.clone(),
+                            &function_clone,
+                            nodes,
+                            global_state,
+                            false,
+                            num_active_instances < 1,
+                        );
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             new_instances.push(std::cell::RefCell::new(new_instance));
@@ -98,7 +126,15 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         }
                     }
                     PhysicalComponentState::Dead(_) => {
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &function, nodes, global_state, false, num_active_instances < 1);
+                        let new_instance = self.spawn_new(
+                            workflow,
+                            f_id.clone(),
+                            &function_clone,
+                            nodes,
+                            global_state,
+                            false,
+                            num_active_instances < 1,
+                        );
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             new_instances.push(std::cell::RefCell::new(new_instance));
@@ -109,7 +145,8 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         //NOOP
                     }
                 }
-            }
+                true
+            });
             function.instances.extend(new_instances);
         }
 

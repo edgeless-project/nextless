@@ -305,8 +305,8 @@ impl PhysicalComponentState {
             PhysicalComponentState::MigratingAway { old, .. } => Some(old.as_ref()),
             PhysicalComponentState::StopPlanned { old, .. } => Some(old.as_ref()),
             PhysicalComponentState::Stopped { .. } => None,
-            PhysicalComponentState::Dead(_) => None,
-            PhysicalComponentState::Lost(_) => None,
+            PhysicalComponentState::Dead(old) => Some(old.as_ref()),
+            PhysicalComponentState::Lost(old) => Some(old.as_ref()),
             PhysicalComponentState::DeadReplaced { .. } => None,
             PhysicalComponentState::LostReplaced { .. } => None,
         }

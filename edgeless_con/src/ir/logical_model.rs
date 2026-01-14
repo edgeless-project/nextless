@@ -11,7 +11,7 @@ pub trait LogicalComponent {
     fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<super::physical_model::PhysicalComponentState>>);
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct LogicalPorts {
     pub logical_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping>,
     pub logical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping>,

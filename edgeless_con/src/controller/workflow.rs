@@ -217,6 +217,10 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     }
 
     async fn node_removal(&mut self, removed_nodes: &std::collections::HashSet<edgeless_api::function_instance::NodeId>) -> WorkflowResult {
+        for removed_node in removed_nodes {
+            self.nodes.remove(removed_node);
+        }
+
         let required_changes = {
             let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
                 self.nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();

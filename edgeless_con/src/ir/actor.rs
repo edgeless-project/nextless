@@ -11,7 +11,7 @@ pub struct LogicalActor {
     pub instances: Vec<std::cell::RefCell<super::PhysicalComponentState>>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ActorConstraints {
     pub max_instances: Option<usize>,
     pub min_instances: Option<usize>,
