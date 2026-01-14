@@ -149,13 +149,13 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     async fn stop_workflow(&mut self, wf_id: &edgeless_api::workflow_instance::WorkflowId) {
         let mut workflow = match self.active_workflows.remove(wf_id) {
             None => {
-                tracing::info!("trying to tear-down a workflow that does not exist: {wf_id}");
+                tracing::info!("Trying to tear down a workflow that does not exist: {wf_id}");
                 return;
             }
             Some(val) => val,
         };
         if let Err(e) = workflow.stop().await {
-            tracing::error!("Could Not Stop Workflow: {e:?}")
+            tracing::error!("Could not stop workflow: {e:?}")
         }
     }
 

@@ -88,8 +88,17 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
     }
 
     pub fn stop(&mut self) -> Vec<super::RequiredChange> {
-        // TODO
-        Vec::new()
+        for (_, component_state) in self.wf.components() {
+            let component_state = component_state.borrow();
+            for instance in &mut component_state.instances() {
+                let mut instance = instance.borrow_mut();
+                if instance.try_unpack_active().is_some() {
+                    instance.plan_stop();
+                }
+            }
+        }
+
+        self.materialize()
     }
 
     #[tracing::instrument(name = "calculate_required_changes", skip_all)]

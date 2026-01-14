@@ -322,8 +322,8 @@ impl PhysicalComponentState {
             PhysicalComponentState::MigratingAway { old, .. } => Some(old.as_mut()),
             PhysicalComponentState::StopPlanned { old, .. } => Some(old.as_mut()),
             PhysicalComponentState::Stopped { .. } => None,
-            PhysicalComponentState::Dead(_) => None,
-            PhysicalComponentState::Lost(_) => None,
+            PhysicalComponentState::Dead(old) => Some(old.as_mut()),
+            PhysicalComponentState::Lost(old) => Some(old.as_mut()),
             PhysicalComponentState::DeadReplaced { .. } => None,
             PhysicalComponentState::LostReplaced { .. } => None,
         }
@@ -394,11 +394,31 @@ impl PhysicalComponentState {
     pub(crate) fn plan_stop(&mut self) {
         let old = std::mem::replace(self, PhysicalComponentState::Invalid);
         let new = match old {
-            PhysicalComponentState::Materialized(inner) => PhysicalComponentState::StopPlanned {
-                old: inner,
+            PhysicalComponentState::Planned(instance) => PhysicalComponentState::Stopped {
+                dead_instance: instance,
+                replacement: None,
+            },
+            PhysicalComponentState::Materialized(instance) => PhysicalComponentState::StopPlanned {
+                old: instance,
+                replacement: None,
+            },
+            PhysicalComponentState::MigrationRequested(instance) => PhysicalComponentState::StopPlanned {
+                old: instance,
                 replacement: None,
             },
             PhysicalComponentState::MigratingAway { old, new } => PhysicalComponentState::StopPlanned { old, replacement: Some(new) },
+            PhysicalComponentState::StopPlanned { old, replacement } => PhysicalComponentState::StopPlanned {
+                old: old,
+                replacement: replacement,
+            },
+            PhysicalComponentState::Dead(old) => PhysicalComponentState::Stopped {
+                dead_instance: old,
+                replacement: None,
+            },
+            PhysicalComponentState::Lost(old) => PhysicalComponentState::Stopped {
+                dead_instance: old,
+                replacement: None,
+            },
             _ => {
                 tracing::error!("Tried to request stop of function that is not in a running state.");
                 old
