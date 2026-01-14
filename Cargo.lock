@@ -1377,6 +1377,7 @@ dependencies = [
  "opentelemetry",
  "serde",
  "serde_json",
+ "thiserror 2.0.17",
  "tokio",
  "toml 0.7.8",
  "uuid",
@@ -1419,6 +1420,7 @@ dependencies = [
  "log",
  "serde",
  "starlark",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

@@ -6,13 +6,13 @@
 use super::BuildError;
 
 pub fn rust_to_wasm(
-    function_source_dir: String,
+    function_source_dir: impl AsRef<std::path::Path>,
     enabled_features: Vec<String>,
     enable_default_features: bool,
     enable_all_features: bool,
 ) -> Result<String, BuildError> {
-    let cargo_project_path = std::fs::canonicalize(std::path::PathBuf::from(function_source_dir.clone())).map_err(|e| BuildError::Package {
-        msg: format!("Bad Path: {function_source_dir}."),
+    let cargo_project_path = std::fs::canonicalize(&function_source_dir).map_err(|e| BuildError::Package {
+        msg: format!("Bad Path: {}.", function_source_dir.as_ref().to_string_lossy()),
         source: Some(e.into()),
     })?;
 

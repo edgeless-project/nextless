@@ -19,3 +19,5 @@ starlark = "0.12.0"
 allocative = "0.3"
 anyhow = "1"
 serde = {version = "1", features = ["rc"]}
+
+thiserror = "2"

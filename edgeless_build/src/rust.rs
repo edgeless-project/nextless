@@ -159,11 +159,11 @@ pub(crate) fn build_rust(
     }
 }
 
-pub fn package_rust(function_source_dir: String) -> Result<String, BuildError> {
+pub fn package_rust(function_source_dir: impl AsRef<std::path::Path>) -> Result<String, BuildError> {
     check_cargo(true)?;
 
-    let cargo_project_path = std::fs::canonicalize(function_source_dir.clone()).map_err(|e| BuildError::Package {
-        msg: format!("Bad Path: {function_source_dir}."),
+    let cargo_project_path = std::fs::canonicalize(&function_source_dir).map_err(|e| BuildError::Package {
+        msg: format!("Bad Path: {}.", function_source_dir.as_ref().to_string_lossy()),
         source: Some(e.into()),
     })?;
     //

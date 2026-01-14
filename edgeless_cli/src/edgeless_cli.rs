@@ -44,6 +44,12 @@ struct CLiConfig {
     controller_url: String,
 }
 
+#[derive(Debug, thiserror::Error)]
+enum CliError {
+    #[error("Could not load the cli configuration file '{file}'")]
+    ConfigurationError { file: String, source: anyhow::Error },
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -54,14 +60,14 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if std::fs::metadata(&args.config_file).is_err() {
-        return Err(anyhow::anyhow!(
-            "configuration file does not exist or cannot be accessed: {}",
-            &args.config_file
-        ));
-    }
-    log::debug!("Got Config");
-    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+    let conf_str = std::fs::read_to_string(&args.config_file).map_err(|e| CliError::ConfigurationError {
+        file: args.config_file.clone(),
+        source: e.into(),
+    })?;
+    let conf = toml::from_str(&conf_str).map_err(|e| CliError::ConfigurationError {
+        file: args.config_file.clone(),
+        source: e.into(),
+    })?;
 
     match args.command {
         None => log::debug!("Bye"),

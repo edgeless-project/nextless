@@ -12,6 +12,24 @@ pub mod resource;
 pub mod resource_class;
 pub mod workflow;
 
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error("Failed to interact with required file '{file}'.")]
+    FileError { file: String, source: anyhow::Error },
+    #[error("Dependency error processing file '{file}'.")]
+    DependencyError { file: String, source: Box<ConfigError> },
+    #[error("Config does not contain entrypoint 'el_main'.")]
+    NoEntryPoint,
+    #[error("Entrypoint 'el_main' is of unknown type.")]
+    BadEntryPoint,
+    #[error("Failed to parse file '{file}'.")]
+    ParseError { file: String, source: anyhow::Error },
+    #[error("Could not freeze file '{file}'.")]
+    FreezeError { file: String, source: anyhow::Error },
+    #[error("Error evaluating file '{file}'.")]
+    EvalError { file: String, source: anyhow::Error },
+}
+
 #[derive(Debug)]
 pub enum LoadResult {
     Workflow(crate::workflow::EdgelessWorkflow),
@@ -21,38 +39,73 @@ pub enum LoadResult {
 #[derive(Debug, starlark::any::ProvidesStaticType, Default)]
 struct FileContext(std::path::PathBuf);
 
-pub fn load(main_file: std::path::PathBuf) -> anyhow::Result<LoadResult> {
-    let m = load_module(&main_file).map_err(|e| anyhow::anyhow!(e))?;
+pub fn load(main_file: std::path::PathBuf) -> Result<LoadResult, ConfigError> {
+    let m = load_module(&main_file)?;
 
     if let Ok(main) = m.get("el_main") {
         if let Ok(workflow) = main.clone().downcast::<crate::workflow::EdgelessWorkflow>() {
-            // panic!("{:?}", workflow);
             return Ok(LoadResult::Workflow(workflow.as_ref().clone()));
         }
 
         if let Ok(actor) = main.downcast::<crate::actor_class::EdgelessActorClass>() {
             return Ok(LoadResult::ActorClass(actor.as_ref().clone()));
         }
-    }
 
-    Err(anyhow::anyhow!("Tried to load unknown entity!"))
+        return Err(ConfigError::BadEntryPoint);
+    } else {
+        Err(ConfigError::NoEntryPoint)
+    }
 }
 
-fn load_module(file: &std::path::PathBuf) -> starlark::Result<starlark::environment::FrozenModule> {
-    let filename: String = String::from_str(file.file_name().unwrap().to_str().unwrap()).map_err(|e| anyhow::anyhow!(e))?;
-    let parent = file.parent().unwrap().to_owned();
+fn load_module(file: &std::path::PathBuf) -> Result<starlark::environment::FrozenModule, ConfigError> {
+    // Uses lossy to_string and should only be used for error messages.
+    let filepath_str_lossy = file.to_string_lossy().to_string();
+    // Uses lossy to_string and should only be used for error messages.
+    let filename_lossy = file
+        .file_name()
+        .ok_or(ConfigError::FileError {
+            file: filepath_str_lossy.clone(),
+            source: anyhow::anyhow!("Could not get filename."),
+        })?
+        .to_string_lossy()
+        .to_string();
 
-    let data = std::fs::read_to_string(file).map_err(|e| anyhow::anyhow!(e))?;
+    let parent = file
+        .parent()
+        .ok_or(ConfigError::FileError {
+            file: filepath_str_lossy.clone(),
+            source: anyhow::anyhow!("Could not get file's parent."),
+        })?
+        .to_owned();
 
-    let ast = starlark::syntax::AstModule::parse(&filename, data, &starlark::syntax::Dialect::Standard).unwrap();
+    let data = std::fs::read_to_string(file).map_err(|e| ConfigError::FileError {
+        file: filepath_str_lossy.clone(),
+        source: e.into(),
+    })?;
+
+    let ast =
+        starlark::syntax::AstModule::parse(&filename_lossy, data, &starlark::syntax::Dialect::Standard).map_err(|e| ConfigError::ParseError {
+            file: filepath_str_lossy.clone(),
+            source: e.into_anyhow(),
+        })?;
 
     let mut loads = std::collections::HashMap::new();
 
     for load in ast.loads() {
-        loads.insert(
-            load.module_id.to_owned(),
-            load_module(&parent.join(std::path::PathBuf::from_str(load.module_id).unwrap()))?,
-        );
+        let load_file = std::path::PathBuf::from_str(load.module_id).map_err(|e| ConfigError::DependencyError {
+            file: filepath_str_lossy.clone(),
+            source: Box::new(ConfigError::FileError {
+                file: load.module_id.to_string(),
+                source: anyhow::Error::from(e).context("Could parse module file path."),
+            }),
+        })?;
+
+        let loaded_dependency = load_module(&parent.join(load_file)).map_err(|e| ConfigError::DependencyError {
+            file: filepath_str_lossy.clone(),
+            source: Box::new(e),
+        })?;
+
+        loads.insert(load.module_id.to_owned(), loaded_dependency);
     }
 
     let load_refs = loads.iter().map(|(k, v)| (k.as_str(), v)).collect();
@@ -72,14 +125,23 @@ fn load_module(file: &std::path::PathBuf) -> starlark::Result<starlark::environm
         .build();
 
     let module = starlark::environment::Module::new();
-    let context = FileContext(file.canonicalize().unwrap());
+    let context = FileContext(file.canonicalize().map_err(|e| ConfigError::FileError {
+        file: filepath_str_lossy.clone(),
+        source: anyhow::Error::from(e).context("Failed to canonicalize."),
+    })?);
 
     {
         let mut eval = starlark::eval::Evaluator::new(&module);
         eval.set_loader(&loader);
         eval.extra = Some(&context);
-        eval.eval_module(ast, &globals).unwrap();
+        eval.eval_module(ast, &globals).map_err(|e| ConfigError::EvalError {
+            file: filepath_str_lossy.clone(),
+            source: e.into_anyhow(),
+        })?;
     }
 
-    Ok(module.freeze()?)
+    Ok(module.freeze().map_err(|e| ConfigError::FreezeError {
+        file: filepath_str_lossy,
+        source: e,
+    })?)
 }

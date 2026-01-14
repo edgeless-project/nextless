@@ -6,6 +6,7 @@ name = "edgeless_cli"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
+rust-version = "1.92"
 
 [[bin]]
 name = "edgeless_cli"
@@ -28,3 +29,4 @@ openssl = { version = "0.10", features = ["vendored"] }
 edgeless_build = {path = "../edgeless_build" }
 edgeless_config = { path  = "../edgeless_config" }
 opentelemetry = {version  = "0.31" }
+thiserror = "2"
