@@ -167,9 +167,14 @@ impl crate::ir::Node for WorkerNode {
 
                     features.insert(match self.capabilities.cpu_arch.as_str() {
                         "x86_64" => crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Amd64,
+                        // Not sure if this is an automatic value on any platform, but that is a common way to describe this.
+                        "amd64" => crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Amd64,
                         "aarch64" => crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Aarch64,
-                        _ => {
-                            tracing::warn!("Unsupported Arch");
+                        // MacOS on M-Series Macs reports amd64. https://github.com/GuillaumeGomez/sysinfo/pull/1126#issuecomment-1793392793
+                        // We could also resolve this at the cli but a second layer of handling does not hurt.
+                        "arm64" => crate::ir::behavior::dialect::native_dyanamic::NativeDynamicDialectFeatures::Aarch64,
+                        other_architecture => {
+                            tracing::warn!("Unsupported CPU Architecture: {other_architecture} ");
                             return None;
                         }
                     });
