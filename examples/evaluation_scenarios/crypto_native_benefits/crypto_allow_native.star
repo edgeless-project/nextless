@@ -1,6 +1,6 @@
-load("../../functions/latency_harness/latency_harness.star", "LatencyHarness")
-load("../../functions/encryptor/encryptor.star", "Encryptor")
-load("../../functions/decryptor/decryptor.star", "Decryptor")
+load("../../../functions/latency_harness/latency_harness.star", "LatencyHarness")
+load("../../../functions/encryptor/encryptor.star", "Encryptor")
+load("../../../functions/decryptor/decryptor.star", "Decryptor")
 
 harness = edgeless_actor(
     id = "latency_harness_i",

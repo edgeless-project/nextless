@@ -1,5 +1,5 @@
-load("../../functions/mock_producer/producer.star", "MockProducer")
-load("../../functions/mock_consumer/consumer.star", "MockConsumer")
+load("../../../functions/mock_producer/producer.star", "MockProducer")
+load("../../../functions/mock_consumer/consumer.star", "MockConsumer")
 
 def id_str(id):
     unpadded = "%x" % (id)

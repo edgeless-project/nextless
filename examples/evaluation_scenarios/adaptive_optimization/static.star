@@ -1,5 +1,5 @@
-load("../../functions/basic_consumer/basic_consumer.star", "BasicConsumer")
-load("../../functions/unbalanced_source/unbalanced_source.star", "UnbalancedSource")
+load("../../../functions/basic_consumer/basic_consumer.star", "BasicConsumer")
+load("../../../functions/unbalanced_source/unbalanced_source.star", "UnbalancedSource")
 
 def id_str(id):
     unpadded = "%x" % (id)
