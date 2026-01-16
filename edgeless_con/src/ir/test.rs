@@ -1,16 +1,19 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+#[derive(Clone)]
 pub(crate) struct PhysicalMock {
     id: edgeless_api::function_instance::InstanceId,
     physical_ports: super::PhysicalPorts,
     materialized: std::cell::RefCell<MaterializedMock>,
 }
 
+#[derive(Clone)]
 pub(crate) struct MaterializedMock {
     materialized_ports: super::MaterializedPorts,
 }
 
+#[derive(Clone)]
 pub(crate) struct MockPortStats {
     message_rates: std::collections::HashMap<edgeless_api::function_instance::InstanceId, f64>,
     message_sizes: std::collections::HashMap<edgeless_api::function_instance::InstanceId, f64>,
@@ -75,7 +78,11 @@ impl super::PhysicalComponent for PhysicalMock {
         vec![]
     }
 
-    fn as_actor(&mut self) -> Option<&mut super::actor::PhysicalActor> {
+    fn as_actor_mut(&mut self) -> Option<&mut super::actor::PhysicalActor> {
+        None
+    }
+
+    fn as_actor(&self) -> Option<&super::actor::PhysicalActor> {
         None
     }
 }
@@ -218,7 +225,11 @@ pub(crate) fn new_actor_with_mocked_materialized_instances(
     crate::ir::actor::LogicalActor {
         image: mock_actor_image(),
         annotations: std::collections::HashMap::new(),
-        constraints: crate::ir::actor::ActorConstraints::default(),
+        scaling_mode: super::actor::ScalingMode::Scalable {
+            min_instances: 1,
+            max_instances: 10,
+        },
+        node_filter: super::actor::NodeFilter::default(),
         logical_ports: logical_ports,
         instances: instances
             .into_iter()

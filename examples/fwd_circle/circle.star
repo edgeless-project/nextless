@@ -8,8 +8,8 @@ harness = edgeless_actor(
     id = "latency_harness_i",
     klass = LatencyHarness,
     annotations = {
-        "max_instances": "1",
-        "node_id_match_any": harness_id(),
+        "scaling_mode": "singleton",
+        "node_ids_allowed": harness_id(),
         "init-payload": ",".join([inter_message_delay_ms(), "1000", "0"])
     }
 )
@@ -18,8 +18,8 @@ forwarders = [edgeless_actor(
     id = "forwarder{}_i".format(id),
     klass = BasicForwarder,
     annotations = {
-        "node_id_match_any": fwd_id(id),
-        "max_instances": "1",
+        "node_ids_allowed": fwd_id(id),
+        "scaling_mode": "singleton",
         "init-payload": fake_work_delay_ms()
     }
 ) for id in range(1, N+1) ]

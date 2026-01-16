@@ -16,9 +16,9 @@ harness = edgeless_actor(
     id = "latency_harness_i",
     klass = LatencyHarness,
     annotations = {
-        "max_instances": "1",
+        "scaling_mode": "singleton",
         "init-payload": ",".join(["100", "1000", "0"]),
-        "NO_NATIVE": "true",
+        "runtime_dialect_denied": "NATIVE_DYNAMIC",
     }
 )
 
@@ -27,7 +27,7 @@ fwd = edgeless_actor(
     klass = NativeBenefitFwd,
     annotations = {
         "init-payload": "300",
-        "node_id_match_any": id_str(1),
+        "node_ids_allowed": id_str(1),
     },
 )
 

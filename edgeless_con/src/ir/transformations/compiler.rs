@@ -29,7 +29,7 @@ impl super::StatefulTransformation<crate::ir::support::image_cache::ImageCache> 
             for instance in &function.instances {
                 let mut instance = instance.borrow_mut();
                 if let super::super::PhysicalComponentState::Planned(component) = &mut *instance {
-                    let actor_instance = component.as_actor().unwrap();
+                    let actor_instance = component.as_actor_mut().unwrap();
 
                     let image_ident = match &actor_instance.image {
                         actor::ImageState::Planned(behavior_image_id) => behavior_image_id.clone(),

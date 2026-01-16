@@ -5,19 +5,25 @@ load("../../functions/image_scaler/scaler.star", "ImageScaler")
 yolox_example = edgeless_actor(
     id = "yolox_nano_i",
     klass = YoloxNano,
-    annotations = {}
+    annotations = {
+        "scaling_mode": "all_nodes"
+    }
 )
 
 detection_tester = edgeless_actor(
     id = "tester_i",
     klass = DetectionTester,
-    annotations = {}
+    annotations = {
+        "scaling_mode": "singleton"
+    }
 )
 
 scaler = edgeless_actor(
     id = "scaler_i",
     klass = ImageScaler,
-    annotations = {}
+    annotations = {
+        "scaling_mode": "all_nodes",
+    }
 )
 
 detection_tester.test_image >> scaler.unscaled

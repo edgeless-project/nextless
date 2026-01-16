@@ -42,6 +42,7 @@ impl super::LogicalComponent for LogicalSubFlow {
     }
 }
 
+#[derive(Clone)]
 pub struct PhysicalSubFlow {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
     #[allow(unused)]
@@ -123,11 +124,16 @@ impl super::PhysicalComponent for PhysicalSubFlow {
         vec![super::RequiredChange::StopFunction { function_id: self.id }]
     }
 
-    fn as_actor(&mut self) -> Option<&mut super::actor::PhysicalActor> {
+    fn as_actor(&self) -> Option<&super::actor::PhysicalActor> {
+        None
+    }
+
+    fn as_actor_mut(&mut self) -> Option<&mut super::actor::PhysicalActor> {
         None
     }
 }
 
+#[derive(Clone)]
 pub struct MaterializedSubflow {
     pub(crate) mapping: super::MaterializedPorts,
     pub(crate) runtime_statistics: Option<Box<dyn super::ComponentRuntimeStatistics>>,

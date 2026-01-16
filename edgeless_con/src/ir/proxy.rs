@@ -41,6 +41,7 @@ impl super::LogicalComponent for LogicalProxy {
     }
 }
 
+#[derive(Clone)]
 pub struct PhyiscalProxy {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
     pub(crate) external_ports: super::ExternalPorts,
@@ -97,11 +98,16 @@ impl super::PhysicalComponent for PhyiscalProxy {
         vec![super::RequiredChange::StopFunction { function_id: self.id }]
     }
 
-    fn as_actor(&mut self) -> Option<&mut super::actor::PhysicalActor> {
+    fn as_actor(&self) -> Option<&super::actor::PhysicalActor> {
+        None
+    }
+
+    fn as_actor_mut(&mut self) -> Option<&mut super::actor::PhysicalActor> {
         None
     }
 }
 
+#[derive(Clone)]
 pub struct MaterializedProxy {
     pub(crate) mapping: super::MaterializedPorts,
     pub(crate) runtime_statistics: Option<Box<dyn super::ComponentRuntimeStatistics>>,

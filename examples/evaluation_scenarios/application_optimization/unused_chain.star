@@ -6,7 +6,7 @@ source = edgeless_actor(
     id = "source",
     klass = UnbalancedSource,
     annotations = {
-        "max_instances": "1",
+        "scaling_mode": "singleton",
     }
 )
 
@@ -14,7 +14,7 @@ sink = edgeless_actor(
     id = "sink",
     klass = BasicConsumer,
     annotations = {
-        "max_instances": "1",
+       "scaling_mode": "singleton",
     }
 )
 
@@ -22,7 +22,7 @@ used_forwarders = [edgeless_actor(
     id = "used_{}".format(id),
     klass = BasicForwarder,
     annotations = {
-        "max_instances": "1",
+        "scaling_mode": "singleton",
     }
 ) for id in range(0, 10) ]
 
@@ -30,7 +30,7 @@ unused_forwarders = [edgeless_actor(
     id = "unused_{}".format(id),
     klass = BasicForwarder,
     annotations = {
-        "max_instances": "1",
+        "scaling_mode": "singleton",
     }
 ) for id in range(0, 10) ]
 

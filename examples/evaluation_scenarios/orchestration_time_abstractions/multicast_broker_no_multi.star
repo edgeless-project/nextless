@@ -18,8 +18,8 @@ producers = [edgeless_actor(
     id = "producer{}_i".format(id),
     klass = MockProducer,
     annotations = {
-        "node_id_match_any": id_str(id),
-        "max_instances": "1",
+        "node_ids_allowed": id_str(id),
+        "scaling_mode": "singleton",
     }
 ) for id in range(1, 5) ]
 
@@ -27,7 +27,8 @@ consumers = [edgeless_actor(
     id = "consumer{}_i".format(id),
     klass = MockConsumer,
     annotations = {
-        "node_id_match_any": id_str(id),
+        "scaling_mode": "scalable",
+        "node_ids_allowed": id_str(id),
         "max_instances": "5",
     }
 ) for id in range(5, 9)]
@@ -36,8 +37,8 @@ broker = edgeless_actor(
     id = "broker_i",
     klass = MockBroker,
     annotations = {
-        "node_id_match_any": id_str(9),
-        "max_instances": "1",
+        "node_ids_allowed": id_str(9),
+        "scaling_mode": "singleton",
     }
 )
 

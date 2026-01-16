@@ -6,9 +6,9 @@ harness = edgeless_actor(
     id = "latency_harness_i",
     klass = LatencyHarness,
     annotations = {
-        "max_instances": "1",
+        "scaling_mode": "singleton",
         "init-payload": ",".join(["100", "1000", "1000"]),
-        "NO_NATIVE": "true",
+        "runtime_dialects_denied": "NATIVE_DYNAMIC",
     }
 )
 
@@ -16,8 +16,8 @@ encryptor = edgeless_actor(
     id = "encryptor_i",
     klass = Encryptor,
     annotations = {
-        "max_instances": "1",
-        "NO_NATIVE": "true",
+        "scaling_mode": "singleton",
+        "runtime_dialects_denied": "NATIVE_DYNAMIC",
     }
 )
 
@@ -25,8 +25,8 @@ decryptor = edgeless_actor(
     id = "decryptor_i",
     klass = Decryptor,
     annotations = {
-        "max_instances": "1",
-        "NO_NATIVE": "true",
+        "scaling_mode": "singleton",
+        "runtime_dialects_denied": "NATIVE_DYNAMIC",
     }
 )
 

@@ -17,8 +17,8 @@ source = edgeless_actor(
     id = "unbalanced_source",
     klass = UnbalancedSource,
     annotations = {
-        "node_id_match_any": id_str(1),
-        "max_instances": "1",
+        "node_ids_allowed": id_str(1),
+        "scaling_mode": "singleton",
     }
 )
 
@@ -26,9 +26,9 @@ frequent = edgeless_actor(
     id = "frequent_dest",
     klass = BasicConsumer,
     annotations = {
-        "node_id_match_any": "{},{}".format(id_str(1), id_str(2)),
+        "node_ids_allowed": "{},{}".format(id_str(1), id_str(2)),
         "node_id_init_on": id_str(2),
-        "max_instances": "1",
+        "scaling_mode": "singleton",
     }
 )
 
@@ -36,9 +36,9 @@ infrequent = edgeless_actor(
     id = "infrequent_dest",
     klass = BasicConsumer,
     annotations = {
-        "node_id_match_any": "{},{}".format(id_str(1), id_str(2)),
+        "node_ids_allowed": "{},{}".format(id_str(1), id_str(2)),
         "node_id_init_on": id_str(1),
-        "max_instances": "1",
+        "scaling_mode": "singleton",
     }
 )
 

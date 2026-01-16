@@ -1,15 +1,17 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use crate::ir::actor;
-
 pub(crate) fn mock_function_under_test(
     instances: Vec<(edgeless_api::function_instance::InstanceId, Box<dyn crate::ir::PortStatistics>)>,
 ) -> std::cell::RefCell<crate::ir::actor::LogicalActor> {
     std::cell::RefCell::new(crate::ir::actor::LogicalActor {
         image: crate::ir::test::mock_actor_image(),
         annotations: std::collections::HashMap::new(),
-        constraints: crate::ir::actor::ActorConstraints::default(),
+        scaling_mode: crate::ir::actor::ScalingMode::Scalable {
+            min_instances: 1,
+            max_instances: 10,
+        },
+        node_filter: crate::ir::actor::NodeFilter::default(),
         logical_ports: crate::ir::LogicalPorts {
             logical_output_mapping: std::collections::HashMap::from([(
                 edgeless_api::function_instance::PortId("port1".to_string()),
@@ -37,7 +39,7 @@ pub(crate) fn mock_function_under_test(
                     crate::ir::actor::PhysicalActor {
                         id: instance_id,
                         creation_time: std::time::Instant::now(),
-                        image: actor::ImageState::Existing(crate::ir::test::mock_actor_image().main_image),
+                        image: crate::ir::actor::ImageState::Existing(crate::ir::test::mock_actor_image().main_image),
                         behavior_spec: crate::ir::test::mock_actor_image().spec,
                         desired_mapping: crate::ir::PhysicalPorts {
                             physical_output_mapping: std::collections::HashMap::new(),
@@ -84,7 +86,11 @@ pub(crate) fn mock_peer_function(
     std::cell::RefCell::new(crate::ir::actor::LogicalActor {
         image: crate::ir::test::mock_actor_image(),
         annotations: std::collections::HashMap::new(),
-        constraints: crate::ir::actor::ActorConstraints::default(),
+        scaling_mode: crate::ir::actor::ScalingMode::Scalable {
+            min_instances: 1,
+            max_instances: 10,
+        },
+        node_filter: crate::ir::actor::NodeFilter::default(),
         logical_ports: crate::ir::LogicalPorts {
             logical_input_mapping: std::collections::HashMap::from([(
                 edgeless_api::function_instance::PortId("port_other".to_string()),
@@ -110,7 +116,7 @@ pub(crate) fn mock_peer_function(
                     crate::ir::actor::PhysicalActor {
                         id: instance_id,
                         creation_time: std::time::Instant::now(),
-                        image: actor::ImageState::Existing(crate::ir::test::mock_actor_image().main_image),
+                        image: crate::ir::actor::ImageState::Existing(crate::ir::test::mock_actor_image().main_image),
                         behavior_spec: crate::ir::test::mock_actor_image().spec,
                         desired_mapping: crate::ir::PhysicalPorts {
                             physical_output_mapping: std::collections::HashMap::new(),

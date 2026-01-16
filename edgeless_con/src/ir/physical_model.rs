@@ -3,9 +3,10 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+#[derive(Clone)]
 pub enum PhysicalComponentState {
     Invalid,
-    Requested,
+    Requested(Option<crate::ir::actor::NodeFilter>),
     Planned(Box<dyn PhysicalComponent>),
     Materialized(Box<dyn PhysicalComponent>),
     MigrationRequested(Box<dyn PhysicalComponent>),
@@ -37,14 +38,35 @@ pub enum PhysicalComponentState {
     },
 }
 
-pub trait PhysicalComponent: Send {
+pub trait PhysicalComponent: Send + PhysicalComponentClone {
     fn id(&self) -> edgeless_api::function_instance::InstanceId;
     fn creation_time(&self) -> std::time::Instant;
     fn physical_ports(&mut self) -> &mut PhysicalPorts;
     fn materialize(&mut self, telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>) -> Vec<super::RequiredChange>;
     fn stop(&mut self) -> Vec<super::RequiredChange>;
     fn materialized_state(&self) -> Option<&std::cell::RefCell<dyn MaterializedComponent>>;
-    fn as_actor(&mut self) -> Option<&mut super::actor::PhysicalActor>;
+    fn as_actor(&self) -> Option<&super::actor::PhysicalActor>;
+    fn as_actor_mut(&mut self) -> Option<&mut super::actor::PhysicalActor>;
+}
+
+// https://stackoverflow.com/a/30353928
+pub trait PhysicalComponentClone {
+    fn clone_box(&self) -> Box<dyn PhysicalComponent>;
+}
+
+impl<T> PhysicalComponentClone for T
+where
+    T: 'static + PhysicalComponent + Clone,
+{
+    fn clone_box(&self) -> Box<dyn PhysicalComponent> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn PhysicalComponent> {
+    fn clone(&self) -> Box<dyn PhysicalComponent> {
+        self.clone_box()
+    }
 }
 
 pub trait MaterializedComponent {
@@ -52,7 +74,7 @@ pub trait MaterializedComponent {
     fn runtime_statistics(&self) -> Option<&dyn ComponentRuntimeStatistics>;
 }
 
-pub trait ComponentRuntimeStatistics: Sync + Send {
+pub trait ComponentRuntimeStatistics: Sync + Send + ComponentRuntimeStatisticsClone {
     fn invocation_rate_abs(&self, period: std::time::Duration) -> Option<f64>;
     fn invocations_rate_abs_by_port(&self, period: std::time::Duration) -> Vec<(edgeless_api::function_instance::PortId, f64)>;
     fn duration_mean_secs(&self, period: std::time::Duration) -> Option<f64>;
@@ -64,7 +86,27 @@ pub trait ComponentRuntimeStatistics: Sync + Send {
     // fn memory_soft_limit_rate_rel(&self, period: std::time::Duration) -> Option<f64>;
 }
 
-pub trait PortStatistics: Sync + Send {
+// https://stackoverflow.com/a/30353928
+pub trait ComponentRuntimeStatisticsClone {
+    fn clone_box(&self) -> Box<dyn ComponentRuntimeStatistics>;
+}
+
+impl<T> ComponentRuntimeStatisticsClone for T
+where
+    T: 'static + ComponentRuntimeStatistics + Clone,
+{
+    fn clone_box(&self) -> Box<dyn ComponentRuntimeStatistics> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn ComponentRuntimeStatistics> {
+    fn clone(&self) -> Box<dyn ComponentRuntimeStatistics> {
+        self.clone_box()
+    }
+}
+
+pub trait PortStatistics: Sync + Send + PortStatisticsClone {
     fn message_rate_abs(&self, period: std::time::Duration) -> Option<f64>;
     fn message_rate_abs_by_peer(&self, period: std::time::Duration) -> Vec<(edgeless_api::function_instance::InstanceId, f64)>;
     fn message_size_mean_bytes(&self, period: std::time::Duration) -> Option<f64>;
@@ -73,6 +115,26 @@ pub trait PortStatistics: Sync + Send {
     // TODO: Probably no great way to meaure this (one-way latencies)
     // fn latency_mean_secs(&self, period: Option<std::time::Duration>) -> f64;
     // fn latency_by_peer_mean_secs(&self, period: Option<std::time::Duration>) -> Vec<(edgeless_api::function_instance::InstanceId, f64)>;
+}
+
+// https://stackoverflow.com/a/30353928
+pub trait PortStatisticsClone {
+    fn clone_box(&self) -> Box<dyn PortStatistics>;
+}
+
+impl<T> PortStatisticsClone for T
+where
+    T: 'static + PortStatistics + Clone,
+{
+    fn clone_box(&self) -> Box<dyn PortStatistics> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn PortStatistics> {
+    fn clone(&self) -> Box<dyn PortStatistics> {
+        self.clone_box()
+    }
 }
 
 pub type PhysicalOutput = crate::ir::interaction::SourcePortMapping;
@@ -169,17 +231,19 @@ pub struct PhysicalPorts {
     pub physical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct MaterializedPorts {
     pub materialized_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, MaterializedOutput>,
     pub materialized_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, MaterializedInput>,
 }
 
+#[derive(Clone)]
 pub struct MaterializedInput {
     pub(crate) mapping: PhysicalInput,
     pub(crate) port_statistics: Option<Box<dyn PortStatistics>>,
 }
 
+#[derive(Clone)]
 pub struct MaterializedOutput {
     pub(crate) mapping: PhysicalOutput,
     pub(crate) port_statistics: Option<Box<dyn PortStatistics>>,
@@ -281,7 +345,7 @@ impl PhysicalComponentState {
     pub fn try_unpack_materialized(&self) -> Option<&dyn PhysicalComponent> {
         match self {
             PhysicalComponentState::Invalid => None,
-            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Requested(_) => None,
             PhysicalComponentState::Planned(_) => None,
             PhysicalComponentState::Materialized(inner) => Some(inner.as_ref()),
             PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_ref()),
@@ -295,10 +359,10 @@ impl PhysicalComponentState {
         }
     }
 
-    pub fn try_unpack_active(&self) -> Option<&dyn PhysicalComponent> {
+    pub fn try_unpack_active<'a>(&'a self) -> Option<&'a dyn PhysicalComponent> {
         match self {
             PhysicalComponentState::Invalid => None,
-            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Requested(_) => None,
             PhysicalComponentState::Planned(inner) => Some(inner.as_ref()),
             PhysicalComponentState::Materialized(inner) => Some(inner.as_ref()),
             PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_ref()),
@@ -315,7 +379,7 @@ impl PhysicalComponentState {
     pub fn try_unpack_active_mut(&mut self) -> Option<&mut dyn PhysicalComponent> {
         match self {
             PhysicalComponentState::Invalid => None,
-            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Requested(_) => None,
             PhysicalComponentState::Planned(inner) => Some(inner.as_mut()),
             PhysicalComponentState::Materialized(inner) => Some(inner.as_mut()),
             PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_mut()),
@@ -332,7 +396,7 @@ impl PhysicalComponentState {
     pub fn try_unpack_materialized_mut(&mut self) -> Option<&mut dyn PhysicalComponent> {
         match self {
             PhysicalComponentState::Invalid => None,
-            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Requested(_) => None,
             PhysicalComponentState::Planned(_) => None,
             PhysicalComponentState::Materialized(inner) => Some(inner.as_mut()),
             PhysicalComponentState::MigrationRequested(inner) => Some(inner.as_mut()),
@@ -349,7 +413,7 @@ impl PhysicalComponentState {
     pub fn id(&self) -> Option<edgeless_api::function_instance::InstanceId> {
         match self {
             PhysicalComponentState::Invalid => None,
-            PhysicalComponentState::Requested => None,
+            PhysicalComponentState::Requested(_) => None,
             PhysicalComponentState::Planned(inner) => Some(inner.id()),
             PhysicalComponentState::Materialized(inner) => Some(inner.id()),
             PhysicalComponentState::MigrationRequested(inner) => Some(inner.id()),
@@ -364,13 +428,17 @@ impl PhysicalComponentState {
     }
 
     pub(crate) fn request_new_instance() -> Self {
-        PhysicalComponentState::Requested
+        PhysicalComponentState::Requested(None)
+    }
+
+    pub(crate) fn request_new_instance_with_extra_constraints(extra_constraints: crate::ir::actor::NodeFilter) -> Self {
+        PhysicalComponentState::Requested(Some(extra_constraints))
     }
 
     pub(crate) fn plan_creation(&mut self, instance: Box<dyn PhysicalComponent>) {
         let old = std::mem::replace(self, PhysicalComponentState::Invalid);
         let new = match old {
-            PhysicalComponentState::Requested => PhysicalComponentState::Planned(instance),
+            PhysicalComponentState::Requested(_) => PhysicalComponentState::Planned(instance),
             _ => {
                 tracing::error!("Tried to plan creation of component in state other than 'requested'");
                 old
@@ -442,9 +510,21 @@ impl PhysicalComponentState {
     pub(crate) fn mark_stopped(&mut self) {
         let old = std::mem::replace(self, PhysicalComponentState::Invalid);
         let new = match old {
+            PhysicalComponentState::Planned(instance) => PhysicalComponentState::Stopped {
+                dead_instance: instance,
+                replacement: None,
+            },
             PhysicalComponentState::StopPlanned { old, replacement } => PhysicalComponentState::Stopped {
                 dead_instance: old,
                 replacement,
+            },
+            PhysicalComponentState::Dead(old) => PhysicalComponentState::Stopped {
+                dead_instance: old,
+                replacement: None,
+            },
+            PhysicalComponentState::Lost(old) => PhysicalComponentState::Stopped {
+                dead_instance: old,
+                replacement: None,
             },
             _ => {
                 tracing::error!("Tried to mark function in wrong state stopped");

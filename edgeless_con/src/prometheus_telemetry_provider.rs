@@ -47,11 +47,13 @@ impl crate::ir::TelemetryProvider for PrometheusTelemetryProvider {
     }
 }
 
+#[derive(Clone)]
 struct PrometheusComponentRuntimeStatistics {
     component_id: edgeless_api::function_instance::InstanceId,
     client: prometheus_http_query::Client,
 }
 
+#[derive(Clone)]
 struct PrometheusPortStatistics {
     component_id: edgeless_api::function_instance::InstanceId,
     port_id: edgeless_api::function_instance::PortId,
@@ -66,6 +68,7 @@ struct PrometheusWasmRuntimeInfo {
     client: prometheus_http_query::Client,
 }
 
+#[derive(Clone)]
 enum PortDirection {
     Input,
     Output,

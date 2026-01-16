@@ -1,11 +1,11 @@
-load("../../functions/latency_harness/latency_harness.star", "LatencyHarness")
-load("../../functions/unused_output/unused_output.star", "UnusedOutput")
+load("../../../functions/latency_harness/latency_harness.star", "LatencyHarness")
+load("../../../functions/unused_output/unused_output.star", "UnusedOutput")
 
 harness = edgeless_actor(
     id = "latency_harness_i",
     klass = LatencyHarness,
     annotations = {
-        "max_instances": "1",
+        "scaling_mode": "singleton",
         "init-payload": ",".join(["100", "1000", "1000"])
     }
 )
@@ -14,7 +14,7 @@ forwarder = edgeless_actor(
     id = "unused_output_i",
     klass = UnusedOutput,
     annotations = {
-        "max_instances": "1",
+        "scaling_mode": "singleton",
     }
 )
 
