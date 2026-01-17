@@ -17,6 +17,13 @@ pub struct ActiveWorkflow {
     pub(crate) proxy: std::cell::RefCell<LogicalProxy>,
 
     pub(crate) links: std::collections::HashMap<edgeless_api::link::LinkInstanceId, WorkflowLink>,
+
+    pub(crate) feature_flags: FeatureFlags,
+}
+
+pub struct FeatureFlags {
+    pub disable_application_optimization: bool,
+    pub disable_actor_optimization: bool,
 }
 
 impl ActiveWorkflow {
@@ -25,9 +32,7 @@ impl ActiveWorkflow {
         id: edgeless_api::workflow_instance::WorkflowId,
         cluster_id: uuid::Uuid,
     ) -> Self {
-        if !request.annotations.is_empty() {
-            tracing::warn!("Workflow annotations ({}) are currently ignored", request.annotations.len());
-        }
+        let feature_flags = FeatureFlags::from_annotations(&request.annotations);
 
         ActiveWorkflow {
             // state: WorkflowState::New,
@@ -50,6 +55,7 @@ impl ActiveWorkflow {
                 &request.workflow_ingress_proxies,
                 &request.workflow_egress_proxies,
             )),
+            feature_flags,
         }
     }
 
@@ -87,5 +93,32 @@ impl ActiveWorkflow {
         } else {
             None
         }
+    }
+}
+
+impl Default for FeatureFlags {
+    fn default() -> Self {
+        Self {
+            disable_application_optimization: false,
+            disable_actor_optimization: false,
+        }
+    }
+}
+
+impl FeatureFlags {
+    fn from_annotations(annotations: &std::collections::HashMap<String, String>) -> Self {
+        let mut flags = Self::default();
+
+        if let Some(string_flags) = annotations.get("feature_flags") {
+            for flag in string_flags.split(",") {
+                match flag {
+                    "disable_application_optimization" => flags.disable_application_optimization = true,
+                    "disable_actor_optimization" => flags.disable_actor_optimization = true,
+                    _ => {}
+                }
+            }
+        }
+
+        flags
     }
 }

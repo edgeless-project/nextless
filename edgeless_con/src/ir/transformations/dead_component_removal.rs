@@ -10,6 +10,9 @@ pub struct DeadComponentRemoval {}
 impl super::StatelessTransformation for DeadComponentRemoval {
     #[tracing::instrument(name = "dead_component_removal", skip_all)]
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
+        if workflow.feature_flags.disable_application_optimization {
+            return;
+        }
         let mut changed = true;
         while changed {
             changed = false;

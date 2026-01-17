@@ -8,6 +8,7 @@ pub fn feasible_node_runtime_candidates<'b>(
     logical_actor: &crate::ir::actor::LogicalActor,
     node: &'b dyn crate::ir::Node,
     allow_suboptimal: bool,
+    disable_actor_optimization: bool,
 ) -> Vec<super::Candidate<'b>> {
     let mut candidates = Vec::new();
 
@@ -30,12 +31,18 @@ pub fn feasible_node_runtime_candidates<'b>(
             }
         }
 
-        let dest_spec = crate::ir::behavior::BehaviorImageId {
-            behavior_id: logical_actor.image.main_image.behavior_image_id.behavior_id.clone(),
-            enabled_ports: crate::ir::behavior::EnabledPorts {
+        let enabled_ports = if disable_actor_optimization {
+            logical_actor.image.main_image.behavior_image_id.enabled_ports.clone()
+        } else {
+            crate::ir::behavior::EnabledPorts {
                 enabled_inputs: logical_actor.enabled_inputs().iter().cloned().collect(),
                 enabled_outputs: logical_actor.enabled_outputs().iter().cloned().collect(),
-            },
+            }
+        };
+
+        let dest_spec = crate::ir::behavior::BehaviorImageId {
+            behavior_id: logical_actor.image.main_image.behavior_image_id.behavior_id.clone(),
+            enabled_ports,
             dialect_type: dest_dialect,
         };
 

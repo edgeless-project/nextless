@@ -94,7 +94,15 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                             urgent: num_active_instances < 1,
                         };
 
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &cloned_function, nodes, global_state, &placement_constraints);
+                        let new_instance = self.spawn_new(
+                            workflow,
+                            f_id.clone(),
+                            &cloned_function,
+                            nodes,
+                            global_state,
+                            &placement_constraints,
+                            workflow.feature_flags.disable_actor_optimization,
+                        );
                         if let Some(new_instance) = new_instance {
                             *i = new_instance;
                         } else {
@@ -111,7 +119,15 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
 
                         let placement_constraints = PlacementConstraints { node_filters, urgent: false };
 
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &cloned_function, nodes, global_state, &placement_constraints);
+                        let new_instance = self.spawn_new(
+                            workflow,
+                            f_id.clone(),
+                            &cloned_function,
+                            nodes,
+                            global_state,
+                            &placement_constraints,
+                            workflow.feature_flags.disable_actor_optimization,
+                        );
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             if new_id.node_id == c.id().node_id {
@@ -150,7 +166,15 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                                 urgent: num_active_instances <= 1,
                             };
 
-                            let new_instance = self.spawn_new(workflow, f_id.clone(), &cloned_function, nodes, global_state, &placement_constraints);
+                            let new_instance = self.spawn_new(
+                                workflow,
+                                f_id.clone(),
+                                &cloned_function,
+                                nodes,
+                                global_state,
+                                &placement_constraints,
+                                workflow.feature_flags.disable_actor_optimization,
+                            );
                             if let Some(new_instance) = new_instance {
                                 let new_id = new_instance.id().unwrap();
                                 new_instances.push(std::cell::RefCell::new(new_instance));
@@ -173,7 +197,15 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                             urgent: num_active_instances <= 1,
                         };
 
-                        let new_instance = self.spawn_new(workflow, f_id.clone(), &cloned_function, nodes, global_state, &placement_constraints);
+                        let new_instance = self.spawn_new(
+                            workflow,
+                            f_id.clone(),
+                            &cloned_function,
+                            nodes,
+                            global_state,
+                            &placement_constraints,
+                            workflow.feature_flags.disable_actor_optimization,
+                        );
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
                             new_instances.push(std::cell::RefCell::new(new_instance));
@@ -288,8 +320,9 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         nodes: &crate::ir::Nodes,
         global_state: &PlacementState<P>,
         placement_constraints: &PlacementConstraints,
+        disable_actor_optimization: bool,
     ) -> Option<PhysicalComponentState> {
-        let candidates = find_candidates_for_actor(placement_constraints, actor, nodes, global_state.image_chache);
+        let candidates = find_candidates_for_actor(placement_constraints, actor, nodes, global_state.image_chache, disable_actor_optimization);
 
         let mut filtered = self.dynamic_colocation_filter.filter_candidates(actor, candidates, workflow);
 
@@ -326,6 +359,7 @@ fn find_candidates_for_actor<'b>(
     logical_actor: &crate::ir::actor::LogicalActor,
     nodes: &'b crate::ir::Nodes,
     image_cache: &crate::ir::support::image_cache::ImageCache,
+    disable_actor_optimization: bool,
 ) -> Vec<Candidate<'b>> {
     let mut candiates = Vec::new();
 
@@ -334,7 +368,13 @@ fn find_candidates_for_actor<'b>(
     if placement_constraints.urgent {
         tracing::debug!("Urgent Mode");
         for node in nodes.values() {
-            let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, logical_actor, *node, true);
+            let node_candidates = feasibility::feasible_node_runtime_candidates(
+                &placement_constraints.node_filters,
+                logical_actor,
+                *node,
+                true,
+                disable_actor_optimization,
+            );
             if let Some(node_candidate) = select_node_candidate(node_candidates, true, true, image_cache) {
                 candiates.push(node_candidate)
             }
@@ -348,7 +388,13 @@ fn find_candidates_for_actor<'b>(
 
     // Attempt to request the best image.
     for node in nodes.values() {
-        let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, logical_actor, *node, false);
+        let node_candidates = feasibility::feasible_node_runtime_candidates(
+            &placement_constraints.node_filters,
+            logical_actor,
+            *node,
+            false,
+            disable_actor_optimization,
+        );
         if let Some(node_candidate) = select_node_candidate(node_candidates, false, false, image_cache) {
             candiates.push(node_candidate)
         }
@@ -360,7 +406,13 @@ fn find_candidates_for_actor<'b>(
 
     // Last attempt: Just use any image
     for node in nodes.values() {
-        let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, logical_actor, *node, true);
+        let node_candidates = feasibility::feasible_node_runtime_candidates(
+            &placement_constraints.node_filters,
+            logical_actor,
+            *node,
+            true,
+            disable_actor_optimization,
+        );
         if let Some(node_candidate) = select_node_candidate(node_candidates, false, true, image_cache) {
             candiates.push(node_candidate)
         }

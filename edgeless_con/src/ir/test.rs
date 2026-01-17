@@ -306,6 +306,7 @@ pub(crate) fn mock_workflow(
             instances: vec![],
         }),
         links: std::collections::HashMap::new(),
+        feature_flags: crate::ir::workflow::FeatureFlags::default(),
     }
 }
 
