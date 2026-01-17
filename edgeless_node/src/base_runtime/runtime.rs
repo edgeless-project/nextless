@@ -83,7 +83,14 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
     }
 
     async fn start_function(&mut self, spawn_request: edgeless_api::function_instance::SpawnFunctionRequest) {
-        tracing::info!("Start Actor {:?} {:?}", spawn_request.code.function_class_id, spawn_request.instance_id);
+        tracing::info!(
+            "Start Actor Class: {:?}; Instance ID: {:?}; Dialect: {:?}; Mapped Output {:?}; Mapped Inputs {:?}",
+            spawn_request.code.function_class_id,
+            spawn_request.instance_id,
+            spawn_request.code.function_class_type,
+            spawn_request.output_mapping.keys().map(|k| &k.0).collect::<Vec<_>>(),
+            spawn_request.input_mapping.keys().map(|k| &k.0).collect::<Vec<_>>()
+        );
         let instance_id = spawn_request.instance_id;
         let cloned_req = spawn_request.clone();
         let telemetry_handle = self.telemetry_handle.fork(std::collections::BTreeMap::from([(

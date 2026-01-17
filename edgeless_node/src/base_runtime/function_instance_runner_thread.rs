@@ -214,11 +214,19 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
     }
 
     fn processing_loop(&mut self) -> Result<(), super::FunctionInstanceError> {
+        let mut clean_exit_triggered = false;
+
         loop {
+            if clean_exit_triggered {
+                return Ok(());
+            }
+
             futures::executor::block_on(async {
                 futures::select! {
                     // Given each function instance is an independent task, the runtime needs to send a poison pill to cleanly stop it (processed here)
                     _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
+                        // This is a bit akward as we don't want to raise an Err but also need to exit the async block...
+                        clean_exit_triggered = true;
                         self.stop()
                     },
                     // Receive a normal event from the dataplane and invoke the function instance
