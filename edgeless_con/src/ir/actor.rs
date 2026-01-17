@@ -162,6 +162,16 @@ impl super::MaterializedComponent for MaterializedActor {
     }
 }
 
+impl LogicalActor {
+    pub(crate) fn enabled_inputs(&self) -> Vec<edgeless_api::function_instance::PortId> {
+        self.logical_ports.logical_input_mapping.iter().map(|i| i.0.clone()).collect()
+    }
+
+    pub(crate) fn enabled_outputs(&self) -> Vec<edgeless_api::function_instance::PortId> {
+        self.logical_ports.logical_output_mapping.iter().map(|i| i.0.clone()).collect()
+    }
+}
+
 impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
     fn from(function_req: edgeless_api::workflow_instance::WorkflowFunction) -> Self {
         let scaling_mode = ScalingMode::from_annotations(&function_req.annotations);

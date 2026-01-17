@@ -289,12 +289,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         global_state: &PlacementState<P>,
         placement_constraints: &PlacementConstraints,
     ) -> Option<PhysicalComponentState> {
-        let candidates = find_candidates_for_actor(
-            placement_constraints,
-            &actor.image.main_image.behavior_image_id,
-            nodes,
-            global_state.image_chache,
-        );
+        let candidates = find_candidates_for_actor(placement_constraints, actor, nodes, global_state.image_chache);
 
         let mut filtered = self.dynamic_colocation_filter.filter_candidates(actor, candidates, workflow);
 
@@ -328,7 +323,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
 
 fn find_candidates_for_actor<'b>(
     placement_constraints: &PlacementConstraints,
-    source_image_id: &behavior::BehaviorImageId,
+    logical_actor: &crate::ir::actor::LogicalActor,
     nodes: &'b crate::ir::Nodes,
     image_cache: &crate::ir::support::image_cache::ImageCache,
 ) -> Vec<Candidate<'b>> {
@@ -339,7 +334,7 @@ fn find_candidates_for_actor<'b>(
     if placement_constraints.urgent {
         tracing::debug!("Urgent Mode");
         for node in nodes.values() {
-            let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, source_image_id, *node, true);
+            let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, logical_actor, *node, true);
             if let Some(node_candidate) = select_node_candidate(node_candidates, true, true, image_cache) {
                 candiates.push(node_candidate)
             }
@@ -353,7 +348,7 @@ fn find_candidates_for_actor<'b>(
 
     // Attempt to request the best image.
     for node in nodes.values() {
-        let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, source_image_id, *node, false);
+        let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, logical_actor, *node, false);
         if let Some(node_candidate) = select_node_candidate(node_candidates, false, false, image_cache) {
             candiates.push(node_candidate)
         }
@@ -365,7 +360,7 @@ fn find_candidates_for_actor<'b>(
 
     // Last attempt: Just use any image
     for node in nodes.values() {
-        let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, source_image_id, *node, true);
+        let node_candidates = feasibility::feasible_node_runtime_candidates(&placement_constraints.node_filters, logical_actor, *node, true);
         if let Some(node_candidate) = select_node_candidate(node_candidates, false, true, image_cache) {
             candiates.push(node_candidate)
         }

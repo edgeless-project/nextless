@@ -5,7 +5,7 @@
 
 pub fn feasible_node_runtime_candidates<'b>(
     node_filter: &crate::ir::actor::NodeFilter,
-    actor_image: &crate::ir::behavior::BehaviorImageId,
+    logical_actor: &crate::ir::actor::LogicalActor,
     node: &'b dyn crate::ir::Node,
     allow_suboptimal: bool,
 ) -> Vec<super::Candidate<'b>> {
@@ -31,13 +31,16 @@ pub fn feasible_node_runtime_candidates<'b>(
         }
 
         let dest_spec = crate::ir::behavior::BehaviorImageId {
-            behavior_id: actor_image.behavior_id.clone(),
-            enabled_ports: actor_image.enabled_ports.clone(),
+            behavior_id: logical_actor.image.main_image.behavior_image_id.behavior_id.clone(),
+            enabled_ports: crate::ir::behavior::EnabledPorts {
+                enabled_inputs: logical_actor.enabled_inputs().iter().cloned().collect(),
+                enabled_outputs: logical_actor.enabled_outputs().iter().cloned().collect(),
+            },
             dialect_type: dest_dialect,
         };
 
         let target_image_id = crate::ir::behavior::dialect::DialectRegistry::new_default()
-            .plan_translation(actor_image, &dest_spec, !allow_suboptimal)
+            .plan_translation(&logical_actor.image.main_image.behavior_image_id, &dest_spec, !allow_suboptimal)
             .ok();
 
         if let Some(dest_image_id) = target_image_id {
