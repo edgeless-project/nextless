@@ -57,10 +57,19 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Logi
         _dests: Vec<(crate::ir::interaction::LogicalPortId, super::super::DestiantionPortMapping)>,
     ) -> Result<Vec<super::super::InteractionMapping>, crate::ir::interaction::InteractionError> {
         let mut collector = std::collections::BTreeMap::<DestinationMapping, Vec<crate::ir::interaction::LogicalPortId>>::new();
+        let mut constraints: Option<std::collections::BTreeSet<super::DialectConstraintContainer>> = None;
 
         for (src_port_id, src_spec) in srcs {
             let overlay_mapping = LogicalOverlaySourcePort::as_concrete(src_spec.mapping.as_ref())?;
-            collector.entry(overlay_mapping.destination.clone()).or_default().push(src_port_id)
+            collector.entry(overlay_mapping.destination.clone()).or_default().push(src_port_id);
+
+            if let Some(constraints) = &mut constraints {
+                if *constraints != src_spec.dialect_type.constraints {
+                    tracing::warn!("Merging Ports with different constraints");
+                }
+            } else {
+                constraints = Some(src_spec.dialect_type.constraints.clone())
+            }
         }
 
         Ok(collector
@@ -69,7 +78,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Logi
                 mapping: Box::new(LogicalOverlayInteraction { sources, destination }),
                 dialect_type: super::DialectDescriptor {
                     base_type: ID,
-                    constraints: std::collections::BTreeSet::new(),
+                    constraints: constraints.clone().unwrap_or_default(),
                 },
             })
             .collect())
@@ -97,10 +106,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Logi
                     mapping: Box::new(LogicalOverlaySourcePort {
                         destination: overlay_mapping.destination.clone(),
                     }),
-                    dialect_type: super::DialectDescriptor {
-                        base_type: ID,
-                        constraints: std::collections::BTreeSet::new(),
-                    },
+                    dialect_type: interaction.dialect_type.clone(),
                 },
             ));
         }
@@ -142,10 +148,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Logi
                 (
                     id,
                     super::super::DestiantionPortMapping {
-                        dialect_type: super::DialectDescriptor {
-                            base_type: ID,
-                            constraints: std::collections::BTreeSet::new(),
-                        },
+                        dialect_type: interaction.dialect_type.clone(),
                         mapping: Box::new(mapping),
                     },
                 )

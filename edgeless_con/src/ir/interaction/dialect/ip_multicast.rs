@@ -79,6 +79,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
         dests: Vec<(crate::ir::interaction::PhysicalPortId, super::super::DestiantionPortMapping)>,
     ) -> Result<Vec<super::super::InteractionMapping>, crate::ir::interaction::InteractionError> {
         let mut buffer = std::collections::HashMap::<edgeless_api::link::LinkInstanceId, IpMulticastInteraction>::new();
+        let mut constraints: Option<std::collections::BTreeSet<super::DialectConstraintContainer>> = None;
 
         for (port_id, src) in srcs {
             let multicast_mapping = IpMulticastSourcePort::as_concrete(src.mapping.as_ref())?;
@@ -92,6 +93,14 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                 })
                 .publishers
                 .push(port_id);
+
+            if let Some(constraints) = &mut constraints {
+                if *constraints != src.dialect_type.constraints {
+                    tracing::warn!("Merging Ports with different constraints");
+                }
+            } else {
+                constraints = Some(src.dialect_type.constraints.clone())
+            }
         }
 
         for (port_id, dst) in dests {
@@ -106,6 +115,14 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                 })
                 .subscribers
                 .push(port_id);
+
+            if let Some(constraints) = &mut constraints {
+                if *constraints != dst.dialect_type.constraints {
+                    tracing::warn!("Merging Ports with different constraints");
+                }
+            } else {
+                constraints = Some(dst.dialect_type.constraints.clone())
+            }
         }
 
         Ok(buffer
@@ -114,7 +131,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                 mapping: Box::new(i),
                 dialect_type: super::DialectDescriptor {
                     base_type: ID,
-                    constraints: std::collections::BTreeSet::new(),
+                    constraints: constraints.clone().unwrap_or_default(),
                 },
             })
             .collect())
@@ -143,10 +160,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                         link_id: multicast_mapping.link_id.clone(),
                         multicast_ip: multicast_mapping.multicast_ip.clone(),
                     }),
-                    dialect_type: super::DialectDescriptor {
-                        base_type: ID,
-                        constraints: std::collections::BTreeSet::new(),
-                    },
+                    dialect_type: interaction.dialect_type.clone(),
                 },
             ));
         }
@@ -159,10 +173,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                         link_id: multicast_mapping.link_id.clone(),
                         multicast_ip: multicast_mapping.multicast_ip.clone(),
                     }),
-                    dialect_type: super::DialectDescriptor {
-                        base_type: ID,
-                        constraints: std::collections::BTreeSet::new(),
-                    },
+                    dialect_type: interaction.dialect_type.clone(),
                 },
             ));
         }

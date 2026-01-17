@@ -170,7 +170,7 @@ fn collect_physical_interactions(
         let mut current = c.borrow_mut();
         let (_logical_ports, physical_instances) = current.split_view();
         for i in &physical_instances {
-            if let Some(i) = i.borrow_mut().try_unpack_materialized_mut() {
+            if let Some(i) = i.borrow_mut().try_unpack_active_mut() {
                 let cloned_id = i.id().clone();
                 let ports = i.physical_ports();
 
@@ -240,7 +240,7 @@ fn distribute_physical_interactions(
         let mut current = c.borrow_mut();
         let (_logical_ports, physical_instances) = current.split_view();
         for i in &physical_instances {
-            if let Some(i) = i.borrow_mut().try_unpack_materialized_mut() {
+            if let Some(i) = i.borrow_mut().try_unpack_active_mut() {
                 let cloned_id = i.id();
                 let ports = i.physical_ports();
 

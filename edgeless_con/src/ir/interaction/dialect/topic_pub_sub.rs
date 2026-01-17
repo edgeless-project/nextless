@@ -64,6 +64,8 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
         let mut collector =
             std::collections::HashMap::<String, (Vec<crate::ir::interaction::LogicalPortId>, Vec<crate::ir::interaction::LogicalPortId>)>::new();
 
+        let mut constraints: Option<std::collections::BTreeSet<super::DialectConstraintContainer>> = None;
+
         for (logical_port_id, port_spec) in srcs {
             let topic_mapping = TopicPubSubSourcePort::as_concrete(port_spec.mapping.as_ref())?;
             collector
@@ -71,6 +73,14 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
                 .or_insert((Vec::new(), Vec::new()))
                 .0
                 .push(logical_port_id);
+
+            if let Some(constraints) = &mut constraints {
+                if *constraints != port_spec.dialect_type.constraints {
+                    tracing::warn!("Merging Ports with different constraints");
+                }
+            } else {
+                constraints = Some(port_spec.dialect_type.constraints.clone())
+            }
         }
 
         for (logical_port_id, port_spec) in dests {
@@ -80,6 +90,14 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
                 .or_insert((Vec::new(), Vec::new()))
                 .1
                 .push(logical_port_id);
+
+            if let Some(constraints) = &mut constraints {
+                if *constraints != port_spec.dialect_type.constraints {
+                    tracing::warn!("Merging Ports with different constraints");
+                }
+            } else {
+                constraints = Some(port_spec.dialect_type.constraints.clone())
+            }
         }
 
         Ok(collector
@@ -103,7 +121,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::LogicalPortId> for Topi
                 }),
                 dialect_type: super::DialectDescriptor {
                     base_type: ID,
-                    constraints: std::collections::BTreeSet::new(),
+                    constraints: constraints.clone().unwrap_or_default(),
                 },
             })
             .collect())
