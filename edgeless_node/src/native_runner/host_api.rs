@@ -5,11 +5,21 @@ pub(crate) struct HostApiImpl {
 
 impl<'a> edgeless_actor_abi::HostApi<'a> for HostApiImpl {
     fn cast(&mut self, output_port: edgeless_actor_abi::Port, msg: edgeless_actor_abi::Message) -> edgeless_actor_abi::HostResult<()> {
-        self.host
-            .handle
-            .clone()
-            .block_on(self.host.cast_alias(output_port.0, msg.0))
-            .map_err(|_| edgeless_actor_abi::HostError::BadAlias)
+        let res = self.host.handle.clone().block_on(self.host.cast_alias(output_port.0, msg.0));
+
+        if let Err(e) = res {
+            match e {
+                crate::base_runtime::guest_api::GuestAPIError::UnknownAlias => {
+                    // TODO: We should raise an edgeless_actor_abi::HostError::BadAlias
+                    // error on completely unknown output ports.
+                    // We currently can't decide between unmapped ports and unknown ports.
+                    tracing::warn!("Cast to unknown target: {}", output_port.0);
+                    return Ok(());
+                }
+            }
+        } else {
+            return Ok(());
+        }
     }
 
     fn cast_raw(
