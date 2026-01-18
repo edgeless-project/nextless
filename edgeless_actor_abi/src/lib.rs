@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+// The use of a shared ABI-crate was inspired by Oxide's Hubris.
+// https://github.com/oxidecomputer/hubris/tree/master/sys/abi
+
 #![no_std]
 
 #[derive(Clone)]
