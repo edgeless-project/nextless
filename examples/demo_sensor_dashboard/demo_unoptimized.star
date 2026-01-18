@@ -50,7 +50,9 @@ reject_processor.data_in << topic("valid_measurements")
 wf = edgeless_workflow(
     "sensor_dashboard_demo",
     [sensor, filter, dashboard, ingress, reject_processor],
-    annotations = {}
+    annotations = {
+        "feature_flags": "disable_application_optimization,disable_actor_optimization",
+    }
 )
 
 el_main = wf
