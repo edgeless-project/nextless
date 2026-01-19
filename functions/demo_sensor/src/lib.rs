@@ -30,7 +30,7 @@ impl DemoSensorAPI<'_> for DemoSensor {
         log::info!("Sending Value: {}", value);
         cast_value(&payload);
 
-        delayed_cast(100, "self", &0u32.to_ne_bytes());
+        delayed_cast(2000, "self", &0u32.to_ne_bytes());
     }
 
     fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
