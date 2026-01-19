@@ -2,7 +2,7 @@ DemoSensor = edgeless_actor_class(
     id = "demo_sensor",
     version = "0.1",
     outputs = [
-        cast_output("value", "eft_eval_mock_sensor_value")
+        cast_output("value", "eft.eval.mock_sensor_value")
     ],
     inputs = [],
     inner_structure = [

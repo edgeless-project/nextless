@@ -31,8 +31,8 @@ ingress = edgeless_resource(
     }
 )
 
-reject_processor = edgeless_actor(
-    id = "reject_processor",
+processor = edgeless_actor(
+    id = "processor",
     klass = DemoProcessor,
     annotations = {
         # Mock Delay
@@ -45,11 +45,11 @@ ingress.new_request >> dashboard.http_fetch
 filter.accepted_out >> topic("valid_measurements")
 dashboard.data_in << topic("valid_measurements")
 # Useless Interaction
-reject_processor.data_in << topic("valid_measurements")
+processor.data_in << topic("valid_measurements")
 
 wf = edgeless_workflow(
     "sensor_dashboard_demo",
-    [sensor, filter, dashboard, ingress, reject_processor],
+    [sensor, filter, dashboard, ingress, processor],
     annotations = {
         "feature_flags": "disable_application_optimization,disable_actor_optimization",
     }

@@ -2,7 +2,7 @@ BasicConsumer = edgeless_actor_class(
     id = "basic_consumer",
     version = "0.1",
     outputs = [],
-    inputs = [cast_input("data_in", "eft_eval_numbered_test_message")],
+    inputs = [cast_input("data_in", "eft.eval.numbered_test_message")],
     inner_structure = [
         sink("data_in")
     ],

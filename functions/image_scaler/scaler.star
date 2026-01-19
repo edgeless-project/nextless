@@ -2,10 +2,10 @@ ImageScaler = edgeless_actor_class(
     id = "image_scaler",
     version = "0.1",
     outputs = [
-        cast_output("scaled", "eft_vision_rawimage")
+        cast_output("scaled", "eft.vision.rawimage")
     ],
     inputs = [
-        cast_input("unscaled", "eft_vision_rawimage")
+        cast_input("unscaled", "eft.vision.rawimage")
     ],
     inner_structure = [
         link("unscaled", ["scaled"])
