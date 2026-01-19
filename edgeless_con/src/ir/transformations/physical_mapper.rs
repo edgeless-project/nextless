@@ -129,7 +129,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                             )
                         }
                         for c_instance in &physical_instances {
-                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
+                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
                                 c_instance.physical_ports().physical_output_mapping.insert(
                                     output_id.clone(),
                                     crate::ir::interaction::SourcePortMapping {
@@ -170,7 +170,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                             )
                         }
                         for c_instance in &physical_instances {
-                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
+                            if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
                                 c_instance.physical_ports().physical_output_mapping.insert(
                                     output_id.clone(),
                                     crate::ir::interaction::SourcePortMapping {
@@ -221,7 +221,7 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
                     )
                 }
                 for c_instance in &physical_instances {
-                    if let Some(c_instance) = c_instance.borrow_mut().try_unpack_materialized_mut() {
+                    if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
                         c_instance.physical_ports().physical_input_mapping.insert(
                             input_id.clone(),
                             crate::ir::interaction::DestiantionPortMapping {
