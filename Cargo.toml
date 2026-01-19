@@ -6,7 +6,6 @@ resolver = "2"
 members = [
     "edgeless_api",
     "edgeless_api_core",
-    #"edgeless_benchmark",
     "edgeless_cli",
     "edgeless_function",
     "edgeless_con",

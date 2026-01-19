@@ -1,7 +1,0 @@
-{
-    "id": "counter",
-    "function_type": "WASM",
-    "version": "0.1",
-    "build": "Cargo.toml",
-    "outputs": ["output"]
-}
