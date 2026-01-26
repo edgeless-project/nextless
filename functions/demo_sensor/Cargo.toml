@@ -30,6 +30,7 @@ edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.g
 edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
 edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types" }
 log = "0.4"
+uuid = { version = "1.19" }
 
 [features]
 

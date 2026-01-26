@@ -120,7 +120,12 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
     }
 
     async fn patch_function_links(&mut self, update_request: edgeless_api::common::PatchRequest) {
-        tracing::info!("Patch Actor {:?}", update_request.function_id);
+        tracing::info!(
+            "Patch Actor: ID: {:?}; Mapped Inputs: {:?}; Mapped Outputs {:?}",
+            update_request.function_id,
+            update_request.input_mapping.keys(),
+            update_request.output_mapping.keys()
+        );
         if let Some(instance) = self.functions.get_mut(&update_request.function_id) {
             instance.patch(update_request).await;
         }

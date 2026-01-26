@@ -16,13 +16,15 @@ impl DemoSensorAPI<'_> for DemoSensor {
         let iteration_id = *state;
         *state += 1;
 
+        let instance_id = slf();
+
         let value = 15.0 + (iteration_id % 20) as f64;
 
         let payload = edgeless_function_types::eval::MockSensorValue {
             sequence_number: iteration_id,
             sensor_id: edgeless_function_types::eval::SensorId {
-                node_id: [0; 16],
-                component_id: [1; 16],
+                node_id: instance_id.node_id,
+                component_id: instance_id.component_id,
             },
             value: value,
         };

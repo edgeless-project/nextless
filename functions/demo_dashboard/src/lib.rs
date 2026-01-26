@@ -6,9 +6,28 @@ struct DemoDashboard;
 
 edgeless_function::generate!(DemoDashboard);
 
+#[derive(Clone, Debug, serde::Serialize)]
+struct StoredValue {
+    value: f64,
+    source_node_id: uuid::Uuid,
+    source_component_id: uuid::Uuid,
+}
+
+#[derive(serde::Serialize)]
+struct ServerId {
+    node_id: uuid::Uuid,
+    component_id: uuid::Uuid,
+}
+
+#[derive(serde::Serialize)]
+struct ServerResponse<'a> {
+    server_id: ServerId,
+    values: &'a [StoredValue],
+}
+
 #[derive(Debug)]
 struct DashboardState {
-    values: std::collections::VecDeque<f64>,
+    values: std::collections::VecDeque<StoredValue>,
 }
 
 static STATE: std::sync::OnceLock<std::sync::Mutex<DashboardState>> = std::sync::OnceLock::new();
@@ -35,20 +54,48 @@ impl DemoDashboardAPI<'_> for DemoDashboard {
         if lck.values.len() == 10 {
             lck.values.pop_front();
         }
-        lck.values.push_back(test_msg.value);
+        lck.values.push_back(StoredValue {
+            value: test_msg.value,
+            source_node_id: sensor_node_id,
+            source_component_id: sensor_component_id,
+        });
     }
 
     fn handle_call_http_fetch(_src: InstanceId, req: Self::EDGELESS_HTTP_REQUEST) -> Self::EDGELESS_HTTP_RESPONSE {
         log::info!("Demo Dashboard received fetch request");
 
+        let own_id = slf();
+        let own_node_id = uuid::Uuid::from_bytes(own_id.node_id);
+        let own_component_id = uuid::Uuid::from_bytes(own_id.node_id);
+
         if req.path == "/values" {
             let data = fetch_values();
 
-            let data_json = serde_json::to_vec(&data).unwrap();
+            let numbers_only: Vec<_> = data.into_iter().map(|value| value.value).collect();
+
+            let response_json = serde_json::to_vec(&numbers_only).unwrap();
 
             edgeless_http::EdgelessHTTPResponse {
                 status: 200,
-                body: Some(data_json),
+                body: Some(response_json),
+                headers: std::collections::HashMap::<String, String>::new(),
+            }
+        } else if req.path == "/values_detailed" {
+            let data = fetch_values();
+
+            let response = ServerResponse {
+                server_id: ServerId {
+                    node_id: own_node_id,
+                    component_id: own_component_id,
+                },
+                values: &data,
+            };
+
+            let response_json = serde_json::to_vec(&response).unwrap();
+
+            edgeless_http::EdgelessHTTPResponse {
+                status: 200,
+                body: Some(response_json),
                 headers: std::collections::HashMap::<String, String>::new(),
             }
         } else {
@@ -81,8 +128,8 @@ impl DemoDashboardAPI<'_> for DemoDashboard {
     }
 }
 
-fn fetch_values() -> Vec<f64> {
+fn fetch_values() -> Vec<StoredValue> {
     let lck = STATE.get().unwrap().lock().unwrap();
 
-    lck.values.iter().map(|v| *v).collect()
+    lck.values.iter().map(|v| v.clone()).collect()
 }
