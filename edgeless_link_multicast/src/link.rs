@@ -51,6 +51,7 @@ impl MulticastLink {
             std::sync::Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
         let reader_clone = reader.clone();
+        // TODO: Cleanup.
         let task = tokio::task::spawn(async move {
             let addr = addr;
             let sock_addr = std::net::SocketAddrV4::new(addr, port);
@@ -58,8 +59,37 @@ impl MulticastLink {
 
             assert!(addr.is_multicast());
 
-            let sock = tokio::net::UdpSocket::bind(sock_addr).await.unwrap();
-            sock.join_multicast_v4(addr, "0.0.0.0".parse().unwrap()).unwrap();
+            // MacOS for some reason does not allow us to use a multicast address as the listen address:
+            // https://stackoverflow.com/questions/49125176/cant-assign-requested-address-when-sending-to-a-udpsocket
+            // https://stackoverflow.com/a/46489791
+            // This is not ideal (we cannot use the same port for multiple connections).
+            // I have not yet found a way to fix this. Windows also appears to have that behaviour:
+            // https://stackoverflow.com/a/6219163
+            #[cfg(target_os = "macos")]
+            let bind_addr = std::net::SocketAddrV4::new(std::net::Ipv4Addr::UNSPECIFIED, port);
+            #[cfg(not(target_os = "macos"))]
+            let bind_addr = sock_addr.clone();
+
+            // We need reuse_address, so we need to start with socket2:
+            // https://github.com/tokio-rs/mio/issues/1426
+            let sock = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::DGRAM, Some(socket2::Protocol::UDP)).unwrap();
+
+            #[cfg(target_os = "macos")]
+            sock.set_reuse_port(true).unwrap();
+
+            // Allow testing on a single node:
+            // https://stackoverflow.com/a/5340820
+            sock.set_reuse_address(true).unwrap();
+            sock.set_multicast_loop_v4(true).unwrap();
+
+            // Required by Tokio.
+            sock.set_nonblocking(true).unwrap();
+            sock.bind(&socket2::SockAddr::from(std::net::SocketAddr::V4(bind_addr))).unwrap();
+
+            // Convert to tokio: https://stackoverflow.com/a/77590253
+            let sock = tokio::net::UdpSocket::from_std(std::net::UdpSocket::from(sock)).unwrap();
+
+            sock.join_multicast_v4(addr, std::net::Ipv4Addr::UNSPECIFIED).unwrap();
             let mut buffer = vec![0_u8; 5000];
 
             loop {

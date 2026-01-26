@@ -25,26 +25,33 @@ pub struct IpMulticastDialect {
     state: std::sync::Arc<tokio::sync::Mutex<DialectState>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MulticastGroup {
+    addr: std::net::Ipv4Addr,
+    // As some platforms do not allow us to bind to a multicast IP, we need unique ports for each group.
+    port: u16,
+}
+
 struct DialectState {
-    pool_free: Vec<std::net::Ipv4Addr>,
+    pool_free: Vec<MulticastGroup>,
     active: std::collections::HashMap<edgeless_api::link::LinkInstanceId, IpMulticastInteraction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IpMulticastSourcePort {
     pub link_id: edgeless_api::link::LinkInstanceId,
-    multicast_ip: std::net::Ipv4Addr,
+    multicast_group: MulticastGroup,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IpMulticastDestinationPort {
     pub link_id: edgeless_api::link::LinkInstanceId,
-    multicast_ip: std::net::Ipv4Addr,
+    multicast_group: MulticastGroup,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IpMulticastInteraction {
     pub link_id: edgeless_api::link::LinkInstanceId,
-    pub multicast_ip: std::net::Ipv4Addr,
+    pub multicast_group: MulticastGroup,
     pub publishers: Vec<crate::ir::interaction::PhysicalPortId>,
     pub subscribers: Vec<crate::ir::interaction::PhysicalPortId>,
 }
@@ -87,7 +94,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                 .entry(multicast_mapping.link_id.clone())
                 .or_insert(IpMulticastInteraction {
                     link_id: multicast_mapping.link_id.clone(),
-                    multicast_ip: multicast_mapping.multicast_ip,
+                    multicast_group: multicast_mapping.multicast_group.clone(),
                     publishers: Vec::new(),
                     subscribers: Vec::new(),
                 })
@@ -109,7 +116,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                 .entry(multicast_mapping.link_id.clone())
                 .or_insert(IpMulticastInteraction {
                     link_id: multicast_mapping.link_id.clone(),
-                    multicast_ip: multicast_mapping.multicast_ip,
+                    multicast_group: multicast_mapping.multicast_group.clone(),
                     publishers: Vec::new(),
                     subscribers: Vec::new(),
                 })
@@ -158,7 +165,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                 super::super::SourcePortMapping {
                     mapping: Box::new(IpMulticastSourcePort {
                         link_id: multicast_mapping.link_id.clone(),
-                        multicast_ip: multicast_mapping.multicast_ip.clone(),
+                        multicast_group: multicast_mapping.multicast_group.clone(),
                     }),
                     dialect_type: interaction.dialect_type.clone(),
                 },
@@ -171,7 +178,7 @@ impl super::InteractionPortUtils<crate::ir::interaction::PhysicalPortId> for IpM
                 super::super::DestiantionPortMapping {
                     mapping: Box::new(IpMulticastDestinationPort {
                         link_id: multicast_mapping.link_id.clone(),
-                        multicast_ip: multicast_mapping.multicast_ip.clone(),
+                        multicast_group: multicast_mapping.multicast_group.clone(),
                     }),
                     dialect_type: interaction.dialect_type.clone(),
                 },
@@ -263,9 +270,10 @@ impl super::InteractionDialect for IpMulticastDialect {
                 let new_publishers = std::collections::BTreeSet::from_iter(overlay_src.sources.iter());
                 let new_subscribers = std::collections::BTreeSet::from_iter(destinations.iter());
 
-                // Keep behavior nearly consistent with old version
-                if existing_publishers == new_publishers && existing_subscribers.is_subset(&new_subscribers) {
-                    active_multicast_link.publishers = destinations.clone();
+                // TODO: Allow for the removal of instances without recreating a group
+                if existing_publishers.is_subset(&new_publishers) && existing_subscribers.is_subset(&new_subscribers) {
+                    active_multicast_link.subscribers = destinations.iter().cloned().collect();
+                    active_multicast_link.publishers = overlay_src.sources.iter().cloned().collect();
                     return Ok(vec![super::super::InteractionMapping {
                         dialect_type: dest.clone(),
                         mapping: Box::new(active_multicast_link.clone()),
@@ -279,9 +287,9 @@ impl super::InteractionDialect for IpMulticastDialect {
             if let Some(ip) = ip {
                 let interaction = IpMulticastInteraction {
                     link_id: id.clone(),
-                    multicast_ip: ip,
-                    publishers: overlay_src.sources.clone(),
-                    subscribers: destinations.clone(),
+                    multicast_group: ip,
+                    publishers: overlay_src.sources.iter().cloned().collect(),
+                    subscribers: destinations.iter().cloned().collect(),
                 };
 
                 state.active.insert(id.clone(), interaction.clone());
@@ -364,8 +372,11 @@ impl super::InteractionDialect for IpMulticastDialect {
 
 impl IpMulticastDialect {
     pub fn new() -> Self {
-        let pool_free: Vec<_> = std::ops::Range { start: 153, end: 253 }
-            .map(|i| std::net::Ipv4Addr::new(224, 0, 0, i))
+        let pool_free: Vec<_> = std::ops::Range { start: 153, end: 249 }
+            .map(|i| MulticastGroup {
+                addr: std::net::Ipv4Addr::new(224, 0, 0, i),
+                port: 9000 + i as u16,
+            })
             .collect();
 
         Self {
@@ -385,8 +396,8 @@ impl IpMulticastDialect {
 
         if let Some(active_link) = state.active.get(&link) {
             let cfg = edgeless_link_multicast::common::MulticastConfig {
-                ip: active_link.multicast_ip,
-                port: 9999,
+                ip: active_link.multicast_group.addr,
+                port: active_link.multicast_group.port,
             };
             Ok(serde_json::to_string(&cfg)
                 .map_err(|e| crate::ir::interaction::InteractionError::LinkConfiguration(e.into()))?

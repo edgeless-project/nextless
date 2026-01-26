@@ -21,3 +21,5 @@ async-trait = "0.1"
 serde = "1.0"
 serde_json = "1.0"
 edgeless_api = {path = "../edgeless_api"}
+
+socket2 = "0.6"
