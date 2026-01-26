@@ -8,6 +8,7 @@ pub struct EdgelessResourceGen<PortType> {
     pub outputs: std::collections::HashMap<String, PortType>,
     pub inputs: std::collections::HashMap<String, PortType>,
     pub configurations: std::collections::HashMap<String, String>,
+    pub annotations: starlark::collections::SmallMap<String, String>,
 }
 
 pub type EdgelessResource = EdgelessResourceGen<crate::port::Port>;
@@ -59,6 +60,7 @@ impl starlark::values::Freeze for EdgelessResource {
             outputs: self.outputs.into_iter().map(|(o_id, o)| (o_id, o.freeze(freezer).unwrap())).collect(),
             inputs: self.inputs.into_iter().map(|(i_id, i)| (i_id, i.freeze(freezer).unwrap())).collect(),
             configurations: self.configurations,
+            annotations: self.annotations,
         })
     }
 }
@@ -87,6 +89,7 @@ pub fn edgeless_resource(builder: &mut starlark::environment::GlobalsBuilder) {
         id: String,
         klass: crate::resource_class::EdgelessResourceClass,
         configurations: starlark::values::dict::DictOf<String, String>,
+        annotations: Option<starlark::values::dict::DictOf<String, String>>,
         heap: &'v starlark::values::Heap,
     ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(EdgelessResource {
@@ -123,6 +126,7 @@ pub fn edgeless_resource(builder: &mut starlark::environment::GlobalsBuilder) {
                 })
                 .collect(),
             configurations: configurations.collect_entries().into_iter().collect(),
+            annotations: annotations.map(|a| a.collect_entries().into_iter().collect()).unwrap_or_default(),
         }))
     }
 }

@@ -322,6 +322,8 @@ message WorkflowResource {
     map<string, string> configurations = 4;
 
     map<string, PortMapping> input_mapping = 5;
+    // Annotations associated with this resource, if any.
+    map<string, string> annotations = 6;
 }
 
 // Message defining a function within a workflow.

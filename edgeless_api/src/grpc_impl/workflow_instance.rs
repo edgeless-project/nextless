@@ -44,6 +44,7 @@ impl WorkflowInstanceConverters {
                 .map(|(port_id, mapping)| (crate::function_instance::PortId(port_id.clone()), Self::parse_port_mapping(mapping)))
                 .collect(),
             configurations: api_resource.configurations.clone(),
+            annotations: api_resource.annotations.clone(),
             input_mapping: api_resource
                 .input_mapping
                 .iter()
@@ -184,6 +185,7 @@ impl WorkflowInstanceConverters {
         crate::grpc_impl::api::WorkflowResource {
             name: crate_resource.name.clone(),
             class_type: crate_resource.class_type.clone(),
+            annotations: crate_resource.annotations.clone(),
             output_mapping: crate_resource
                 .output_mapping
                 .iter()
@@ -590,6 +592,7 @@ mod tests {
                 ),
             ]),
             input_mapping: HashMap::new(),
+            annotations: std::collections::HashMap::from([("scaling_mode".to_string(), "all_nodes".to_string())]),
             configurations: HashMap::from([("conf1".to_string(), "val1".to_string()), ("conf2".to_string(), "val2".to_string())]),
         }];
 
@@ -698,6 +701,7 @@ mod tests {
                     ),
                 ]),
                 input_mapping: HashMap::new(),
+                annotations: std::collections::HashMap::from([("scaling_mode".to_string(), "all_nodes".to_string())]),
                 configurations: HashMap::from([("conf1".to_string(), "val1".to_string()), ("conf2".to_string(), "val2".to_string())]),
             }],
             workflow_ingress_proxies: vec![],

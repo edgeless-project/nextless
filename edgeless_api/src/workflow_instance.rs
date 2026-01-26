@@ -57,6 +57,7 @@ pub struct WorkflowResource {
     pub class_type: String,
     pub output_mapping: std::collections::HashMap<super::function_instance::PortId, PortMapping>,
     pub input_mapping: std::collections::HashMap<super::function_instance::PortId, PortMapping>,
+    pub annotations: std::collections::HashMap<String, String>,
     pub configurations: std::collections::HashMap<String, String>,
 }
 

@@ -129,6 +129,7 @@ pub fn edgeless_workflow(builder: &mut starlark::environment::GlobalsBuilder) {
                         })
                         .collect(),
                     configurations: cloned.configurations,
+                    annotations: cloned.annotations,
                 });
             } else if let Some(i) = value.downcast_ref::<crate::resource::FrozenEdgelessResource>() {
                 resources.push(i.clone())

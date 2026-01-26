@@ -344,6 +344,7 @@ mod tests {
                         class_type: "file-log".to_string(),
                         output_mapping: std::collections::HashMap::new(),
                         input_mapping: std::collections::HashMap::new(),
+                        annotations: std::collections::HashMap::new(),
                         configurations: std::collections::HashMap::from([("filename".to_string(), removeme_filename(workflow_i))]),
                     }],
                     workflow_egress_proxies: vec![],
