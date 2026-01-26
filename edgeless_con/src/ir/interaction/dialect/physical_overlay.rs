@@ -195,8 +195,7 @@ impl super::InteractionDialect for PhysicalOverlayDialect {
     }
 
     fn provides_transformations_to(&self) -> &'static [super::DialectId] {
-        static TRANSFORMATIONS: [super::DialectId; 1] = [super::ip_multicast::ID];
-        &TRANSFORMATIONS
+        &[]
     }
 
     fn provides_transformations_from(&self) -> &'static [super::DialectId] {
