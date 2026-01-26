@@ -18,7 +18,7 @@ impl super::StatelessTransformation for InputLinker {
     fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
         let mut inputs = std::collections::HashMap::<
             String,
-            std::collections::HashMap<edgeless_api::function_instance::PortId, Vec<interaction::LogicalPortId>>,
+            std::collections::HashMap<edgeless_api::function_instance::PortId, std::collections::BTreeSet<interaction::LogicalPortId>>,
         >::new();
 
         for (out_cid, fdesc) in workflow.components() {
@@ -31,15 +31,17 @@ impl super::StatelessTransformation for InputLinker {
                 };
 
                 match &mapping.destination {
-                    interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => inputs
-                        .entry(logical_port_id.component.clone())
-                        .or_default()
-                        .entry(logical_port_id.port.clone())
-                        .or_default()
-                        .push(interaction::LogicalPortId {
-                            component: out_cid.to_string(),
-                            port: out_port.clone(),
-                        }),
+                    interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => {
+                        inputs
+                            .entry(logical_port_id.component.clone())
+                            .or_default()
+                            .entry(logical_port_id.port.clone())
+                            .or_default()
+                            .insert(interaction::LogicalPortId {
+                                component: out_cid.to_string(),
+                                port: out_port.clone(),
+                            });
+                    }
                     interaction::dialect::logical_overlay::DestinationMapping::Anycast(logical_port_ids) => {
                         for logical_port_id in logical_port_ids {
                             inputs
@@ -47,10 +49,10 @@ impl super::StatelessTransformation for InputLinker {
                                 .or_default()
                                 .entry(logical_port_id.port.clone())
                                 .or_default()
-                                .push(interaction::LogicalPortId {
+                                .insert(interaction::LogicalPortId {
                                     component: out_cid.to_string(),
                                     port: out_port.clone(),
-                                })
+                                });
                         }
                     }
                     interaction::dialect::logical_overlay::DestinationMapping::Multicast(logical_port_ids) => {
@@ -60,10 +62,10 @@ impl super::StatelessTransformation for InputLinker {
                                 .or_default()
                                 .entry(logical_port_id.port.clone())
                                 .or_default()
-                                .push(interaction::LogicalPortId {
+                                .insert(interaction::LogicalPortId {
                                     component: out_cid.to_string(),
                                     port: out_port.clone(),
-                                })
+                                });
                         }
                     }
                 }

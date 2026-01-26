@@ -100,10 +100,10 @@ pub(crate) fn mock_peer_function(
                         constraints: std::collections::BTreeSet::new(),
                     },
                     mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDestinationPort {
-                        sources: vec![crate::ir::interaction::LogicalPortId {
+                        sources: std::collections::BTreeSet::from([crate::ir::interaction::LogicalPortId {
                             component: "fut".to_string(),
                             port: edgeless_api::function_instance::PortId("port1".to_string()),
-                        }],
+                        }]),
                     }),
                 },
             )]),

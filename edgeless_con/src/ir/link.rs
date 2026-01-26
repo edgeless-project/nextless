@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+#[derive(Debug)]
 pub struct WorkflowLink {
     #[allow(unused)]
     pub(crate) id: edgeless_api::link::LinkInstanceId,
