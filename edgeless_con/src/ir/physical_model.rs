@@ -6,7 +6,7 @@
 #[derive(Clone)]
 pub enum PhysicalComponentState {
     Invalid,
-    Requested(Option<crate::ir::actor::NodeFilter>),
+    Requested(Option<crate::ir::component::NodeFilters>),
     Planned(Box<dyn PhysicalComponent>),
     Materialized(Box<dyn PhysicalComponent>),
     MigrationRequested(Box<dyn PhysicalComponent>),
@@ -431,7 +431,7 @@ impl PhysicalComponentState {
         PhysicalComponentState::Requested(None)
     }
 
-    pub(crate) fn request_new_instance_with_extra_constraints(extra_constraints: crate::ir::actor::NodeFilter) -> Self {
+    pub(crate) fn request_new_instance_with_extra_constraints(extra_constraints: crate::ir::component::NodeFilters) -> Self {
         PhysicalComponentState::Requested(Some(extra_constraints))
     }
 

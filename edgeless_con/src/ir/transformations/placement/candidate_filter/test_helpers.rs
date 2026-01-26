@@ -7,11 +7,11 @@ pub(crate) fn mock_function_under_test(
     std::cell::RefCell::new(crate::ir::actor::LogicalActor {
         image: crate::ir::test::mock_actor_image(),
         annotations: std::collections::HashMap::new(),
-        scaling_mode: crate::ir::actor::ScalingMode::Scalable {
+        scaling_mode: crate::ir::component::ScalingMode::Scalable {
             min_instances: 1,
             max_instances: 10,
         },
-        node_filter: crate::ir::actor::NodeFilter::default(),
+        node_filter: crate::ir::component::NodeFilters::default(),
         logical_ports: crate::ir::LogicalPorts {
             logical_output_mapping: std::collections::HashMap::from([(
                 edgeless_api::function_instance::PortId("port1".to_string()),
@@ -86,11 +86,11 @@ pub(crate) fn mock_peer_function(
     std::cell::RefCell::new(crate::ir::actor::LogicalActor {
         image: crate::ir::test::mock_actor_image(),
         annotations: std::collections::HashMap::new(),
-        scaling_mode: crate::ir::actor::ScalingMode::Scalable {
+        scaling_mode: crate::ir::component::ScalingMode::Scalable {
             min_instances: 1,
             max_instances: 10,
         },
-        node_filter: crate::ir::actor::NodeFilter::default(),
+        node_filter: crate::ir::component::NodeFilters::default(),
         logical_ports: crate::ir::LogicalPorts {
             logical_input_mapping: std::collections::HashMap::from([(
                 edgeless_api::function_instance::PortId("port_other".to_string()),

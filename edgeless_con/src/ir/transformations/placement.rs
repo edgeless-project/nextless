@@ -37,7 +37,7 @@ pub struct PlacementState<'a, P: strategy::PlacementStrategy> {
 }
 
 struct PlacementConstraints {
-    node_filters: crate::ir::actor::NodeFilter,
+    node_filters: crate::ir::component::NodeFilters,
     /// Used to indicate that the system should prefer fast deployment over efficiency.
     urgent: bool,
 }
@@ -156,7 +156,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                         }
                     }
                     PhysicalComponentState::Lost(_) => match &cloned_function.scaling_mode {
-                        actor::ScalingMode::AllNodes => {
+                        crate::ir::component::ScalingMode::AllNodes => {
                             i.mark_stopped();
                         }
                         _ => {
@@ -184,7 +184,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                     },
                     PhysicalComponentState::Dead(old_instance) => {
                         let node_filters = match &cloned_function.scaling_mode {
-                            actor::ScalingMode::AllNodes => {
+                            crate::ir::component::ScalingMode::AllNodes => {
                                 let mut filters = cloned_node_filters.clone();
                                 filters.node_ids_allowed = Some(vec![old_instance.id().node_id.clone()]);
                                 filters

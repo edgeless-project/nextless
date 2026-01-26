@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 pub fn feasible_node_runtime_candidates<'b>(
-    node_filter: &crate::ir::actor::NodeFilter,
+    node_filter: &crate::ir::component::NodeFilters,
     logical_actor: &crate::ir::actor::LogicalActor,
     node: &'b dyn crate::ir::Node,
     allow_suboptimal: bool,
@@ -62,7 +62,7 @@ pub fn feasible_node_runtime_candidates<'b>(
     candidates
 }
 
-fn node_fulfills_constraints(node_filter: &crate::ir::actor::NodeFilter, node: &dyn crate::ir::Node) -> bool {
+fn node_fulfills_constraints(node_filter: &crate::ir::component::NodeFilters, node: &dyn crate::ir::Node) -> bool {
     if let Some(allowed_nodes) = &node_filter.node_ids_allowed {
         if !allowed_nodes.contains(&node.node_id()) {
             return false;
@@ -163,14 +163,14 @@ mod constraint_test {
 
     #[test]
     fn allowed_without_filters() {
-        let filter = crate::ir::actor::NodeFilter::default();
+        let filter = crate::ir::component::NodeFilters::default();
         let node = MockNode {};
         assert!(super::node_fulfills_constraints(&filter, &node))
     }
 
     #[test]
     fn allowed_allowed_node_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_ids_allowed: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000001").unwrap()]),
             ..Default::default()
         };
@@ -180,7 +180,7 @@ mod constraint_test {
 
     #[test]
     fn denied_allowed_node_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_ids_allowed: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000010").unwrap()]),
             ..Default::default()
         };
@@ -190,7 +190,7 @@ mod constraint_test {
 
     #[test]
     fn allowed_denied_node_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_ids_denied: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000010").unwrap()]),
             ..Default::default()
         };
@@ -200,7 +200,7 @@ mod constraint_test {
 
     #[test]
     fn denied_denied_node_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_ids_denied: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000001").unwrap()]),
             ..Default::default()
         };
@@ -210,7 +210,7 @@ mod constraint_test {
 
     #[test]
     fn denied_allowed_and_denied_node_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_ids_allowed: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000001").unwrap()]),
             node_ids_denied: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000001").unwrap()]),
             ..Default::default()
@@ -221,7 +221,7 @@ mod constraint_test {
 
     #[test]
     fn allowed_allowed_cluster_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             cluster_ids_allowed: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000002").unwrap()]),
             ..Default::default()
         };
@@ -231,7 +231,7 @@ mod constraint_test {
 
     #[test]
     fn denied_allowed_cluster_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             cluster_ids_allowed: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000010").unwrap()]),
             ..Default::default()
         };
@@ -241,7 +241,7 @@ mod constraint_test {
 
     #[test]
     fn allowed_denied_cluster_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             cluster_ids_denied: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000010").unwrap()]),
             ..Default::default()
         };
@@ -251,7 +251,7 @@ mod constraint_test {
 
     #[test]
     fn denied_denied_cluster_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             cluster_ids_denied: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000002").unwrap()]),
             ..Default::default()
         };
@@ -261,7 +261,7 @@ mod constraint_test {
 
     #[test]
     fn denied_allowed_and_denied_cluster_ids() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             cluster_ids_allowed: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000002").unwrap()]),
             cluster_ids_denied: Some(vec![uuid::Uuid::from_str("00000000-0000-0000-0000-000000000002").unwrap()]),
             ..Default::default()
@@ -272,7 +272,7 @@ mod constraint_test {
 
     #[test]
     fn allowed_allowed_one_label() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_allowed: Some(vec![std::collections::HashSet::from(["label1".to_string()])]),
             ..Default::default()
         };
@@ -282,7 +282,7 @@ mod constraint_test {
 
     #[test]
     fn allowed_allowed_two_labels() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_allowed: Some(vec![std::collections::HashSet::from(["label1".to_string(), "label2".to_string()])]),
             ..Default::default()
         };
@@ -292,7 +292,7 @@ mod constraint_test {
 
     #[test]
     fn allowed_allowed_two_groups() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_allowed: Some(vec![
                 std::collections::HashSet::from(["label3".to_string()]),
                 std::collections::HashSet::from(["label1".to_string(), "label2".to_string()]),
@@ -305,7 +305,7 @@ mod constraint_test {
 
     #[test]
     fn denied_allowed_one_label() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_allowed: Some(vec![std::collections::HashSet::from(["label3".to_string()])]),
             ..Default::default()
         };
@@ -315,7 +315,7 @@ mod constraint_test {
 
     #[test]
     fn denied_allowed_two_labels() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_allowed: Some(vec![std::collections::HashSet::from(["label1".to_string(), "label3".to_string()])]),
             ..Default::default()
         };
@@ -325,7 +325,7 @@ mod constraint_test {
 
     #[test]
     fn allowed_denied_one_label() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_denied: Some(vec![std::collections::HashSet::from(["label3".to_string()])]),
             ..Default::default()
         };
@@ -335,7 +335,7 @@ mod constraint_test {
 
     #[test]
     fn allowed_denied_two_labels() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_denied: Some(vec![std::collections::HashSet::from(["label1".to_string(), "label3".to_string()])]),
             ..Default::default()
         };
@@ -345,7 +345,7 @@ mod constraint_test {
 
     #[test]
     fn denied_denied_one_label() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_denied: Some(vec![std::collections::HashSet::from(["label2".to_string()])]),
             ..Default::default()
         };
@@ -355,7 +355,7 @@ mod constraint_test {
 
     #[test]
     fn denied_denied_two_labels() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_denied: Some(vec![std::collections::HashSet::from(["label2".to_string(), "label1".to_string()])]),
             ..Default::default()
         };
@@ -365,7 +365,7 @@ mod constraint_test {
 
     #[test]
     fn denied_denied_two_groups() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_denied: Some(vec![
                 std::collections::HashSet::from(["label2".to_string(), "label3".to_string()]),
                 std::collections::HashSet::from(["label1".to_string()]),
@@ -378,7 +378,7 @@ mod constraint_test {
 
     #[test]
     fn denied_allowed_and_denied_label() {
-        let filter = crate::ir::actor::NodeFilter {
+        let filter = crate::ir::component::NodeFilters {
             node_label_filter_allowed: Some(vec![std::collections::HashSet::from(["label2".to_string()])]),
             node_label_filter_denied: Some(vec![std::collections::HashSet::from(["label2".to_string()])]),
             ..Default::default()

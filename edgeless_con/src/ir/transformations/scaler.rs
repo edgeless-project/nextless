@@ -24,13 +24,13 @@ impl super::StatelessTransformation for Scaler {
             let mut f = f.borrow_mut();
 
             match f.scaling_mode {
-                crate::ir::actor::ScalingMode::Singleton { .. } => {
+                crate::ir::component::ScalingMode::Singleton { .. } => {
                     scale_singleton(logical_function_id, &mut f);
                 }
-                crate::ir::actor::ScalingMode::Scalable { .. } => {
+                crate::ir::component::ScalingMode::Scalable { .. } => {
                     scale_scalable(logical_function_id, &mut f);
                 }
-                crate::ir::actor::ScalingMode::AllNodes { .. } => {
+                crate::ir::component::ScalingMode::AllNodes { .. } => {
                     scale_to_all_nodes(logical_function_id, &mut f, available_nodes);
                 }
             }
@@ -102,7 +102,7 @@ fn scale_singleton(logical_function_id: &str, f: &mut crate::ir::actor::LogicalA
 }
 
 fn scale_scalable(logical_function_id: &str, f: &mut crate::ir::actor::LogicalActor) {
-    let crate::ir::actor::ScalingMode::Scalable {
+    let crate::ir::component::ScalingMode::Scalable {
         min_instances,
         max_instances,
         ..

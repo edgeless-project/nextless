@@ -5,6 +5,7 @@
 
 pub mod actor;
 pub mod behavior;
+pub mod component;
 pub mod interaction;
 pub mod link;
 pub mod logical_model;

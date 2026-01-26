@@ -6,10 +6,10 @@
 pub struct LogicalResource {
     pub(crate) class: String,
     pub(crate) configurations: std::collections::HashMap<String, String>,
-
     pub(crate) instances: Vec<std::cell::RefCell<super::PhysicalComponentState>>,
-
     pub(crate) logical_ports: super::LogicalPorts,
+    pub(crate) scaling_mode: crate::ir::component::ScalingMode,
+    pub(crate) node_filters: crate::ir::component::NodeFilters,
 }
 
 impl super::LogicalComponent for LogicalResource {
@@ -129,6 +129,9 @@ impl super::MaterializedComponent for MaterializedResource {
 
 impl From<edgeless_api::workflow_instance::WorkflowResource> for LogicalResource {
     fn from(resource_req: edgeless_api::workflow_instance::WorkflowResource) -> Self {
+        let scaling_mode = crate::ir::component::ScalingMode::from_annotations(&resource_req.annotations);
+        let node_filters = crate::ir::component::NodeFilters::from_annotations(&resource_req.annotations);
+
         LogicalResource {
             class: resource_req.class_type,
             configurations: resource_req.configurations,
@@ -137,6 +140,8 @@ impl From<edgeless_api::workflow_instance::WorkflowResource> for LogicalResource
                 logical_input_mapping: super::logical_model::parse_api_input_mapping(resource_req.input_mapping),
                 logical_output_mapping: super::logical_model::parse_api_output_mapping(resource_req.output_mapping),
             },
+            scaling_mode,
+            node_filters,
         }
     }
 }
