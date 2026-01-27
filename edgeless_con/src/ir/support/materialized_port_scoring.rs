@@ -171,6 +171,38 @@ pub fn trafic_locality(component_instance: &dyn crate::ir::PhysicalComponent, pe
     100u8.min((local_rate / total_rate * 100.0).ceil() as u8)
 }
 
+pub fn traffic_per_node(component_instance: &dyn crate::ir::PhysicalComponent, period: std::time::Duration) -> Vec<(uuid::Uuid, u8)> {
+    let mut local_rates = std::collections::HashMap::<uuid::Uuid, f64>::new();
+
+    let mut materialized_state = component_instance.materialized_state().unwrap().borrow_mut();
+    let p = materialized_state.materialized_ports();
+
+    let mut total_rate = 0.0f64;
+
+    for input in p.materialized_inputs.values() {
+        for (peer_id, rate) in input.port_statistics.as_ref().unwrap().message_rate_abs_by_peer(period) {
+            total_rate += rate;
+            *local_rates.entry(peer_id.node_id).or_default() += rate;
+        }
+    }
+
+    for output in p.materialized_outputs.values() {
+        for (peer_id, rate) in output.port_statistics.as_ref().unwrap().message_rate_abs_by_peer(period) {
+            total_rate += rate;
+            *local_rates.entry(peer_id.node_id).or_default() += rate;
+        }
+    }
+
+    let mut rates: Vec<_> = local_rates
+        .into_iter()
+        .map(|(k, v)| (k, 100u8.min((v / total_rate * 100.0).ceil() as u8)))
+        .collect();
+
+    rates.sort_by(|a, b| b.1.cmp(&a.1));
+
+    rates
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -367,5 +399,59 @@ mod test {
             std::time::Duration::from_secs(60),
         );
         assert_eq!(port_link_costs, 50);
+    }
+
+    #[test]
+    fn traffic_per_node_all_local() {
+        let runtime = crate::ir::test::MockWasmRuntime {};
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
+        let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
+        let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
+        let colocated_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[0]);
+
+        let component_under_test = component_mock(component_id, (colocated_other_id, 5.0), (colocated_other_id2, 5.0));
+        let result = traffic_per_node(
+            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
+            std::time::Duration::from_secs(60),
+        );
+        assert_eq!(result, vec![(nodes[0], 100)]);
+    }
+
+    #[test]
+    fn traffic_per_node_all_remote() {
+        let runtime = crate::ir::test::MockWasmRuntime {};
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
+        let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
+        let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
+        let remote_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[1]);
+
+        let component_under_test = component_mock(component_id, (remote_other_id, 5.0), (remote_other_id2, 5.0));
+        let result = traffic_per_node(
+            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
+            std::time::Duration::from_secs(60),
+        );
+        assert_eq!(result, vec![(nodes[1], 100)]);
+    }
+
+    #[test]
+    fn traffic_per_node_split() {
+        let runtime = crate::ir::test::MockWasmRuntime {};
+        let actor_image = crate::ir::test::mock_actor_image();
+        let (nodes, _candidates) = crate::ir::test::mock_nodes_and_candidates(2, &runtime, actor_image.main_image.behavior_image_id);
+        let component_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
+        let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
+        let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
+
+        let component_under_test = component_mock(component_id, (remote_other_id, 5.0), (colocated_other_id, 5.0));
+        let result = traffic_per_node(
+            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
+            std::time::Duration::from_secs(60),
+        );
+
+        assert!(result.len() == 0);
+        assert!(result.iter().find(|x| x.0 == nodes[0] && x.1 == 50).is_some());
+        assert!(result.iter().find(|x| x.0 == nodes[1] && x.1 == 50).is_some());
     }
 }

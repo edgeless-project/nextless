@@ -8,6 +8,9 @@ pub trait LogicalComponent {
     fn logical_ports_mut(&mut self) -> &mut LogicalPorts;
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId>;
     fn instances(&self) -> Vec<&std::cell::RefCell<super::physical_model::PhysicalComponentState>>;
+    fn instances_mut(&mut self) -> &mut Vec<std::cell::RefCell<super::physical_model::PhysicalComponentState>>;
+    fn scaling_mode(&self) -> crate::ir::component::ScalingMode;
+    fn node_filters(&self) -> crate::ir::component::NodeFilters;
     fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<super::physical_model::PhysicalComponentState>>);
 }
 

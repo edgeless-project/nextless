@@ -24,7 +24,7 @@ dashboard = edgeless_actor(
     id = "dashboard",
     klass = DemoDashboard,
     annotations = {
-        "scaling_mode": "all_nodes"
+        # "scaling_mode": "scalable"
     }
 )
 
@@ -34,7 +34,10 @@ ingress = edgeless_resource(
     configurations = {
         "host": "demo.localhost",
         "methods": "GET"
-    }
+    },
+    annotations = {
+        "scaling_mode": "all_nodes"
+    },
 )
 
 processor = edgeless_actor(

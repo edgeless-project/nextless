@@ -40,6 +40,18 @@ impl super::LogicalComponent for LogicalSubFlow {
     fn instances(&self) -> Vec<&std::cell::RefCell<super::PhysicalComponentState>> {
         self.instances.iter().collect()
     }
+
+    fn instances_mut(&mut self) -> &mut Vec<std::cell::RefCell<super::PhysicalComponentState>> {
+        &mut self.instances
+    }
+
+    fn scaling_mode(&self) -> crate::ir::component::ScalingMode {
+        crate::ir::component::ScalingMode::Singleton
+    }
+
+    fn node_filters(&self) -> crate::ir::component::NodeFilters {
+        crate::ir::component::NodeFilters::default()
+    }
 }
 
 #[derive(Clone)]

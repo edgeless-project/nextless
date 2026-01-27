@@ -225,10 +225,7 @@ pub(crate) fn new_actor_with_mocked_materialized_instances(
     crate::ir::actor::LogicalActor {
         image: mock_actor_image(),
         annotations: std::collections::HashMap::new(),
-        scaling_mode: super::component::ScalingMode::Scalable {
-            min_instances: 1,
-            max_instances: 10,
-        },
+        scaling_mode: super::component::ScalingMode::Singleton,
         node_filter: super::component::NodeFilters::default(),
         logical_ports: logical_ports,
         instances: instances

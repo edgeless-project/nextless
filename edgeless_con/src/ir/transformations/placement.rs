@@ -42,6 +42,13 @@ struct PlacementConstraints {
     urgent: bool,
 }
 
+#[derive(Clone)]
+pub struct Candidate<'a> {
+    pub(crate) node_id: edgeless_api::function_instance::NodeId,
+    pub(crate) dest_image: actor::ImageState,
+    pub(crate) runtime: crate::ir::Runtime<'a>,
+}
+
 impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<PlacementState<'a, P>> for DefaultPlacement<P> {
     #[tracing::instrument(name = "placement", skip_all)]
     fn apply(
@@ -53,163 +60,32 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
     ) {
         for (f_id, function) in &workflow.functions {
             let mut function = function.borrow_mut();
+            self.process_actor(workflow, f_id, &mut *function, nodes, global_state);
+        }
 
-            let num_instances = function.instances.len();
-            let num_active_instances = function.instances.iter().filter(|i| i.borrow().try_unpack_active().is_some()).count();
+        for (resource_id, resource) in &mut workflow.resources {
+            let mut resource = resource.borrow_mut();
 
-            let cloned_node_filters = function.node_filter.clone();
-            let cloned_function_instance_len = function.instances.len();
-            let cloned_init_on = function.annotations.get("node_id_init_on").cloned();
+            let r_class_clone = resource.class.to_string();
+            let r_configuration_clone = resource.configurations.clone();
 
-            let cloned_function = function.clone();
-
-            global_state.image_chache.insert_blocking(function.image.main_image.clone());
-            for extra in function.image.extra_images.clone() {
-                tracing::debug!("Storing Extra Image in Cache: {:?}", extra.behavior_image_id);
-                global_state.image_chache.insert_blocking(extra);
-            }
-
-            let mut new_instances = Vec::new();
-
-            function.instances.retain(|i| {
-                let mut i = i.borrow_mut();
-                match &mut *i {
-                    PhysicalComponentState::Requested(extra_constraints) => {
-                        let mut node_filters = if let Some(extra_constraints) = extra_constraints {
-                            extra_constraints.clone()
+            resource.instances.retain(|r| {
+                let mut r = r.borrow_mut();
+                match &*r {
+                    PhysicalComponentState::Requested(_extra_constraints) => {
+                        let dst = select_node_for_resource(&r_class_clone, nodes);
+                        if let Some(dst) = dst {
+                            *r = PhysicalComponentState::Materialized(Box::new(resource::PhysicalResource {
+                                id: edgeless_api::function_instance::InstanceId::new(dst),
+                                desired_mapping: PhysicalPorts::default(),
+                                materialized: None,
+                                creation_time: std::time::Instant::now(),
+                                class: r_class_clone.clone(),
+                                component_name: resource_id.clone(),
+                                configuration: r_configuration_clone.clone(),
+                            }));
                         } else {
-                            cloned_node_filters.clone()
-                        };
-
-                        // This was added for evaluation purposes
-                        if let Some(dest_node) = &cloned_init_on {
-                            if num_instances == 1 {
-                                let dest_uuid = uuid::Uuid::from_str(dest_node).unwrap();
-                                node_filters.node_ids_allowed = Some(vec![dest_uuid])
-                            }
-                        }
-
-                        let placement_constraints = PlacementConstraints {
-                            node_filters,
-                            urgent: num_active_instances < 1,
-                        };
-
-                        let new_instance = self.spawn_new(
-                            workflow,
-                            f_id.clone(),
-                            &cloned_function,
-                            nodes,
-                            global_state,
-                            &placement_constraints,
-                            workflow.feature_flags.disable_actor_optimization,
-                        );
-                        if let Some(new_instance) = new_instance {
-                            *i = new_instance;
-                        } else {
-                            tracing::info!("Requested Instance: Found no viable node for {} in {}", &f_id, workflow.id.workflow_id);
                             return false;
-                        }
-                    }
-                    PhysicalComponentState::MigrationRequested(c) => {
-                        let node_filters = cloned_node_filters.clone();
-
-                        // This would allow to guarantee getting a different instance but that might be less efficient than the old instance.
-                        // To properly do this, we might be required to also return the efficiency and compare it here.
-                        // node_filters.node_ids_denied.get_or_insert_default().push(c.id().node_id.clone());
-
-                        let placement_constraints = PlacementConstraints { node_filters, urgent: false };
-
-                        let new_instance = self.spawn_new(
-                            workflow,
-                            f_id.clone(),
-                            &cloned_function,
-                            nodes,
-                            global_state,
-                            &placement_constraints,
-                            workflow.feature_flags.disable_actor_optimization,
-                        );
-                        if let Some(new_instance) = new_instance {
-                            let new_id = new_instance.id().unwrap();
-                            if new_id.node_id == c.id().node_id {
-                                tracing::info!(
-                                    "Migrating Instance: Node would be equal {}({}). {}",
-                                    f_id,
-                                    c.id(),
-                                    cloned_function_instance_len
-                                );
-                                i.abort_migration();
-                            } else {
-                                tracing::info!(
-                                    "MigratingInstance: Found Replacement node for {} in {} ({}); Will migrate: {} -> {}",
-                                    &f_id,
-                                    workflow.id.workflow_id,
-                                    c.id(),
-                                    c.id().node_id,
-                                    new_id.node_id
-                                );
-                                new_instances.push(std::cell::RefCell::new(new_instance));
-                                i.mark_migrating_away(new_id);
-                            }
-                        } else {
-                            tracing::debug!("Migration: Could not spawn replacement instance. Aborting.");
-                            i.abort_migration();
-                        }
-                    }
-                    PhysicalComponentState::Lost(_) => match &cloned_function.scaling_mode {
-                        crate::ir::component::ScalingMode::AllNodes => {
-                            i.mark_stopped();
-                        }
-                        _ => {
-                            let node_filters = cloned_node_filters.clone();
-                            let placement_constraints = PlacementConstraints {
-                                node_filters,
-                                urgent: num_active_instances <= 1,
-                            };
-
-                            let new_instance = self.spawn_new(
-                                workflow,
-                                f_id.clone(),
-                                &cloned_function,
-                                nodes,
-                                global_state,
-                                &placement_constraints,
-                                workflow.feature_flags.disable_actor_optimization,
-                            );
-                            if let Some(new_instance) = new_instance {
-                                let new_id = new_instance.id().unwrap();
-                                new_instances.push(std::cell::RefCell::new(new_instance));
-                                i.mark_lost_replaced(new_id);
-                            }
-                        }
-                    },
-                    PhysicalComponentState::Dead(old_instance) => {
-                        let node_filters = match &cloned_function.scaling_mode {
-                            crate::ir::component::ScalingMode::AllNodes => {
-                                let mut filters = cloned_node_filters.clone();
-                                filters.node_ids_allowed = Some(vec![old_instance.id().node_id.clone()]);
-                                filters
-                            }
-                            _ => cloned_node_filters.clone(),
-                        };
-
-                        let placement_constraints = PlacementConstraints {
-                            node_filters: node_filters,
-                            urgent: num_active_instances <= 1,
-                        };
-
-                        let new_instance = self.spawn_new(
-                            workflow,
-                            f_id.clone(),
-                            &cloned_function,
-                            nodes,
-                            global_state,
-                            &placement_constraints,
-                            workflow.feature_flags.disable_actor_optimization,
-                        );
-                        if let Some(new_instance) = new_instance {
-                            let new_id = new_instance.id().unwrap();
-                            new_instances.push(std::cell::RefCell::new(new_instance));
-                            i.mark_dead_replaced(new_id);
                         }
                     }
                     _ => {
@@ -218,36 +94,6 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
                 }
                 true
             });
-            function.instances.extend(new_instances);
-        }
-
-        for (resource_id, resource) in &mut workflow.resources {
-            let resource = resource.borrow_mut();
-
-            for r in &resource.instances {
-                let mut r = r.borrow_mut();
-                match &*r {
-                    PhysicalComponentState::Requested(_extra_constraints) => {
-                        let dst = select_node_for_resource(&resource, nodes);
-                        if let Some(dst) = dst {
-                            *r = PhysicalComponentState::Materialized(Box::new(resource::PhysicalResource {
-                                id: edgeless_api::function_instance::InstanceId::new(dst),
-                                desired_mapping: PhysicalPorts::default(),
-                                materialized: None,
-                                creation_time: std::time::Instant::now(),
-                                class: resource.class.clone(),
-                                component_name: resource_id.clone(),
-                                configuration: resource.configurations.clone(),
-                            }));
-                        }
-                    }
-                    _ => {
-                        //NOOP
-                    }
-                }
-            }
-
-            if resource.instances.is_empty() {}
         }
 
         for subflow in workflow.subflows.values_mut() {
@@ -303,16 +149,188 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<Placement
     }
 }
 
-#[derive(Clone)]
-pub struct Candidate<'a> {
-    pub(crate) node_id: edgeless_api::function_instance::NodeId,
-    pub(crate) dest_image: actor::ImageState,
-    pub(crate) runtime: crate::ir::Runtime<'a>,
-}
-
 impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
+    fn process_actor(
+        &mut self,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
+        actor_id: &str,
+        actor: &mut crate::ir::actor::LogicalActor,
+        nodes: &crate::ir::Nodes,
+        global_state: &PlacementState<P>,
+    ) {
+        let num_instances = actor.instances.len();
+        let num_active_instances = actor.instances.iter().filter(|i| i.borrow().try_unpack_active().is_some()).count();
+
+        let cloned_node_filters = actor.node_filter.clone();
+        let cloned_function_instance_len = actor.instances.len();
+        let cloned_init_on = actor.annotations.get("node_id_init_on").cloned();
+
+        let cloned_function = actor.clone();
+
+        global_state.image_chache.insert_blocking(actor.image.main_image.clone());
+        for extra in actor.image.extra_images.clone() {
+            tracing::debug!("Storing Extra Image in Cache: {:?}", extra.behavior_image_id);
+            global_state.image_chache.insert_blocking(extra);
+        }
+
+        let mut new_instances = Vec::new();
+
+        actor.instances.retain(|i| {
+            let mut i = i.borrow_mut();
+            match &mut *i {
+                PhysicalComponentState::Requested(extra_constraints) => {
+                    let mut node_filters = if let Some(extra_constraints) = extra_constraints {
+                        extra_constraints.clone()
+                    } else {
+                        cloned_node_filters.clone()
+                    };
+
+                    // This was added for evaluation purposes
+                    if let Some(dest_node) = &cloned_init_on {
+                        if num_instances == 1 {
+                            let dest_uuid = uuid::Uuid::from_str(dest_node).unwrap();
+                            node_filters.node_ids_allowed = Some(vec![dest_uuid])
+                        }
+                    }
+
+                    let placement_constraints = PlacementConstraints {
+                        node_filters,
+                        urgent: num_active_instances < 1,
+                    };
+
+                    let new_instance = self.spawn_new_actor(
+                        workflow,
+                        actor_id.to_string(),
+                        &cloned_function,
+                        nodes,
+                        global_state,
+                        &placement_constraints,
+                        workflow.feature_flags.disable_actor_optimization,
+                    );
+                    if let Some(new_instance) = new_instance {
+                        *i = new_instance;
+                    } else {
+                        tracing::info!(
+                            "Requested Instance: Found no viable node for {} in {}",
+                            &actor_id,
+                            workflow.id.workflow_id
+                        );
+                        return false;
+                    }
+                }
+                PhysicalComponentState::MigrationRequested(c) => {
+                    let node_filters = cloned_node_filters.clone();
+
+                    // This would allow to guarantee getting a different instance but that might be less efficient than the old instance.
+                    // To properly do this, we might be required to also return the efficiency and compare it here.
+                    // node_filters.node_ids_denied.get_or_insert_default().push(c.id().node_id.clone());
+
+                    let placement_constraints = PlacementConstraints { node_filters, urgent: false };
+
+                    let new_instance = self.spawn_new_actor(
+                        workflow,
+                        actor_id.to_string(),
+                        &cloned_function,
+                        nodes,
+                        global_state,
+                        &placement_constraints,
+                        workflow.feature_flags.disable_actor_optimization,
+                    );
+                    if let Some(new_instance) = new_instance {
+                        let new_id = new_instance.id().unwrap();
+                        if new_id.node_id == c.id().node_id {
+                            tracing::info!(
+                                "Migrating Instance: Node would be equal {}({}). {}",
+                                actor_id,
+                                c.id(),
+                                cloned_function_instance_len
+                            );
+                            i.abort_migration();
+                        } else {
+                            tracing::info!(
+                                "MigratingInstance: Found Replacement node for {} in {} ({}); Will migrate: {} -> {}",
+                                &actor_id,
+                                workflow.id.workflow_id,
+                                c.id(),
+                                c.id().node_id,
+                                new_id.node_id
+                            );
+                            new_instances.push(std::cell::RefCell::new(new_instance));
+                            i.mark_migrating_away(new_id);
+                        }
+                    } else {
+                        tracing::debug!("Migration: Could not spawn replacement instance. Aborting.");
+                        i.abort_migration();
+                    }
+                }
+                PhysicalComponentState::Lost(_) => match &cloned_function.scaling_mode {
+                    crate::ir::component::ScalingMode::AllNodes => {
+                        i.mark_stopped();
+                    }
+                    _ => {
+                        let node_filters = cloned_node_filters.clone();
+                        let placement_constraints = PlacementConstraints {
+                            node_filters,
+                            urgent: num_active_instances <= 1,
+                        };
+
+                        let new_instance = self.spawn_new_actor(
+                            workflow,
+                            actor_id.to_string(),
+                            &cloned_function,
+                            nodes,
+                            global_state,
+                            &placement_constraints,
+                            workflow.feature_flags.disable_actor_optimization,
+                        );
+                        if let Some(new_instance) = new_instance {
+                            let new_id = new_instance.id().unwrap();
+                            new_instances.push(std::cell::RefCell::new(new_instance));
+                            i.mark_lost_replaced(new_id);
+                        }
+                    }
+                },
+                PhysicalComponentState::Dead(old_instance) => {
+                    let node_filters = match &cloned_function.scaling_mode {
+                        crate::ir::component::ScalingMode::AllNodes => {
+                            let mut filters = cloned_node_filters.clone();
+                            filters.node_ids_allowed = Some(vec![old_instance.id().node_id.clone()]);
+                            filters
+                        }
+                        _ => cloned_node_filters.clone(),
+                    };
+
+                    let placement_constraints = PlacementConstraints {
+                        node_filters: node_filters,
+                        urgent: num_active_instances <= 1,
+                    };
+
+                    let new_instance = self.spawn_new_actor(
+                        workflow,
+                        actor_id.to_string(),
+                        &cloned_function,
+                        nodes,
+                        global_state,
+                        &placement_constraints,
+                        workflow.feature_flags.disable_actor_optimization,
+                    );
+                    if let Some(new_instance) = new_instance {
+                        let new_id = new_instance.id().unwrap();
+                        new_instances.push(std::cell::RefCell::new(new_instance));
+                        i.mark_dead_replaced(new_id);
+                    }
+                }
+                _ => {
+                    //NOOP
+                }
+            }
+            true
+        });
+        actor.instances.extend(new_instances);
+    }
+
     #[allow(clippy::too_many_arguments)]
-    fn spawn_new(
+    fn spawn_new_actor(
         &mut self,
         workflow: &crate::ir::workflow::ActiveWorkflow,
         logical_name: String,
@@ -375,7 +393,7 @@ fn find_candidates_for_actor<'b>(
                 true,
                 disable_actor_optimization,
             );
-            if let Some(node_candidate) = select_node_candidate(node_candidates, true, true, image_cache) {
+            if let Some(node_candidate) = select_actor_node_candidate(node_candidates, true, true, image_cache) {
                 candiates.push(node_candidate)
             }
         }
@@ -395,7 +413,7 @@ fn find_candidates_for_actor<'b>(
             false,
             disable_actor_optimization,
         );
-        if let Some(node_candidate) = select_node_candidate(node_candidates, false, false, image_cache) {
+        if let Some(node_candidate) = select_actor_node_candidate(node_candidates, false, false, image_cache) {
             candiates.push(node_candidate)
         }
     }
@@ -413,7 +431,7 @@ fn find_candidates_for_actor<'b>(
             true,
             disable_actor_optimization,
         );
-        if let Some(node_candidate) = select_node_candidate(node_candidates, false, true, image_cache) {
+        if let Some(node_candidate) = select_actor_node_candidate(node_candidates, false, true, image_cache) {
             candiates.push(node_candidate)
         }
     }
@@ -425,7 +443,7 @@ fn find_candidates_for_actor<'b>(
     candiates
 }
 
-fn select_node_candidate<'b>(
+fn select_actor_node_candidate<'b>(
     candiates: Vec<Candidate<'b>>,
     only_available: bool,
     allow_imperfect: bool,
@@ -498,10 +516,10 @@ fn select_node_candidate<'b>(
     viable_candidates.pop()
 }
 
-fn select_node_for_resource(resource: &resource::LogicalResource, nodes: &crate::ir::Nodes) -> Option<edgeless_api::function_instance::NodeId> {
+fn select_node_for_resource(resource_class: &str, nodes: &crate::ir::Nodes) -> Option<edgeless_api::function_instance::NodeId> {
     if let Some((id, _)) = nodes
         .iter()
-        .find(|(_, n)| n.available_resource_providers().iter().any(|(_, r)| r.class_type() == resource.class))
+        .find(|(_, n)| n.available_resource_providers().iter().any(|(_, r)| r.class_type() == resource_class))
     {
         Some(*id)
     } else {
