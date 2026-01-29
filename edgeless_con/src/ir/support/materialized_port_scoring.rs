@@ -450,7 +450,7 @@ mod test {
             std::time::Duration::from_secs(60),
         );
 
-        assert!(result.len() == 0);
+        assert!(result.len() == 2);
         assert!(result.iter().find(|x| x.0 == nodes[0] && x.1 == 50).is_some());
         assert!(result.iter().find(|x| x.0 == nodes[1] && x.1 == 50).is_some());
     }
