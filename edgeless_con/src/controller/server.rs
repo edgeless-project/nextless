@@ -299,8 +299,9 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 }
             }
         }
-
-        self.handle_node_removal(&to_be_disconnected).await;
+        if !to_be_disconnected.is_empty() {
+            self.handle_node_removal(&to_be_disconnected).await;
+        }
     }
 
     async fn find_dead_nodes(&mut self) -> std::collections::HashSet<edgeless_api::function_instance::NodeId> {
