@@ -16,12 +16,14 @@ pub struct EncryptedNumberedTestMessage {
     pub payload: Vec<u8>,
 }
 
+#[derive(Clone)]
 pub struct MockSensorValue {
     pub sequence_number: u64,
     pub sensor_id: SensorId,
     pub value: f64,
 }
 
+#[derive(Clone)]
 pub struct SensorId {
     pub node_id: [u8; 16],
     pub component_id: [u8; 16],
