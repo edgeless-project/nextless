@@ -55,9 +55,17 @@ fn setup_tracing_with_opentelemetry(otlp_endpoint: String) {
         .with_endpoint(otlp_endpoint)
         .build()
         .unwrap();
+
+    let mut otel_resource = opentelemetry_sdk::Resource::builder().with_service_name("edgeless_controller");
+
+    // Used for experiment names.
+    if let Ok(edgeless_deployment) = std::env::var("EDGELESS_DEPLOYMENT") {
+        otel_resource = otel_resource.with_attribute(opentelemetry::KeyValue::new("edgeless_deployment", edgeless_deployment))
+    }
+
     let otel_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
         .with_batch_exporter(otlp_exporter)
-        .with_resource(opentelemetry_sdk::Resource::builder().with_service_name("edgeless_controller").build())
+        .with_resource(otel_resource.build())
         .build();
 
     let env_filter = tracing_subscriber::EnvFilter::builder()
