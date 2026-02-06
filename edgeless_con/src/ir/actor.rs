@@ -86,6 +86,7 @@ impl super::PhysicalComponent for PhysicalActor {
     }
 
     // TODO add proper input mapping handling preventing the creation of overlay inputs
+    #[tracing::instrument(name = "materialize_actor", skip_all)]
     fn materialize(&mut self, telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>) -> Vec<super::RequiredChange> {
         let mut changes = Vec::new();
         if let Some(materialized) = &self.materialized {

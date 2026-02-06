@@ -76,6 +76,7 @@ impl super::PhysicalComponent for PhysicalResource {
         self.creation_time
     }
 
+    #[tracing::instrument(name = "materialize_resource", skip_all)]
     fn materialize(&mut self, telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>) -> Vec<super::RequiredChange> {
         let mut changes = Vec::new();
         if let Some(materialized) = &self.materialized {

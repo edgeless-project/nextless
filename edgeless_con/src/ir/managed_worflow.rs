@@ -105,6 +105,8 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
     fn materialize(&mut self) -> Vec<super::RequiredChange> {
         let mut changes = Vec::new();
 
+        tracing::debug!("Number of Links: {}", self.wf.links.len());
+
         for (link_id, link) in &mut self.wf.links {
             if !link.materialized {
                 changes.push(super::RequiredChange::InstantiateLinkControlPlane {
@@ -127,8 +129,11 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
             }
         }
 
+        tracing::debug!("Number of Components: {}", self.wf.components().len());
+
         for (_c_name, function) in self.wf.components() {
             let function = function.borrow_mut();
+            tracing::debug!("Number of Instances: {}", function.instances().len());
             for i in function.instances().iter() {
                 let mut current = i.borrow_mut();
                 match &mut *current {

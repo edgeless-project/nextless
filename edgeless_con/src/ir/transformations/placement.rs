@@ -210,7 +210,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                     if let Some(new_instance) = new_instance {
                         *i = new_instance;
                     } else {
-                        tracing::info!(
+                        tracing::debug!(
                             "Requested Instance: Found no viable node for {} in {}",
                             &actor_id,
                             workflow.id.workflow_id
