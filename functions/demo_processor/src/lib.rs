@@ -34,7 +34,11 @@ impl DemoProcessorAPI<'_> for DemoProcessor {
             fake_work(delay);
         }
 
-        let out_message = cast_data_out(&test_msg);
+        let mut message = test_msg.clone();
+
+        message.value = message.value * 2.0;
+
+        let out_message = cast_data_out(&message);
     }
 
     fn handle_internal(_data: &[u8]) {
