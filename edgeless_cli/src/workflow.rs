@@ -63,7 +63,7 @@ pub async fn start_workflow(
     spec_file: String,
     extra_images: String,
 ) -> Result<(), WorkflowError> {
-    println!("Attempting to start Workflow with config '{spec_file}'...");
+    log::info!("Attempting to start Workflow with config '{spec_file}'...");
 
     let p = std::path::PathBuf::from(spec_file.clone());
 
@@ -98,15 +98,16 @@ pub async fn start_workflow(
         Ok(response) => {
             match &response {
                 edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
-                    println!("{err:?}");
+                    log::error!("Spawning workflow failed (controller): {err:?}");
                 }
                 edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
+                    // This needs to be on stdout.
                     println!("{}", val.workflow_id.workflow_id);
                 }
             }
             log::info!("{response:?}")
         }
-        Err(err) => println!("{err}"),
+        Err(err) => log::error!("Could not complete interaction with controller: {err}"),
     }
 
     Ok(())
@@ -116,14 +117,14 @@ pub async fn stop_workflow(
     workflow_instance_client: &mut dyn edgeless_api::workflow_instance::WorkflowInstanceAPI,
     workflow_id: String,
 ) -> Result<(), WorkflowError> {
-    println!("Attempting to stop Application with id '{workflow_id}'...");
+    log::info!("Attempting to stop Application with id '{workflow_id}'...");
     let parsed_id = uuid::Uuid::parse_str(&workflow_id).map_err(|_e| WorkflowError::BadWorkflowId)?;
     match workflow_instance_client
         .stop(edgeless_api::workflow_instance::WorkflowId { workflow_id: parsed_id })
         .await
     {
-        Ok(_) => println!("Workflow Stopped"),
-        Err(err) => println!("{err}"),
+        Ok(_) => log::info!("Workflow Stopped"),
+        Err(err) => log::error!("Could not stop workflow (controller): {err}"),
     }
     Ok(())
 }
@@ -132,13 +133,15 @@ pub async fn list_workflows(workflow_instance_client: &mut dyn edgeless_api::wor
     match workflow_instance_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
         Ok(instances) => {
             for instance in instances.iter() {
-                println!("workflow: {}", instance.workflow_id);
+                // This is expected on stdout.
+                println!("Workflow: {}", instance.workflow_id);
                 for function in instance.node_mapping.iter() {
+                    // This is expected on stdout.
                     println!("\t{function:?}");
                 }
             }
         }
-        Err(err) => println!("{err}"),
+        Err(err) => log::info!("Could not list workflows (controller): {err}"),
     }
     Ok(())
 }
