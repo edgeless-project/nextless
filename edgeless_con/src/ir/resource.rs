@@ -112,7 +112,7 @@ impl super::PhysicalComponent for PhysicalResource {
     }
 
     fn stop(&mut self) -> Vec<super::RequiredChange> {
-        vec![super::RequiredChange::StopFunction { function_id: self.id }]
+        vec![super::RequiredChange::StopResource { resource_id: self.id }]
     }
 
     fn as_actor(&self) -> Option<&super::actor::PhysicalActor> {

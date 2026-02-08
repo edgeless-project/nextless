@@ -376,6 +376,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                         .await
                 }
                 RequiredChange::StopFunction { function_id } => self.stop_workflow_function_on_node(function_id).await,
+                RequiredChange::StopResource { resource_id } => self.stop_workflow_resource_on_node(resource_id).await,
             });
         }
 
@@ -461,7 +462,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     async fn stop_workflow_function_on_node(&mut self, function_id: edgeless_api::function_instance::InstanceId) -> Result<(), String> {
         if let Some(node_api) = self.nodes.get_mut(&function_id.node_id) {
             if let Err(e) = node_api.fn_client().unwrap().stop(function_id).await {
-                Err(format!("Stopping Node Failed: {e}"))
+                Err(format!("Stopping Node Function Failed: {e}"))
             } else {
                 Ok(())
             }
@@ -508,6 +509,18 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 }
             },
             Err(err) => Err(format!("failed interaction when starting a resource: {err}")),
+        }
+    }
+
+    async fn stop_workflow_resource_on_node(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> Result<(), String> {
+        if let Some(node_api) = self.nodes.get_mut(&resource_id.node_id) {
+            if let Err(e) = node_api.resource_client().unwrap().stop(resource_id).await {
+                Err(format!("Stopping Node Resource Failed: {e}"))
+            } else {
+                Ok(())
+            }
+        } else {
+            Err("Invalid Resource ID".to_string())
         }
     }
 

@@ -89,6 +89,9 @@ pub enum RequiredChange {
     StopFunction {
         function_id: edgeless_api::function_instance::InstanceId,
     },
+    StopResource {
+        resource_id: edgeless_api::function_instance::InstanceId,
+    },
     StartResource {
         resource_id: edgeless_api::function_instance::InstanceId,
         resource_name: String,
