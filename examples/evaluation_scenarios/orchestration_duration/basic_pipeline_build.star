@@ -1,7 +1,7 @@
 load("../../../functions/demo_sensor/demo_sensor_wasm.star", "DemoSensor")
 load("../../../functions/demo_dashboard/demo_dashboard_wasm.star", "DemoDashboard")
 load("../../../resources/http_ingress.star", "HTTPIngress")
-load("../../../functions/demo_processor/demo_processor_wasm.star", "DemoProcessor")
+load("../../../functions/demo_processor/demo_processor.star", "DemoProcessor")
 load("./configuration.star", "PROCESSOR_INIT_NODE", "SENSOR_ALLOWED_NODES", "DASHBOARD_ALLOWED_NODES", "PROCESSOR_ALLOWED_NODES")
 
 sensor = edgeless_actor(

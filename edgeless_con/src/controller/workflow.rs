@@ -7,6 +7,7 @@
 
 use crate::ir::{Node, RequiredChange};
 use edgeless_api::image_repository::FunctionImageHash;
+use std::io::Write;
 
 pub struct WorkflowInstance {
     inner: WorkflowInstanceState,
@@ -27,6 +28,7 @@ struct WorkflowTask<P: crate::ir::transformations::placement::strategy::Placemen
     nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, super::node::WorkerNode>,
     peer_clusters: std::collections::HashMap<edgeless_api::function_instance::NodeId, super::peer_cluster::PeerCluster>,
     image_repository: super::image_repository::ImageRepository,
+    duration_log_file: Option<std::fs::File>,
 }
 
 enum WorkflowManagementEvent {
@@ -59,6 +61,13 @@ impl WorkflowInstance {
     ) -> Self {
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
 
+        let duration_log_file = if let Ok(filename) = std::env::var("EDGELESS_DEBUG_FILE") {
+            let file = std::fs::OpenOptions::new().write(true).append(true).create(true).open(filename).unwrap();
+            Some(file)
+        } else {
+            None
+        };
+
         let t = WorkflowTask {
             wf,
             global_pipeline_state,
@@ -66,6 +75,7 @@ impl WorkflowInstance {
             nodes: initial_nodes,
             peer_clusters: initial_peer_clusters,
             image_repository,
+            duration_log_file: duration_log_file,
         };
 
         let task = tokio::task::spawn(WorkflowTask::run(t, start_completed));
@@ -151,6 +161,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         &mut self,
         on_start_completed: impl FnOnce(anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>) + Send,
     ) -> WorkflowResult {
+        let start = tokio::time::Instant::now();
+
         let required_changes = {
             tokio::task::block_in_place(|| {
                 let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
@@ -198,6 +210,14 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 },
             )),
         });
+
+        let duration = start.elapsed();
+        if let Some(duration_log_file) = &mut self.duration_log_file {
+            duration_log_file
+                .write_fmt(format_args!("initial_spawn,{}\n", duration.as_micros()))
+                .unwrap();
+        }
+
         Ok(())
     }
 
@@ -217,6 +237,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     }
 
     async fn node_removal(&mut self, removed_nodes: &std::collections::HashSet<edgeless_api::function_instance::NodeId>) -> WorkflowResult {
+        let start = tokio::time::Instant::now();
+
         for removed_node in removed_nodes {
             self.nodes.remove(removed_node);
         }
@@ -232,6 +254,14 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         if let Err(errs) = self.materialize(required_changes).await {
             tracing::error!("Failures materializing node removal: {}.", errs.join(";"));
         }
+
+        let duration = start.elapsed();
+        if let Some(duration_log_file) = &mut self.duration_log_file {
+            duration_log_file
+                .write_fmt(format_args!("node_removal,{}\n", duration.as_micros()))
+                .unwrap();
+        }
+
         Ok(())
     }
 

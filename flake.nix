@@ -150,6 +150,7 @@
             binutils
             lld
             (pkgs.python3.withPackages (pypkg: [
+              pypkg.jupyter
               pypkg.pandas
               pypkg.scapy
               pypkg.seaborn
