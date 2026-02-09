@@ -409,7 +409,15 @@ fn collect_wasm_image_for_rust_base(
             },
             dialect_type: edgeless_api::node_registration::RuntimeType {
                 base_type: "WASM".to_string(),
-                features: base_image_id.dialect_type.features.clone(),
+                features: base_image_id
+                    .dialect_type
+                    .features
+                    .iter()
+                    .filter_map(|f| match f.as_str() {
+                        "WGPU" => Some("WGPU".to_string()),
+                        _ => None,
+                    })
+                    .collect(),
             },
         },
         image: wasm_code,
