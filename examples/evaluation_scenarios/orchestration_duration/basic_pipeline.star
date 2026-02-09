@@ -1,7 +1,7 @@
 load("../../../functions/demo_sensor/demo_sensor_wasm.star", "DemoSensor")
 load("../../../functions/demo_dashboard/demo_dashboard_wasm.star", "DemoDashboard")
 load("../../../resources/http_ingress.star", "HTTPIngress")
-load("../../../functions/demo_processor/demo_processor_wasm.star", "DemoProcessor")
+load("../../../functions/native_processor/native_processor_wasm.star", "NativeProcessor")
 load("./configuration.star", "PROCESSOR_INIT_NODE", "SENSOR_ALLOWED_NODES", "DASHBOARD_ALLOWED_NODES", "PROCESSOR_ALLOWED_NODES")
 
 sensor = edgeless_actor(
@@ -17,14 +17,15 @@ sensor = edgeless_actor(
 
 processor = edgeless_actor(
     id = "processor",
-    klass = DemoProcessor,
+    klass = NativeProcessor,
     annotations = {
         # Mock Delay
         "init-payload": "100",
         # Node labels currently lead to broken scaling behavior.
         # "node_label_filter_allowed": "processor",
         "node_ids_allowed": PROCESSOR_ALLOWED_NODES,
-        "node_id_init_on": PROCESSOR_INIT_NODE
+        "node_id_init_on": PROCESSOR_INIT_NODE,
+        "runtime_dialects_allowed": "WASM"
     }
 )
 
