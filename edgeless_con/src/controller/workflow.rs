@@ -197,7 +197,8 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
 
         let res = self.materialize(required_changes).await;
 
-        if res.is_err() {
+        if let Err(errors) = &res {
+            tracing::warn!("Failure starting workflow: {}", errors.join("\n"));
             self.stop().await?;
         }
 
@@ -454,7 +455,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 code: edgeless_api::function_instance::FunctionClassSpecification {
                     function_class_id: image.behavior_image_id.behavior_id.id.clone(),
                     function_class_type: image.behavior_image_id.dialect_type.base_type.to_string(),
-                    function_class_version: image.behavior_image_id.behavior_id.id.clone(),
+                    function_class_version: image.behavior_image_id.behavior_id.version.clone(),
                     function_class_code: image.image.clone(),
                     function_class_outputs: behavior_spec.output_ports.into_iter().collect(),
                     function_class_inputs: behavior_spec.input_ports.into_iter().collect(),
