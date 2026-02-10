@@ -9,7 +9,7 @@ struct TestFun;
 
 edgeless_function::generate!(TestFun);
 
-impl<'c> EspTestFunAPI<'c> for TestFun {
+impl<'c> EspSensorPAPI<'c> for TestFun {
     type STRING = &'c str;
 
     fn handle_cast_measurement(_src: InstanceId, str_message: &'c str) {

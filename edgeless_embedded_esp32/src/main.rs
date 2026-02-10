@@ -24,29 +24,11 @@ use epd_waveshare::prelude::*;
 use esp_alloc as _;
 use esp_backtrace as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static RNG: once_cell::sync::OnceCell<esp_hal::rng::Rng> = once_cell::sync::OnceCell::new();
 
 const NODE_ID: uuid::Uuid = uuid::uuid!("0827240a-3050-4604-bf3e-564c41c77106");
-
-static mut APP_CORE_STACK: esp_hal::system::Stack<16384> = esp_hal::system::Stack::new();
-
-// Originally was planning to use a dedicated heap here, but this is currently not possible: https://github.com/esp-rs/esp-hal/issues/3187
-#[no_mangle]
-pub extern "C" fn esp_wifi_free_internal_heap() -> usize {
-    // return size of free allocatable RAM
-    esp_alloc::HEAP.free_caps(esp_alloc::MemoryCapability::Internal.into())
-}
-
-#[no_mangle]
-pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
-    // allocate memory of size `size` from internal memory
-    unsafe {
-        esp_alloc::HEAP.alloc_caps(
-            esp_alloc::MemoryCapability::Internal.into(),
-            core::alloc::Layout::from_size_align_unchecked(size, 4),
-        )
-    }
-}
 
 #[no_mangle]
 unsafe extern "Rust" fn __getrandom_v03_custom(dest: *mut u8, len: usize) -> Result<(), getrandom::Error> {
@@ -85,24 +67,20 @@ fn main() -> ! {
         #[link_section = ".dram2_uninit"]
         size: 64 * 1024
     );
-    esp_alloc::heap_allocator!(size: 24 * 1024);
+    esp_alloc::heap_allocator!(size: 16 * 1024);
 
     let timer_group0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
 
-    let rng = esp_hal::rng::Rng::new(peripherals.RNG);
+    // todo: maybe use trng here.
+    let rng = esp_hal::rng::Rng::new();
     assert!(RNG.set(rng).is_ok());
 
-    #[cfg(not(feature = "esp32"))]
-    {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
-        esp_hal_embassy::init(systimer.alarm0);
-    }
-    #[cfg(feature = "esp32")]
-    {
-        esp_hal_embassy::init(timer_group0.timer1);
-    }
-
-    let mut cpu_control = esp_hal::system::CpuControl::new(peripherals.CPU_CTRL);
+    let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(
+        timer_group0.timer0,
+        #[cfg(target_arch = "riscv32")]
+        sw_int.software_interrupt0,
+    );
 
     #[cfg(feature = "epaper_2_13")]
     let display_wrapper = {
@@ -156,6 +134,7 @@ fn main() -> ! {
 
     #[cfg(feature = "scd30")]
     let sensor_wrapper = {
+        #[cfg(feature = "esp32")]
         let i2c = esp_hal::i2c::master::I2c::new(
             peripherals.I2C0,
             esp_hal::i2c::master::Config::default()
@@ -165,6 +144,17 @@ fn main() -> ! {
         .unwrap()
         .with_sda(peripherals.GPIO33)
         .with_scl(peripherals.GPIO32);
+
+        #[cfg(feature = "esp32s3")]
+        let i2c = esp_hal::i2c::master::I2c::new(
+            peripherals.I2C0,
+            esp_hal::i2c::master::Config::default()
+                .with_frequency(esp_hal::time::Rate::from_khz(50))
+                .with_timeout(esp_hal::i2c::master::BusTimeout::Maximum),
+        )
+        .unwrap()
+        .with_sda(peripherals.GPIO17)
+        .with_scl(peripherals.GPIO18);
 
         let mut i2c_delay = esp_hal::delay::Delay::new();
         i2c_delay.delay_ns(5_000_000u32);
@@ -219,17 +209,17 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "psram")] {
-            static DISPLAY_CHANNEL_RAW: static_cell::StaticCell<
-                embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
-            > = static_cell::StaticCell::new();
-            let display_channel = DISPLAY_CHANNEL_RAW
-                .init_with(|| embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>::new());
-        } else {
             let display_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::channel::Channel::<
                 embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
-                heapless::String<1500>,
+                heapless::String<256>,
                 2,
             >::new()));
+        } else {
+            static DISPLAY_CHANNEL_RAW: static_cell::StaticCell<
+                embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<256>, 2>,
+            > = static_cell::StaticCell::new();
+            let display_channel = DISPLAY_CHANNEL_RAW
+                .init_with(|| embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<256>, 2>::new());
         }
     }
 
@@ -238,74 +228,52 @@ fn main() -> ! {
     #[allow(unused_variables)]
     let display_receiver = display_channel.receiver();
 
-    let _other_core = cpu_control
-        .start_app_core(
-            unsafe {
-                #[allow(static_mut_refs)]
-                &mut APP_CORE_STACK
-            },
-            move || {
-                static IO_EXECUTOR_RAW: static_cell::StaticCell<esp_hal_embassy::Executor> = static_cell::StaticCell::new();
-                let io_executor = IO_EXECUTOR_RAW.init_with(esp_hal_embassy::Executor::new);
+    static mut APP_CORE_STACK: esp_hal::system::Stack<4096> = esp_hal::system::Stack::new();
 
-                io_executor.run(|#[allow(unused_variables)] spawner| {
-                    #[cfg(feature = "epaper_2_13")]
-                    display_wrapper.set_text("Edgeless");
-                    #[cfg(feature = "scd30")]
-                    spawner.spawn(io_task(spawner, sender, sensor_wrapper)).unwrap();
-                    #[cfg(feature = "epaper_2_13")]
-                    spawner
-                        .spawn(edgeless_embedded::resource::epaper_display::display_writer(
-                            display_receiver,
-                            display_wrapper,
-                        ))
-                        .unwrap();
-                });
-            },
-        )
-        .unwrap();
+    esp_rtos::start_second_core_with_stack_guard_offset(
+        peripherals.CPU_CTRL,
+        sw_int.software_interrupt0,
+        sw_int.software_interrupt1,
+        unsafe {
+            #[allow(static_mut_refs)]
+            &mut APP_CORE_STACK
+        },
+        None,
+        move || {
+            static IO_EXECUTOR_RAW: static_cell::StaticCell<esp_rtos::embassy::Executor> = static_cell::StaticCell::new();
+            let io_executor = IO_EXECUTOR_RAW.init_with(esp_rtos::embassy::Executor::new);
 
-    static EXECUTOR_RAW: static_cell::StaticCell<esp_hal_embassy::Executor> = static_cell::StaticCell::new();
-    let executor = EXECUTOR_RAW.init_with(esp_hal_embassy::Executor::new);
+            io_executor.run(|#[allow(unused_variables)] spawner| {
+                // #[cfg(feature = "epaper_2_13")]
+                // display_wrapper.set_text("Edgeless");
+                #[cfg(feature = "scd30")]
+                spawner
+                    .spawn(edgeless_embedded::resource::scd30_sensor::scd30_reader_task(sensor_wrapper, sender))
+                    .unwrap();
+                #[cfg(feature = "epaper_2_13")]
+                spawner
+                    .spawn(edgeless_embedded::resource::epaper_display::display_writer(
+                        display_receiver,
+                        display_wrapper,
+                    ))
+                    .unwrap();
+            });
+        },
+    );
+
+    static EXECUTOR_RAW: static_cell::StaticCell<esp_rtos::embassy::Executor> = static_cell::StaticCell::new();
+    let executor = EXECUTOR_RAW.init_with(esp_rtos::embassy::Executor::new);
 
     executor.run(|spawner| {
-        spawner
-            .spawn(edgeless(
-                spawner,
-                timer_group0.timer0,
-                rng,
-                peripherals.RADIO_CLK,
-                peripherals.WIFI,
-                receiver,
-                display_sender,
-            ))
-            .unwrap();
+        spawner.spawn(edgeless(spawner, rng, peripherals.WIFI, receiver, display_sender)).unwrap();
     });
-}
-
-#[embassy_executor::task]
-async fn io_task(
-    spawner: embassy_executor::Spawner,
-    sender: embassy_sync::channel::Sender<
-        'static,
-        embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
-        edgeless_embedded::resource::scd30_sensor::Measurement,
-        2,
-    >,
-    sensor_wrapper: &'static mut dyn edgeless_embedded::resource::scd30_sensor::Sensor,
-) {
-    spawner
-        .spawn(edgeless_embedded::resource::scd30_sensor::scd30_reader_task(sensor_wrapper, sender))
-        .unwrap();
 }
 
 #[embassy_executor::task]
 async fn edgeless(
     spawner: embassy_executor::Spawner,
-    timer: esp_hal::timer::timg::Timer,
     rng: esp_hal::rng::Rng,
-    radio_clock_control: esp_hal::peripherals::RADIO_CLK,
-    wifi: esp_hal::peripherals::WIFI,
+    wifi: esp_hal::peripherals::WIFI<'static>,
     #[allow(unused_variables)] sensor_scd_receiver: embassy_sync::channel::Receiver<
         'static,
         embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
@@ -315,7 +283,7 @@ async fn edgeless(
     #[allow(unused_variables)] display_sender: embassy_sync::channel::Sender<
         'static,
         embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
-        heapless::String<1500>,
+        heapless::String<256>,
         2,
     >,
 ) {
@@ -323,25 +291,25 @@ async fn edgeless(
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "psram")] {
-            let rx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
+            let rx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 1600]));
             let rx_meta = alloc::boxed::Box::leak(alloc::boxed::Box::new([embassy_net::udp::PacketMetadata::EMPTY; 10]));
-            let tx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
+            let tx_buf = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 1600]));
             let tx_meta = alloc::boxed::Box::leak(alloc::boxed::Box::new([embassy_net::udp::PacketMetadata::EMPTY; 10]));
-            let app_tx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
-            let app_rx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 2500]));
+            let app_tx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 1600]));
+            let app_rx = alloc::boxed::Box::leak(alloc::boxed::Box::new([0 as u8; 1600]));
         } else {
-            static RX_BUF_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-            let rx_buf = RX_BUF_RAW.init_with(|| [0_u8; 2500]);
+            static RX_BUF_RAW: static_cell::StaticCell<[u8; 1600]> = static_cell::StaticCell::new();
+            let rx_buf = RX_BUF_RAW.init_with(|| [0_u8; 1600]);
             static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
             let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
-            static TX_BUF_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-            let tx_buf = TX_BUF_RAW.init_with(|| [0_u8; 2500]);
+            static TX_BUF_RAW: static_cell::StaticCell<[u8; 1600]> = static_cell::StaticCell::new();
+            let tx_buf = TX_BUF_RAW.init_with(|| [0_u8; 1600]);
             static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
             let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
-            static APP_TX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-            let app_tx = APP_TX_RAW.init_with(|| [0_u8; 2500]);
-            static APP_RX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-            let app_rx = APP_RX_RAW.init_with(|| [0_u8; 2500]);
+            static APP_TX_RAW: static_cell::StaticCell<[u8; 1600]> = static_cell::StaticCell::new();
+            let app_tx = APP_TX_RAW.init_with(|| [0_u8; 1600]);
+            static APP_RX_RAW: static_cell::StaticCell<[u8; 1600]> = static_cell::StaticCell::new();
+            let app_rx = APP_RX_RAW.init_with(|| [0_u8; 1600]);
         }
     }
 
@@ -383,7 +351,7 @@ async fn edgeless(
 
     log::info!("Agent Created");
 
-    let stack = wifi::init(spawner, timer, rng, radio_clock_control, wifi, agent.clone()).await;
+    let stack = wifi::init(spawner, rng, wifi, agent.clone()).await;
     let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
 
     log::info!("WiFi Started");

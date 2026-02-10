@@ -21,8 +21,8 @@ pub struct OwnedFunctionInstanceSpecification {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EncodedFunctionClassSpecification {
-    pub class_id: heapless::String<32>,
-    pub class_type: heapless::String<32>,
+    pub class_id: heapless::String<64>,
+    pub class_type: heapless::String<64>,
     pub version: heapless::String<8>,
     pub image_hash: [u8; 32],
     // We might split this into id and size
@@ -110,10 +110,10 @@ impl<C> minicbor::CborLen<C> for EncodedFunctionClassSpecification {
 
 impl<'b, C> minicbor::Decode<'b, C> for EncodedFunctionClassSpecification {
     fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let class_id: heapless::String<32> =
-            heapless::String::<32>::from_str(d.str()?).map_err(|_| minicbor::decode::Error::message("Bad String"))?;
-        let class_type: heapless::String<32> =
-            heapless::String::<32>::from_str(d.str()?).map_err(|_| minicbor::decode::Error::message("Bad String"))?;
+        let class_id: heapless::String<64> =
+            heapless::String::<64>::from_str(d.str()?).map_err(|_| minicbor::decode::Error::message("Bad String"))?;
+        let class_type: heapless::String<64> =
+            heapless::String::<64>::from_str(d.str()?).map_err(|_| minicbor::decode::Error::message("Bad String"))?;
         let version: heapless::String<8> = heapless::String::<8>::from_str(d.str()?).map_err(|_| minicbor::decode::Error::message("Bad String"))?;
         let config_hash: [u8; 32] = d.bytes()?.try_into().map_err(|_| minicbor::decode::Error::message("Bad Hash"))?;
         let image_size: u64 = d.u64()?;

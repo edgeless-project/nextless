@@ -10,10 +10,10 @@ edition = "2021"
 resolver = "2"
 rust-version = "1.88"
 
-[profile.dev.package.esp-wifi]
+[profile.dev.package.esp-radio]
 opt-level = 3
 
-[profile.release.package.esp-wifi]
+[profile.release.package.esp-radio]
 opt-level = 3
 
 [profile.release]
@@ -30,13 +30,13 @@ log = { version = "0.4", default-features = false }
 embedded-hal = "1"
 embedded-hal-async = "1"
 embedded-hal-bus = { version = "0.2", features = ["async"] }
-esp-alloc = { version = "0.7.0" }
+esp-alloc = { version = "0.9.0" }
 
 
-embassy-executor = { version = "0.7.0", features = ["nightly"] }
-embassy-sync = { version = "0.6" }
-embassy-time = { version = "0.4", features = ["tick-hz-1_000_000"] }
-embassy-net = { version = "0.6", features = [
+embassy-executor = { version = "0.9", features = ["nightly"] }
+embassy-sync = { version = "0.7" }
+embassy-time = { version = "0.5" }
+embassy-net = { version = "0.7", features = [
     "tcp",
     "udp",
     "dhcpv4",
@@ -47,7 +47,7 @@ embassy-futures = { version = "0.1" }
 embassy-embedded-hal = { version = "0.3" }
 
 static_cell = { version = "1.2.0" }
-heapless = "0.8"
+heapless = "0.9"
 once_cell = { version = "1.18", default-features = false, features = [
     "critical-section",
 ] }
@@ -71,56 +71,58 @@ cfg-if = "1.0"
 
 
 [target.xtensa-esp32-none-elf.dependencies]
-esp-hal = { version = "1.0.0-beta.0", features = ["unstable"] }
-esp-backtrace = { version = "0.15", features = [
+esp-hal = { version = "1.0.0", features = ["unstable"] }
+esp-backtrace = { version = "0.18", features = [
     "esp32",
     "panic-handler",
-    "exception-handler",
     "println",
 ] }
-esp-println = { version = "0.13", default-features = false, features = [
+esp-println = { version = "0.16", default-features=false, features = [
     "esp32",
     "uart",
-    "log",
-    "critical-section",
+    "log-04",
 ] }
-esp-wifi = { version = "0.13", default-features = false, features = [
+esp-radio = { version = "0.17", features = [
     "esp32",
     "wifi",
-    "builtin-scheduler",
+    "unstable",
+    "log-04",
 ] }
-esp-hal-embassy = { version = "0.7.0", features = ["esp32"] }
+esp-rtos = { version = "0.2", features = ["esp32", "embassy", "esp-radio"] }
+esp-bootloader-esp-idf = {version = "0.2", features = ["esp32"]}
 
 [target.xtensa-esp32s3-none-elf.dependencies]
-esp-hal = { version = "1.0.0-beta.0", features = ["unstable"] }
-esp-backtrace = { version = "0.15", features = [
+esp-hal = { version = "1.0.0", features = ["unstable"] }
+esp-backtrace = { version = "0.18", features = [
     "esp32s3",
     "panic-handler",
-    "exception-handler",
     "println",
 ] }
-esp-println = { version = "0.13", default-features = false, features = [
+esp-println = { version = "0.16", features = [
     "esp32s3",
-    "uart",
-    "log",
+    # "uart",
+    "log-04",
     "critical-section",
 ] }
-esp-wifi = { version = "0.13", default-features = false, features = [
+esp-radio = { version = "0.17", features = [
     "esp32s3",
     "wifi",
-    "builtin-scheduler",
-    "log",
+    "unstable",
+    "log-04"
+
 ] }
-esp-hal-embassy = { version = "0.7.0", features = ["esp32s3"] }
+esp-rtos = { version = "0.2", features = ["esp32s3", "embassy", "esp-radio"] }
+esp-bootloader-esp-idf = {version = "0.2", features = ["esp32s3"]}
 
 [features]
 # GDEH0213B73
 epaper_2_13 = []
 scd30 = []
 tum_node_2_13 = ["epaper_2_13", "scd30", "esp32"]
-esp32 = []
-wasm = []
+wasm = ["edgeless_embedded/wasm"]
 psram = ["esp-hal/psram", "edgeless_embedded/alloc_static"]
+esp32 = []
+esp32s3 = ["wasm", "psram"]
 
 [build-dependencies]
 embuild = "0.31.2"

@@ -30,7 +30,7 @@ type StoreType = alloc::collections::BTreeMap<edgeless_api_core::function_instan
 
 #[derive(Clone)]
 pub struct CodeStore {
-    inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoreType>,
+    inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoreType>,
 }
 
 impl Default for CodeStore {
@@ -43,7 +43,7 @@ impl CodeStore {
     pub fn new() -> Self {
         Self {
             inner: alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::mutex::Mutex::<
-                embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                embassy_sync::blocking_mutex::raw::NoopRawMutex,
                 StoreType,
             >::new(StoreType::new()))),
         }

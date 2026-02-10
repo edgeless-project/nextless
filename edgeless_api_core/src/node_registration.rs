@@ -128,7 +128,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedRuntimeType {
         let mut features = heapless::Vec::<heapless::String<32>, 4>::new();
         for item in d.array_iter::<&'b str>()?.flatten() {
             if features
-                .push(heapless::String::from_str(item).map_err(|()| minicbor::decode::Error::message("String Failure"))?)
+                .push(heapless::String::from_str(item).map_err(|e| minicbor::decode::Error::message("String Failure: {e:?}"))?)
                 .is_err()
             {
                 log::error!("Too many Runtime Features");

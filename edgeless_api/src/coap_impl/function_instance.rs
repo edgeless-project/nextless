@@ -12,12 +12,12 @@ impl crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_i
         spawn_request: crate::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>> {
         let cbor_class = edgeless_api_core::function_instance::EncodedFunctionClassSpecification {
-            class_id: heapless::String::<32>::from_str(spawn_request.code.function_class_id.as_str())
-                .map_err(|_| anyhow::anyhow!("String to long!"))?,
-            class_type: heapless::String::<32>::from_str(spawn_request.code.function_class_type.as_str())
-                .map_err(|_| anyhow::anyhow!("String to long!"))?,
+            class_id: heapless::String::<64>::from_str(spawn_request.code.function_class_id.as_str())
+                .map_err(|e| anyhow::anyhow!("Heapless String Failure! : {e:?} {}", spawn_request.code.function_class_id.as_str()))?,
+            class_type: heapless::String::<64>::from_str(spawn_request.code.function_class_type.as_str())
+                .map_err(|e| anyhow::anyhow!("Heapless String Failure!: {e:?} {}", spawn_request.code.function_class_type.as_str()))?,
             version: heapless::String::<8>::from_str(spawn_request.code.function_class_version.as_str())
-                .map_err(|_| anyhow::anyhow!("String to long!"))?,
+                .map_err(|e| anyhow::anyhow!("Heapless String Failure!: {e:?} {}", spawn_request.code.function_class_version.as_str()))?,
             image_size: spawn_request.code.function_class_code.len() as u64,
             image_hash: spawn_request.code.function_class_code.image_hash(),
         };

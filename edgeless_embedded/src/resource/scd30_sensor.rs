@@ -30,7 +30,7 @@ pub struct SCD30SensorConfiguration {
 }
 
 pub struct SCD30Sensor {
-    pub inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>,
+    pub inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>,
 }
 
 impl SCD30Sensor {
@@ -63,7 +63,7 @@ impl SCD30Sensor {
         data_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
-            embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>,
+            embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>,
         > = static_cell::StaticCell::new();
         let sensor_state = SENSOR_STATE_RAW.init_with(|| {
             embassy_sync::mutex::Mutex::new(SCD30SensorInner {
@@ -131,7 +131,7 @@ impl crate::resource::Resource for SCD30Sensor {
 
 #[embassy_executor::task]
 pub async fn scd30_sensor_task(
-    state: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, SCD30SensorInner>,
+    state: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>,
     agent: crate::agent::EmbeddedAgent,
 ) {
     let receiver = {
@@ -199,17 +199,19 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let instance_specification = SCD30Sensor::parse_configuration(instance_specification).await?;
-        let mut lck = self.inner.lock().await;
+        {
+            let mut lck = self.inner.lock().await;
 
-        if lck.instance_id.is_some() {
-            return Err(edgeless_api_core::common::ErrorResponse {
-                summary: "Resource Busy",
-                detail: None,
-            });
+            if lck.instance_id.is_some() {
+                return Err(edgeless_api_core::common::ErrorResponse {
+                    summary: "Resource Busy",
+                    detail: None,
+                });
+            }
+
+            lck.instance_id = Some(instance_specification.instance_id);
+            lck.data_out_id = instance_specification.data_out_id;
         }
-
-        lck.instance_id = Some(instance_specification.instance_id);
-        lck.data_out_id = instance_specification.data_out_id;
         log::info!("Start Sensor");
         Ok(())
     }

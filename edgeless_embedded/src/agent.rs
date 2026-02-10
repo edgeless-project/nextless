@@ -6,11 +6,11 @@ use core::str::FromStr;
 #[derive(Clone)]
 pub struct EmbeddedAgent {
     own_node_id: edgeless_api_core::instance_id::NodeId,
-    upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>,
-    upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>>,
-    inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>,
-    registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
-    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
+    upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>,
+    upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>>,
+    inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>,
+    registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
+    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
     code_store: crate::code_store::CodeStore,
 }
 
@@ -21,8 +21,8 @@ struct EmbeddedAgentInner {
 }
 
 struct AgentTask {
-    inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>,
-    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
+    inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>,
+    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
 }
 
 #[embassy_executor::task]
@@ -52,7 +52,7 @@ pub enum AgentEvent {
     Registration(
         (
             edgeless_api_core::node_registration::EncodedNodeRegistration<'static>,
-            &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
+            &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
         ),
     ),
     FetchImage {
@@ -76,37 +76,37 @@ impl EmbeddedAgent {
         cfg_if::cfg_if! {
             if #[cfg(feature = "alloc_static")] {
                 let channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::channel::Channel::<
-                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     AgentEvent,
                     2,
                 >::new()));
                 let buffer_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::channel::Channel::<
-                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     StoredMessage,
                     2,
                 >::new()));
                 let reply_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::signal::Signal::<
-                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     RegistrationReply,
                 >::new()));
             } else {
-                static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>> =
+                static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
                     static_cell::StaticCell::new();
                 let channel = CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<
-                    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+                    embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     AgentEvent,
                     2,
                     >::new
                 );
                 static BUFFER_CHANNEL_RAW: static_cell::StaticCell<
-                    embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>,
+                    embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
                 > = static_cell::StaticCell::new();
                 let buffer_channel =
-                    BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, StoredMessage, 2>::new);
+                    BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>::new);
                 static REPLY_CHANNEL: static_cell::StaticCell<
-                    embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>,
+                    embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
                 > = static_cell::StaticCell::new();
-                let reply_channel = REPLY_CHANNEL.init_with(embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, RegistrationReply>::new);
+                let reply_channel = REPLY_CHANNEL.init_with(embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new);
             }
         }
 
@@ -136,7 +136,7 @@ impl EmbeddedAgent {
                 }));
             } else {
                 static SLF_INNER_RAW: static_cell::StaticCell<
-                    embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedAgentInner>,
+                    embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>,
                 > = static_cell::StaticCell::new();
                 let slf_inner = SLF_INNER_RAW.init_with(|| {
                     embassy_sync::mutex::Mutex::new(EmbeddedAgentInner {
@@ -179,11 +179,12 @@ impl EmbeddedAgent {
 
     pub fn upstream_receiver(
         &mut self,
-    ) -> Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, AgentEvent, 2>> {
+    ) -> Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> {
         self.upstream_receiver.take()
     }
 
     pub async fn register(&mut self, addr: embassy_net::Ipv4Address) {
+        log::info!("Register");
         let mut url = heapless::String::<256>::new();
         let url_bytes = addr.octets();
         ufmt::uwrite!(url, "coap://{}.{}.{}.{}:7050", url_bytes[0], url_bytes[1], url_bytes[2], url_bytes[3]).unwrap();
@@ -211,16 +212,21 @@ impl EmbeddedAgent {
             }
         }
 
+        #[cfg(feature = "wasm")]
+        let runtimes = heapless::Vec::from_slice(&[edgeless_api_core::node_registration::EncodedRuntimeType {
+            base_type: heapless::String::from_str("WASM").unwrap(),
+            features: heapless::Vec::new(),
+        }])
+        .unwrap();
+        #[cfg(not(feature = "wasm"))]
+        let runtimes = heapless::Vec::new();
+
         let reg = edgeless_api_core::node_registration::EncodedNodeRegistration {
             node_id: edgeless_api_core::node_registration::NodeId(self.own_node_id),
             agent_url: url.clone(),
             invocation_url: url,
             resources,
-            runtimes: heapless::Vec::from_slice(&[edgeless_api_core::node_registration::EncodedRuntimeType {
-                base_type: heapless::String::from_str("WASM").unwrap(),
-                features: heapless::Vec::new(),
-            }])
-            .unwrap(),
+            runtimes: runtimes,
         };
 
         loop {
@@ -284,14 +290,21 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
-        log::info!("R Start 1");
         let mut lck = self.inner.lock().await;
-        log::info!("R Start 2");
         for r in lck.resources.iter_mut() {
-            log::info!("R Start {} {}", instance_specification.class_type.len(), r.resource_class());
+            log::info!("Resource Start {}", r.resource_class());
             if r.resource_class() == instance_specification.class_type {
-                log::info!("Try Start");
-                return r.start(instance_specification).await;
+                log::info!("Try Start Resource");
+                match r.start(instance_specification).await {
+                    Ok(_) => {
+                        log::info!("Resource Started");
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::info!("Resource Stop Failed: {e:?}");
+                        return Ok(());
+                    }
+                }
             }
         }
         log::info!("not found");

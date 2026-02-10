@@ -13,22 +13,26 @@ codegen-units = 1
 strip = true
 
 [package]
-name = "esp_test_fun"
+name = "esp_sensor_p"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
 include = ["src/**/*", "function.json", "*.star"]
 
 [lib]
-name = "esp_test_fun"
+name = "esp_sensor_p"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-edgeless_function = { path = "../../edgeless_function", default-features = false }
+edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function", default-features = false, features = [
+    "alloc",
+] }
+edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
+edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
+edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types", default-features = false }
 # edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 log = "0.4"
-edgeless_function_core = { path = "../../edgeless_function_core" }
 
 # minicbor = { version = "0.19", default-features = false, features = ["derive"] }
 [features]

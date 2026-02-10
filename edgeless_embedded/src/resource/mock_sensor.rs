@@ -14,7 +14,7 @@ pub struct MockSensorConfiguration {
 }
 
 pub struct MockSensor {
-    pub inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>,
+    pub inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>,
 }
 
 impl MockSensor {
@@ -66,10 +66,10 @@ impl MockSensor {
 
     pub async fn new_resource() -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
-            embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>,
+            embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>,
         > = static_cell::StaticCell::new();
         let mock_sensor_state = SENSOR_STATE_RAW.init_with(|| {
-            embassy_sync::mutex::Mutex::<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, _>::new(MockSensorInner {
+            embassy_sync::mutex::Mutex::<embassy_sync::blocking_mutex::raw::NoopRawMutex, _>::new(MockSensorInner {
                 instance_id: None,
                 data_out_id: None,
                 delay: 30,
@@ -106,7 +106,7 @@ impl crate::resource::Resource for MockSensor {
 
 #[embassy_executor::task]
 pub async fn mock_sensor_task(
-    state: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, MockSensorInner>,
+    state: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>,
     agent: crate::agent::EmbeddedAgent,
 ) {
     loop {
@@ -165,24 +165,26 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Mock Sensor Start");
         let instance_specification = Self::parse_configuration(instance_specification).await?;
-        log::info!("Post Config Start");
 
-        let mut lck = self.inner.lock().await;
-        log::info!("got Lock Start");
+        {
+            let mut lck = self.inner.lock().await;
 
-        if lck.instance_id.is_some() {
-            return Err(edgeless_api_core::common::ErrorResponse {
-                summary: "Resource Busy",
-                detail: None,
-            });
+            if lck.instance_id.is_some() {
+                return Err(edgeless_api_core::common::ErrorResponse {
+                    summary: "Resource Busy",
+                    detail: None,
+                });
+            }
+
+            let instance_id = instance_specification.instance_id;
+
+            lck.instance_id = Some(instance_id);
+            lck.data_out_id = instance_specification.data_out_id;
+            lck.delay = instance_specification.delay_s;
         }
 
-        let instance_id = instance_specification.instance_id;
+        log::info!("End Mock Sensor Start");
 
-        lck.instance_id = Some(instance_id);
-        lck.data_out_id = instance_specification.data_out_id;
-        lck.delay = instance_specification.delay_s;
-        log::info!("End Start");
         Ok(())
     }
 

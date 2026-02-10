@@ -1,11 +1,11 @@
 #load("../../functions/esp_test_fun/esp_test_fun.star", "EspTestFun")
-load("../../functions/esp_test_fun_no_std/esp_test_fun_no_std.star", "EspTestFunNoStd")
+load("../../functions/esp_test_fun_no_std/esp_test_fun_no_std.star", "EspSensorP")
 load("../../resources/scd_30.star", "SCD30Sensor")
 load("../../resources/epaper_display.star", "EPaperDisplay")
 
 bridge = edgeless_actor(
     id = "bridge_i",
-    klass = EspTestFunNoStd,
+    klass = EspSensorP,
     annotations = {}
 )
 

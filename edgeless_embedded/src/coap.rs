@@ -7,15 +7,15 @@ use crate::resource_configuration::ResourceConfigurationAPI;
 
 struct CoapMultiplexer {
     sock: embassy_net::udp::UdpSocket<'static>,
-    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, crate::agent::AgentEvent, 2>,
+    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 2>,
     agent: crate::agent::EmbeddedAgent,
-    app_buf_tx: &'static mut [u8; 2500],
+    app_buf_tx: &'static mut [u8; 1600],
     last_tokens: heapless::LinearMap<embassy_net::IpEndpoint, (u8, Option<Result<(), edgeless_api_core::common::ErrorResponse>>), 4>,
     peers: heapless::LinearMap<edgeless_api_core::node_registration::NodeId, embassy_net::IpEndpoint, 8>,
     token: u8,
     waiting_for_reply: Option<(
         u8,
-        &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, crate::agent::RegistrationReply>,
+        &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::RegistrationReply>,
     )>,
     active_fetch: Option<ImageFetchJob>,
 }
@@ -29,10 +29,10 @@ struct ImageFetchJob {
 #[embassy_executor::task]
 pub async fn coap_task(
     mut sock: embassy_net::udp::UdpSocket<'static>,
-    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, crate::agent::AgentEvent, 2>,
+    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 2>,
     agent: crate::agent::EmbeddedAgent,
-    rx_buffer: &'static mut [u8; 2500],
-    tx_buffer: &'static mut [u8; 2500],
+    rx_buffer: &'static mut [u8; 1600],
+    tx_buffer: &'static mut [u8; 1600],
 ) {
     sock.bind(7050).unwrap();
 
@@ -52,7 +52,7 @@ pub async fn coap_task(
 }
 
 impl CoapMultiplexer {
-    async fn task(&mut self, rx_buffer: &'static mut [u8; 2500]) {
+    async fn task(&mut self, rx_buffer: &'static mut [u8; 1600]) {
         loop {
             log::debug!("Receive Loop");
             let res = embassy_futures::select::select3(
@@ -82,6 +82,7 @@ impl CoapMultiplexer {
                     let sender = sender.endpoint;
                     match message {
                         edgeless_api_core::coap_mapping::CoapMessage::Invocation(invocation) => {
+                            log::debug!("Got invocation event.");
                             self.incoming_invocation(sender, token, invocation).await;
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::ResourceStart(start_spec) => {
@@ -100,7 +101,7 @@ impl CoapMultiplexer {
                             self.incoming_peer_remove(sender, token, node_id).await;
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::Response(data, success) => {
-                            log::info!("Got Response: {}, {}", data.len(), success);
+                            log::debug!("Got Response: {}, {}", data.len(), success);
                             if let Some((t, channel)) = self.waiting_for_reply.take() {
                                 if t == token {
                                     channel.signal(crate::agent::RegistrationReply::Sucess)
@@ -110,9 +111,8 @@ impl CoapMultiplexer {
                         edgeless_api_core::coap_mapping::CoapMessage::KeepAlive => {
                             self.incoming_keepalive(sender, token).await;
                         }
-                        // #[cfg(feature = "wasm")]
                         edgeless_api_core::coap_mapping::CoapMessage::FunctionStart(start_spec) => {
-                            log::info!("Is Start");
+                            log::debug!("Got function start event.");
                             self.incoming_function_start(sender, token, start_spec).await;
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::FunctionStop(stop_instance_id) => {
@@ -324,10 +324,7 @@ impl CoapMultiplexer {
     async fn outgoing_registration(
         &mut self,
         registration: &edgeless_api_core::node_registration::EncodedNodeRegistration<'static>,
-        reply_channel: &'static embassy_sync::signal::Signal<
-            embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
-            crate::agent::RegistrationReply,
-        >,
+        reply_channel: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::RegistrationReply>,
     ) {
         let endpoint = crate::REGISTRATION_PEER;
         let ((data, endpoint), _tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_node_registration(

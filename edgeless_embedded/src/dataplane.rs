@@ -19,7 +19,7 @@ pub enum CallRet {
 
 pub struct EmbeddedDataplaneHandle {
     own_id: edgeless_api_core::instance_id::InstanceId,
-    inner: embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, EmbeddedDataplaneHandleInner>,
+    inner: embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedDataplaneHandleInner>,
 }
 
 struct EmbeddedDataplaneHandleInner {

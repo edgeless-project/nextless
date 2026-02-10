@@ -35,23 +35,23 @@ async fn registration(agent: edgeless_embedded::agent::EmbeddedAgent) {
 async fn edgeless(spawner: embassy_executor::Spawner) {
     log::info!("Edgeless Embedded Async Main");
 
-    static RX_BUF_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-    let rx_buf = RX_BUF_RAW.init_with(|| [0_u8; 2500]);
+    static RX_BUF_RAW: static_cell::StaticCell<[u8; 1600]> = static_cell::StaticCell::new();
+    let rx_buf = RX_BUF_RAW.init_with(|| [0_u8; 1600]);
     static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
     let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
-    static TX_BUF_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-    let tx_buf = TX_BUF_RAW.init_with(|| [0_u8; 2500]);
+    static TX_BUF_RAW: static_cell::StaticCell<[u8; 1600]> = static_cell::StaticCell::new();
+    let tx_buf = TX_BUF_RAW.init_with(|| [0_u8; 1600]);
     static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
     let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
-    static APP_TX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-    let app_tx = APP_TX_RAW.init_with(|| [0_u8; 2500]);
-    static APP_RX_RAW: static_cell::StaticCell<[u8; 2500]> = static_cell::StaticCell::new();
-    let app_rx = APP_RX_RAW.init_with(|| [0_u8; 2500]);
+    static APP_TX_RAW: static_cell::StaticCell<[u8; 1600]> = static_cell::StaticCell::new();
+    let app_tx = APP_TX_RAW.init_with(|| [0_u8; 1600]);
+    static APP_RX_RAW: static_cell::StaticCell<[u8; 1600]> = static_cell::StaticCell::new();
+    let app_rx = APP_RX_RAW.init_with(|| [0_u8; 1600]);
 
     let device = embassy_net_tuntap::TunTapDevice::new("tap0").unwrap();
     let config = embassy_net::Config::ipv4_static(embassy_net::StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 101, 1), 24),
-        dns_servers: heapless::Vec::new(),
+        dns_servers: heapless::Vec::<embassy_net::Ipv4Address, 3>::new(),
         gateway: None,
     });
 

@@ -9,24 +9,16 @@ runner = "espflash flash --monitor --partition-table part_table.txt -B 921600"
 
 [env]
 ESP_LOG = "TRACE"
-ESP_WIFI_CONFIG_RX_QUEUE_SIZE = "8"
-ESP_WIFI_CONFIG_TX_QUEUE_SIZE = "3"
-ESP_WIFI_CONFIG_STATIC_RX_BUF_NUM = "8"
-ESP_WIFI_CONFIG_DYNAMIC_RX_BUF_NUM = "16"
-ESP_WIFI_CONFIG_STATIC_TX_BUF_NUM = "0"
-ESP_WIFI_CONFIG_DYNAMIC_TX_BUF_NUM = "16"
 # ESP_WIFI_CONFIG_RX_BA_WIN = "6"
-ESP_WIFI_CONFIG_COUNTRY_CODE = "DE"
+# ESP_WIFI_CONFIG_COUNTRY_CODE = "DE"
 ESP_HAL_CONFIG_PSRAM_MODE = "octal"
 
 [build]
 rustflags = [
-    "-C",
-    "link-arg=-Tlinkall.x",
+    "-C", "link-arg=-Wl,-Tlinkall.x",
+    "-C", "link-arg=-nostartfiles",
     "--cfg",
     "getrandom_backend=\"custom\"",
-    # "-C", "link-arg=-nostartfiles",
-    # "-C", "link-arg=-Trom_functions.x",
 ]
 
 target = "xtensa-esp32s3-none-elf"
