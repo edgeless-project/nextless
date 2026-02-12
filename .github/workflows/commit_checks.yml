@@ -48,7 +48,7 @@ jobs:
               run: cargo build --release --target=xtensa-esp32s3-none-elf --features=wasm,psram
             - name: Build ES32 Release
               working-directory: ./edgeless_embedded_esp32
-              run: cargo build --release --target=xtensa-esp32-none-elf --features=tum_node_2_13
+              run: ESP_HAL_CONFIG_PSRAM_MODE=octal cargo build --release --target=xtensa-esp32-none-elf --features=tum_node_2_13
     build-nix-amd64:
         runs-on:
             - ubuntu-latest

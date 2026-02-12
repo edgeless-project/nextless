@@ -24,19 +24,27 @@ pub async fn init(
     }
     let init = ESP_INIT.init(tmp_wifi.unwrap());
 
+    #[cfg(feature = "esp32")]
     let (controller, interfaces) = esp_radio::wifi::new(
         init,
         radio,
         esp_radio::wifi::Config::default()
             .with_country_code(*b"DE")
-            .with_rx_queue_size(8)
+            .with_rx_queue_size(5)
             .with_tx_queue_size(3)
             .with_static_rx_buf_num(8)
             .with_dynamic_rx_buf_num(8)
             .with_static_tx_buf_num(0)
-            .with_dynamic_tx_buf_num(8),
+            .with_dynamic_tx_buf_num(8)
+            .with_ampdu_rx_enable(false)
+            .with_ampdu_tx_enable(false)
+            .with_amsdu_tx_enable(false),
     )
     .unwrap();
+
+    #[cfg(feature = "esp32s3")]
+    let (controller, interfaces) = esp_radio::wifi::new(init, radio, esp_radio::wifi::Config::default().with_country_code(*b"DE")).unwrap();
+
     log::info!("Radio Initialized");
 
     let wifi_interface = interfaces.sta;

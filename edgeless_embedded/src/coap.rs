@@ -7,7 +7,7 @@ use crate::resource_configuration::ResourceConfigurationAPI;
 
 struct CoapMultiplexer {
     sock: embassy_net::udp::UdpSocket<'static>,
-    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 2>,
+    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 1>,
     agent: crate::agent::EmbeddedAgent,
     app_buf_tx: &'static mut [u8; 1600],
     last_tokens: heapless::LinearMap<embassy_net::IpEndpoint, (u8, Option<Result<(), edgeless_api_core::common::ErrorResponse>>), 4>,
@@ -29,7 +29,7 @@ struct ImageFetchJob {
 #[embassy_executor::task]
 pub async fn coap_task(
     mut sock: embassy_net::udp::UdpSocket<'static>,
-    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 2>,
+    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 1>,
     agent: crate::agent::EmbeddedAgent,
     rx_buffer: &'static mut [u8; 1600],
     tx_buffer: &'static mut [u8; 1600],
@@ -65,6 +65,7 @@ impl CoapMultiplexer {
             match res {
                 // External Message Received
                 embassy_futures::select::Either3::First(res) => {
+                    log::debug!("Got Message");
                     let (data_len, sender) = match res {
                         Ok(ret) => ret,
                         Err(err) => {
@@ -146,28 +147,33 @@ impl CoapMultiplexer {
                             log::info!("Unhandled Message");
                         }
                     }
+                    log::debug!("Done receiving message");
                 }
                 // Internal Message that needs to be sent out.
-                embassy_futures::select::Either3::Second(event) => match event {
-                    crate::agent::AgentEvent::Invocation(event) => {
-                        self.outgoing_invocation(event).await;
-                    }
-                    crate::agent::AgentEvent::Registration((registration, reply_signal)) => {
-                        self.outgoing_registration(&registration, reply_signal).await;
-                    }
-                    crate::agent::AgentEvent::FetchImage { function_id, image_spec } => {
-                        if self.active_fetch.is_none() {
-                            self.active_fetch = Some(ImageFetchJob {
-                                spec: image_spec,
-                                current_offset: 0,
-                                requesting_function: function_id,
-                            });
-                            self.fetch_next_chunk().await;
-                        } else {
-                            log::error!("Parallel Fetch not Implemented");
+                embassy_futures::select::Either3::Second(event) => {
+                    log::debug!("Sending Message...");
+                    match event {
+                        crate::agent::AgentEvent::Invocation(event) => {
+                            self.outgoing_invocation(event).await;
+                        }
+                        crate::agent::AgentEvent::Registration((registration, reply_signal)) => {
+                            self.outgoing_registration(&registration, reply_signal).await;
+                        }
+                        crate::agent::AgentEvent::FetchImage { function_id, image_spec } => {
+                            if self.active_fetch.is_none() {
+                                self.active_fetch = Some(ImageFetchJob {
+                                    spec: image_spec,
+                                    current_offset: 0,
+                                    requesting_function: function_id,
+                                });
+                                self.fetch_next_chunk().await;
+                            } else {
+                                log::error!("Parallel Fetch not Implemented");
+                            }
                         }
                     }
-                },
+                    log::debug!("Done sending message");
+                }
                 // Periodic Retry
                 embassy_futures::select::Either3::Third(_) => {
                     if self.active_fetch.is_some() {

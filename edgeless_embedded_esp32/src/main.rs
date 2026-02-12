@@ -67,7 +67,7 @@ fn main() -> ! {
         #[link_section = ".dram2_uninit"]
         size: 64 * 1024
     );
-    esp_alloc::heap_allocator!(size: 16 * 1024);
+    esp_alloc::heap_allocator!(size: 20 * 1024);
 
     let timer_group0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
 

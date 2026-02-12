@@ -6,11 +6,11 @@ use core::str::FromStr;
 #[derive(Clone)]
 pub struct EmbeddedAgent {
     own_node_id: edgeless_api_core::instance_id::NodeId,
-    upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>,
-    upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>>,
+    upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 1>,
+    upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 1>>,
     inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>,
     registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
-    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
+    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 1>,
     code_store: crate::code_store::CodeStore,
 }
 
@@ -22,7 +22,7 @@ struct EmbeddedAgentInner {
 
 struct AgentTask {
     inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>,
-    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
+    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 1>,
 }
 
 #[embassy_executor::task]
@@ -90,19 +90,19 @@ impl EmbeddedAgent {
                     RegistrationReply,
                 >::new()));
             } else {
-                static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
+                static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 1>> =
                     static_cell::StaticCell::new();
                 let channel = CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<
                     embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     AgentEvent,
-                    2,
+                    1,
                     >::new
                 );
                 static BUFFER_CHANNEL_RAW: static_cell::StaticCell<
-                    embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>,
+                    embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 1>,
                 > = static_cell::StaticCell::new();
                 let buffer_channel =
-                    BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 2>::new);
+                    BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 1>::new);
                 static REPLY_CHANNEL: static_cell::StaticCell<
                     embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
                 > = static_cell::StaticCell::new();
@@ -179,7 +179,7 @@ impl EmbeddedAgent {
 
     pub fn upstream_receiver(
         &mut self,
-    ) -> Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> {
+    ) -> Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 1>> {
         self.upstream_receiver.take()
     }
 
@@ -261,9 +261,11 @@ impl EmbeddedAgent {
 impl crate::invocation::InvocationAPI for EmbeddedAgent {
     async fn handle(&mut self, event: edgeless_api_core::invocation::Event) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
         if event.target.node_id != self.own_node_id && event.source.node_id == self.own_node_id {
+            log::debug!("Agent Updstream Invocation");
             self.upstream_sender.send(AgentEvent::Invocation(event)).await;
             Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
         } else {
+            log::debug!("Agent Internal Invocation");
             if self.internal_buffer_sender.try_send(event).is_ok() {
                 return Ok(edgeless_api_core::invocation::LinkProcessingResult::PROCESSED);
             }
