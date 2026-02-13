@@ -3,14 +3,19 @@
 use crate::{function_instance::FunctionInstanceAPI, invocation::InvocationAPI};
 use core::str::FromStr;
 
+pub const INTERNAL_MESSAGE_BUFFER_SIZE: usize = 1;
+pub const UPSTREAM_EVENT_BUFFER_SIZE: usize = 1;
+
 #[derive(Clone)]
 pub struct EmbeddedAgent {
     own_node_id: edgeless_api_core::instance_id::NodeId,
-    upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 1>,
-    upstream_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 1>>,
+    upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, UPSTREAM_EVENT_BUFFER_SIZE>,
+    upstream_receiver:
+        Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, UPSTREAM_EVENT_BUFFER_SIZE>>,
     inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>,
     registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
-    internal_buffer_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 1>,
+    internal_buffer_sender:
+        embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, INTERNAL_MESSAGE_BUFFER_SIZE>,
     code_store: crate::code_store::CodeStore,
 }
 
@@ -22,7 +27,8 @@ struct EmbeddedAgentInner {
 
 struct AgentTask {
     inner: &'static embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, EmbeddedAgentInner>,
-    internal_buffer_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 1>,
+    internal_buffer_receiver:
+        embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, INTERNAL_MESSAGE_BUFFER_SIZE>,
 }
 
 #[embassy_executor::task]
@@ -78,31 +84,31 @@ impl EmbeddedAgent {
                 let channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::channel::Channel::<
                     embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     AgentEvent,
-                    2,
+                    UPSTREAM_EVENT_BUFFER_SIZE,
                 >::new()));
                 let buffer_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::channel::Channel::<
                     embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     StoredMessage,
-                    2,
+                    INTERNAL_MESSAGE_BUFFER_SIZE,
                 >::new()));
                 let reply_channel = alloc::boxed::Box::leak(alloc::boxed::Box::new(embassy_sync::signal::Signal::<
                     embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     RegistrationReply,
                 >::new()));
             } else {
-                static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 1>> =
+                static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, UPSTREAM_EVENT_BUFFER_SIZE>> =
                     static_cell::StaticCell::new();
                 let channel = CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<
                     embassy_sync::blocking_mutex::raw::NoopRawMutex,
                     AgentEvent,
-                    1,
+                    UPSTREAM_EVENT_BUFFER_SIZE,
                     >::new
                 );
                 static BUFFER_CHANNEL_RAW: static_cell::StaticCell<
-                    embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 1>,
+                    embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, INTERNAL_MESSAGE_BUFFER_SIZE>,
                 > = static_cell::StaticCell::new();
                 let buffer_channel =
-                    BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, 1>::new);
+                    BUFFER_CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, StoredMessage, INTERNAL_MESSAGE_BUFFER_SIZE>::new);
                 static REPLY_CHANNEL: static_cell::StaticCell<
                     embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
                 > = static_cell::StaticCell::new();
@@ -179,7 +185,8 @@ impl EmbeddedAgent {
 
     pub fn upstream_receiver(
         &mut self,
-    ) -> Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 1>> {
+    ) -> Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, UPSTREAM_EVENT_BUFFER_SIZE>>
+    {
         self.upstream_receiver.take()
     }
 

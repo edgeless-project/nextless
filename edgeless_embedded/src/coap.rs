@@ -7,7 +7,12 @@ use crate::resource_configuration::ResourceConfigurationAPI;
 
 struct CoapMultiplexer {
     sock: embassy_net::udp::UdpSocket<'static>,
-    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 1>,
+    out_reader: embassy_sync::channel::Receiver<
+        'static,
+        embassy_sync::blocking_mutex::raw::NoopRawMutex,
+        crate::agent::AgentEvent,
+        { crate::agent::UPSTREAM_EVENT_BUFFER_SIZE },
+    >,
     agent: crate::agent::EmbeddedAgent,
     app_buf_tx: &'static mut [u8; 1600],
     last_tokens: heapless::LinearMap<embassy_net::IpEndpoint, (u8, Option<Result<(), edgeless_api_core::common::ErrorResponse>>), 4>,
@@ -29,7 +34,12 @@ struct ImageFetchJob {
 #[embassy_executor::task]
 pub async fn coap_task(
     mut sock: embassy_net::udp::UdpSocket<'static>,
-    out_reader: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::AgentEvent, 1>,
+    out_reader: embassy_sync::channel::Receiver<
+        'static,
+        embassy_sync::blocking_mutex::raw::NoopRawMutex,
+        crate::agent::AgentEvent,
+        { crate::agent::UPSTREAM_EVENT_BUFFER_SIZE },
+    >,
     agent: crate::agent::EmbeddedAgent,
     rx_buffer: &'static mut [u8; 1600],
     tx_buffer: &'static mut [u8; 1600],
