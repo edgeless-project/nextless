@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+// https://github.com/rust-lang/cargo/issues/1403
+// https://doc.rust-lang.org/cargo/reference/external-tools.html?highlight=output-format
+
 #[derive(serde::Deserialize)]
 pub(crate) struct MetadataRoot {
     pub(crate) packages: Vec<MetadataPackage>,
