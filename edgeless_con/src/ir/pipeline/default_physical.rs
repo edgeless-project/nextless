@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use crate::ir::transformations::{StatefulTransformation, StatelessTransformation};
+use crate::ir::transformations::{StatefulPhysicalTransformation, StatelessPhysicalTransformation};
 
 pub struct DefaultPhysicalPipeline {
     physical_connection_mapper: crate::ir::transformations::physical_mapper::PhysicalConnectionMapper,
@@ -32,10 +32,7 @@ impl<'a> crate::ir::pipeline::TransformationPipeline<PhysicalPipelineState<'a>> 
         peer_clusters: &crate::ir::Clusters,
         global_state: &PhysicalPipelineState,
     ) {
-        self.physical_connection_mapper.apply(workflow, nodes, peer_clusters);
-        self.pipe_generator
-            .apply(workflow, nodes, peer_clusters, global_state.pipe_generator_state);
-        self.compiler.apply(workflow, nodes, peer_clusters, global_state.compiler_state);
+        self.apply_dynamic(workflow, nodes, peer_clusters, global_state);
     }
 
     fn apply_dynamic(
@@ -45,6 +42,16 @@ impl<'a> crate::ir::pipeline::TransformationPipeline<PhysicalPipelineState<'a>> 
         peer_clusters: &crate::ir::Clusters,
         global_state: &PhysicalPipelineState,
     ) {
-        self.apply_all(workflow, nodes, peer_clusters, global_state);
+        let changes = self.physical_connection_mapper.apply(workflow, nodes, peer_clusters);
+        tracing::info!("Connection Mapper: {changes:?}");
+        workflow.apply_physical_changes(changes);
+        let changes = self
+            .pipe_generator
+            .apply(workflow, nodes, peer_clusters, global_state.pipe_generator_state);
+        tracing::info!("Interaction Specializer: {changes:?}");
+        workflow.apply_physical_changes(changes);
+        let changes = self.compiler.apply(workflow, nodes, peer_clusters, global_state.compiler_state);
+        tracing::info!("Compiler: {changes:?}");
+        workflow.apply_physical_changes(changes);
     }
 }

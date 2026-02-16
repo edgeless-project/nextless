@@ -1,11 +1,13 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use crate::ir::actor::ImageState;
+
 #[derive(Clone)]
 pub(crate) struct PhysicalMock {
     id: edgeless_api::function_instance::InstanceId,
     physical_ports: super::PhysicalPorts,
-    materialized: std::cell::RefCell<MaterializedMock>,
+    materialized: MaterializedMock,
 }
 
 #[derive(Clone)]
@@ -60,20 +62,23 @@ impl super::PhysicalComponent for PhysicalMock {
         std::time::Instant::now() - std::time::Duration::from_secs(120)
     }
 
-    fn physical_ports(&mut self) -> &mut super::PhysicalPorts {
-        &mut self.physical_ports
+    fn physical_ports(&self) -> &super::PhysicalPorts {
+        &self.physical_ports
     }
 
-    fn materialize(&mut self, _telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>) -> Vec<super::RequiredChange> {
+    fn materialize(
+        &self,
+        _telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>,
+    ) -> (Vec<crate::ir::transformations::PhysicalChange>, Vec<super::RequiredChange>) {
         println!("Called Materialize on a PhysicalMock!");
-        vec![]
+        (vec![], vec![])
     }
 
-    fn materialized_state(&self) -> Option<&std::cell::RefCell<dyn super::MaterializedComponent>> {
+    fn materialized_state(&self) -> Option<&dyn super::MaterializedComponent> {
         Some(&self.materialized)
     }
 
-    fn stop(&mut self) -> Vec<super::RequiredChange> {
+    fn stop(&self) -> Vec<super::RequiredChange> {
         println!("Called Stop on a PhysicalMock!");
         vec![]
     }
@@ -85,11 +90,19 @@ impl super::PhysicalComponent for PhysicalMock {
     fn as_actor(&self) -> Option<&super::actor::PhysicalActor> {
         None
     }
+
+    fn physical_ports_mut(&mut self) -> &mut super::PhysicalPorts {
+        &mut self.physical_ports
+    }
+
+    fn logical_parent(&self) -> String {
+        "todo".to_string()
+    }
 }
 
 impl super::MaterializedComponent for MaterializedMock {
-    fn materialized_ports(&mut self) -> &mut super::MaterializedPorts {
-        &mut self.materialized_ports
+    fn materialized_ports(&self) -> &super::MaterializedPorts {
+        &self.materialized_ports
     }
 
     fn runtime_statistics(&self) -> Option<&dyn super::ComponentRuntimeStatistics> {
@@ -116,10 +129,14 @@ impl crate::ir::WasmRuntime for MockWasmRuntime {
 }
 
 pub(crate) fn component_mock(
+    logical_id: String,
     component_id: edgeless_api::function_instance::InstanceId,
     output_1: (edgeless_api::function_instance::InstanceId, f64),
     output_2: (edgeless_api::function_instance::InstanceId, f64),
-) -> crate::ir::actor::LogicalActor {
+) -> (
+    crate::ir::logical_model::LogicalComponent,
+    Vec<(uuid::Uuid, crate::ir::physical_model::PhysicalComponentState)>,
+) {
     let cut_logical_ports = crate::ir::LogicalPorts {
         logical_output_mapping: std::collections::HashMap::from([
             (
@@ -215,42 +232,82 @@ pub(crate) fn component_mock(
         },
     );
 
-    crate::ir::test::new_actor_with_mocked_materialized_instances(cut_logical_ports, vec![instance_1])
+    let mock_logical = mock_logical_actor(cut_logical_ports);
+    let mock_instances = mock_physical_actors(logical_id.clone(), vec![instance_1]);
+
+    (mock_logical, mock_instances)
 }
 
-pub(crate) fn new_actor_with_mocked_materialized_instances(
-    logical_ports: super::LogicalPorts,
-    instances: Vec<(edgeless_api::function_instance::InstanceId, super::MaterializedPorts)>,
-) -> crate::ir::actor::LogicalActor {
-    crate::ir::actor::LogicalActor {
+pub(crate) fn component_mock_basic(
+    logical_id: String,
+    component_id: edgeless_api::function_instance::InstanceId,
+) -> (
+    crate::ir::logical_model::LogicalComponent,
+    Vec<(uuid::Uuid, crate::ir::physical_model::PhysicalComponentState)>,
+) {
+    let cut_logical_ports = crate::ir::LogicalPorts {
+        logical_output_mapping: std::collections::HashMap::new(),
+        logical_input_mapping: std::collections::HashMap::new(),
+    };
+
+    let instance_1 = (
+        component_id,
+        crate::ir::MaterializedPorts {
+            materialized_outputs: Default::default(),
+            materialized_inputs: std::collections::HashMap::new(),
+        },
+    );
+
+    let mock_logical = mock_logical_actor(cut_logical_ports);
+    let mock_instances = mock_physical_actors(logical_id.clone(), vec![instance_1]);
+
+    (mock_logical, mock_instances)
+}
+
+pub(crate) fn mock_logical_actor(logical_ports: super::LogicalPorts) -> crate::ir::logical_model::LogicalComponent {
+    crate::ir::logical_model::LogicalComponent::Actor(crate::ir::actor::LogicalActor {
         image: mock_actor_image(),
         annotations: std::collections::HashMap::new(),
         scaling_mode: super::component::ScalingMode::Singleton,
         node_filter: super::component::NodeFilters::default(),
-        logical_ports: logical_ports,
-        instances: instances
-            .into_iter()
-            .map(|(id, materialized_ports)| {
-                let instance = PhysicalMock {
-                    id,
-                    physical_ports: super::PhysicalPorts {
-                        physical_output_mapping: materialized_ports
-                            .materialized_outputs
-                            .iter()
-                            .map(|(id, port)| (id.clone(), port.mapping.clone()))
-                            .collect(),
-                        physical_input_mapping: materialized_ports
-                            .materialized_inputs
-                            .iter()
-                            .map(|(id, port)| (id.clone(), port.mapping.clone()))
-                            .collect(),
-                    },
-                    materialized: std::cell::RefCell::new(MaterializedMock { materialized_ports }),
-                };
-                std::cell::RefCell::new(crate::ir::PhysicalComponentState::Materialized(Box::new(instance)))
-            })
-            .collect(),
-    }
+        logical_ports,
+    })
+}
+
+pub(crate) fn mock_physical_actors(
+    component_name: String,
+    instances: Vec<(edgeless_api::function_instance::InstanceId, super::MaterializedPorts)>,
+) -> Vec<(uuid::Uuid, crate::ir::physical_model::PhysicalComponentState)> {
+    instances
+        .into_iter()
+        .map(|(id, materialized_ports)| {
+            let instance = crate::ir::actor::PhysicalActor {
+                id,
+                materialized: None,
+                component_name: component_name.clone(),
+                creation_time: std::time::Instant::now(),
+                image: ImageState::Existing(mock_actor_image().main_image),
+                behavior_spec: mock_actor_image().spec,
+                desired_mapping: crate::ir::PhysicalPorts {
+                    physical_output_mapping: materialized_ports
+                        .materialized_outputs
+                        .iter()
+                        .map(|(id, port)| (id.clone(), port.mapping.clone()))
+                        .collect(),
+                    physical_input_mapping: materialized_ports
+                        .materialized_inputs
+                        .iter()
+                        .map(|(id, port)| (id.clone(), port.mapping.clone()))
+                        .collect(),
+                },
+                annotations: Default::default(),
+            };
+            (
+                id.function_id.clone(),
+                crate::ir::PhysicalComponentState::Materialized(Box::new(instance)),
+            )
+        })
+        .collect()
 }
 
 pub(crate) fn mock_nodes_and_candidates<'a>(
@@ -277,34 +334,6 @@ pub(crate) fn mock_nodes_and_candidates<'a>(
         .collect();
 
     (nodes, candidates)
-}
-
-pub(crate) fn mock_workflow(
-    functions: std::collections::HashMap<String, std::cell::RefCell<crate::ir::actor::LogicalActor>>,
-) -> crate::ir::workflow::ActiveWorkflow {
-    crate::ir::workflow::ActiveWorkflow {
-        id: edgeless_api::workflow_instance::WorkflowId {
-            workflow_id: uuid::Uuid::new_v4(),
-        },
-        cluster_id: uuid::Uuid::new_v4(),
-        original_request: edgeless_api::workflow_instance::SpawnWorkflowRequest {
-            workflow_functions: vec![],
-            workflow_resources: vec![],
-            workflow_ingress_proxies: vec![],
-            workflow_egress_proxies: vec![],
-            annotations: std::collections::HashMap::new(),
-        },
-        functions: functions,
-        resources: std::collections::HashMap::new(),
-        subflows: std::collections::HashMap::new(),
-        proxy: std::cell::RefCell::new(crate::ir::proxy::LogicalProxy {
-            logical_ports: crate::ir::LogicalPorts::default(),
-            external_ports: crate::ir::ExternalPorts::default(),
-            instances: vec![],
-        }),
-        links: std::collections::HashMap::new(),
-        feature_flags: crate::ir::workflow::FeatureFlags::default(),
-    }
 }
 
 pub(crate) fn mock_actor_image() -> crate::ir::behavior::Behavior {

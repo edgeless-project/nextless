@@ -9,7 +9,8 @@ pub(crate) mod test_helpers;
 pub trait FilterStrategy: Send + Sync {
     fn filter_candidates<'b>(
         &mut self,
-        logical_component: &dyn crate::ir::LogicalComponent,
+        logical_component_id: String,
+        logical_component: &crate::ir::LogicalComponent,
         candidates: Vec<super::Candidate<'b>>,
         workflow: &crate::ir::workflow::ActiveWorkflow,
     ) -> Vec<super::Candidate<'b>>;

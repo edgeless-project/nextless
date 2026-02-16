@@ -3,15 +3,63 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-pub trait LogicalComponent {
+pub type LogicalComponentId = String;
+
+#[derive(Clone, Debug)]
+pub enum LogicalComponent {
+    Actor(crate::ir::actor::LogicalActor),
+    Resource(crate::ir::resource::LogicalResource),
+    SubApplication(crate::ir::subflow::LogicalSubFlow),
+    Proxy(crate::ir::proxy::LogicalProxy),
+}
+
+impl LogicalComponent {
+    pub fn logical_ports(&self) -> &LogicalPorts {
+        match self {
+            LogicalComponent::Actor(logical_actor) => &logical_actor.logical_ports,
+            LogicalComponent::Resource(logical_resource) => &logical_resource.logical_ports,
+            LogicalComponent::SubApplication(logical_sub_application) => &logical_sub_application.logical_ports,
+            LogicalComponent::Proxy(logical_proxy) => &logical_proxy.logical_ports,
+        }
+    }
+
+    pub fn logical_ports_mut(&mut self) -> &mut LogicalPorts {
+        match self {
+            LogicalComponent::Actor(logical_actor) => &mut logical_actor.logical_ports,
+            LogicalComponent::Resource(logical_resource) => &mut logical_resource.logical_ports,
+            LogicalComponent::SubApplication(logical_sub_application) => &mut logical_sub_application.logical_ports,
+            LogicalComponent::Proxy(logical_proxy) => &mut logical_proxy.logical_ports,
+        }
+    }
+
+    pub fn scaling_mode(&self) -> crate::ir::component::ScalingMode {
+        match self {
+            LogicalComponent::Actor(logical_actor) => logical_actor.scaling_mode.clone(),
+            LogicalComponent::Resource(logical_resource) => logical_resource.scaling_mode.clone(),
+            LogicalComponent::SubApplication(_logical_sub_application) => crate::ir::component::ScalingMode::Singleton,
+            LogicalComponent::Proxy(_logical_proxy) => crate::ir::component::ScalingMode::Singleton,
+        }
+    }
+
+    pub fn node_filters(&self) -> crate::ir::component::NodeFilters {
+        match self {
+            LogicalComponent::Actor(logical_actor) => logical_actor.node_filter.clone(),
+            LogicalComponent::Resource(logical_resource) => logical_resource.node_filters.clone(),
+            LogicalComponent::SubApplication(_logical_sub_application) => Default::default(),
+            LogicalComponent::Proxy(_logical_proxy) => Default::default(),
+        }
+    }
+}
+
+pub trait LogicalComponentTrait {
     fn logical_ports(&self) -> &LogicalPorts;
     fn logical_ports_mut(&mut self) -> &mut LogicalPorts;
-    fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId>;
-    fn instances(&self) -> Vec<&std::cell::RefCell<super::physical_model::PhysicalComponentState>>;
-    fn instances_mut(&mut self) -> &mut Vec<std::cell::RefCell<super::physical_model::PhysicalComponentState>>;
+    // fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId>;
+    // fn instances(&self) -> Vec<&std::cell::RefCell<super::physical_model::PhysicalComponentState>>;
+    // fn instances_mut(&mut self) -> &mut Vec<std::cell::RefCell<super::physical_model::PhysicalComponentState>>;
     fn scaling_mode(&self) -> crate::ir::component::ScalingMode;
     fn node_filters(&self) -> crate::ir::component::NodeFilters;
-    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<super::physical_model::PhysicalComponentState>>);
+    // fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<super::physical_model::PhysicalComponentState>>);
 }
 
 #[derive(Default, Debug, Clone)]

@@ -11,9 +11,10 @@ impl WorkflowSplitter {
     }
 }
 
-impl super::StatelessTransformation for WorkflowSplitter {
+impl super::StatelessLogicalTransformation for WorkflowSplitter {
     #[tracing::instrument(name = "workflow_splitter", skip_all)]
-    fn apply(&mut self, _workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
+    fn apply(&mut self, _workflow: &crate::ir::workflow::ActiveWorkflow) -> Vec<super::LogicalChange> {
         // TODO
+        vec![]
     }
 }

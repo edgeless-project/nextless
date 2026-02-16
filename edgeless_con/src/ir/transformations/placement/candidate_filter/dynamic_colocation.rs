@@ -6,39 +6,40 @@ pub struct DynamicColocation {}
 impl super::FilterStrategy for DynamicColocation {
     fn filter_candidates<'b>(
         &mut self,
-        logical_component: &dyn crate::ir::LogicalComponent,
+        logical_component_id: String,
+        _logical_component: &crate::ir::LogicalComponent,
         candidates: Vec<crate::ir::transformations::placement::Candidate<'b>>,
-        _workflow: &crate::ir::workflow::ActiveWorkflow,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
     ) -> Vec<crate::ir::transformations::placement::Candidate<'b>> {
         let mut materialized_instance_count = 0;
         let mut node_rates_abs = std::collections::HashMap::<uuid::Uuid, f64>::new();
 
-        logical_component.instances().iter().for_each(|i| {
-            // The borrow will fail for the instance that should currently be placed.
-            // This is fine as long as we only use this for new functions but might be
-            // probelematic if we use this to check whether the function should be moved.
-            if let Ok(maybe_c) = i.try_borrow() {
-                if let Some(c) = maybe_c.try_unpack_materialized() {
-                    if let Some(materialized) = c.materialized_state() {
-                        materialized_instance_count += 1;
-                        for input in materialized.borrow_mut().materialized_ports().materialized_inputs.values_mut() {
-                            if let Some(port_statistics) = &mut input.port_statistics {
-                                for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
-                                    *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
-                                }
+        let Some((_, component_instances)) = workflow.get_component_with_instances(&logical_component_id) else {
+            tracing::warn!("Could not find logical component that should be filtered");
+            return candidates;
+        };
+
+        for component_instance in component_instances {
+            if let Some(c) = component_instance.component.try_unpack_materialized() {
+                if let Some(materialized) = c.materialized_state() {
+                    materialized_instance_count += 1;
+                    for input in materialized.materialized_ports().materialized_inputs.values() {
+                        if let Some(port_statistics) = &input.port_statistics {
+                            for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
+                                *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
                             }
                         }
-                        for output in materialized.borrow_mut().materialized_ports().materialized_outputs.values_mut() {
-                            if let Some(port_statistics) = &mut output.port_statistics {
-                                for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
-                                    *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
-                                }
+                    }
+                    for output in materialized.materialized_ports().materialized_outputs.values() {
+                        if let Some(port_statistics) = &output.port_statistics {
+                            for (peer_id, rate) in &port_statistics.message_rate_abs_by_peer(c.creation_time().elapsed()) {
+                                *node_rates_abs.entry(peer_id.node_id).or_insert(0.0) += rate;
                             }
                         }
                     }
                 }
             }
-        });
+        }
 
         if materialized_instance_count == 0 {
             return candidates;
@@ -114,18 +115,34 @@ mod test {
             std::collections::HashMap::new(),
         ));
 
-        let function_under_test =
+        let (function_under_test, function_under_test_instances) =
             crate::ir::transformations::placement::candidate_filter::test_helpers::mock_function_under_test(vec![(fut_id, mock_stats)]);
-        let other_function = crate::ir::transformations::placement::candidate_filter::test_helpers::mock_peer_function(vec![colocated_peer_id]);
+        let (other_function, other_function_instances) =
+            crate::ir::transformations::placement::candidate_filter::test_helpers::mock_peer_function(vec![colocated_peer_id]);
 
-        let workflow = mock_workflow(std::collections::HashMap::from([
-            ("fut".to_string(), function_under_test),
-            ("f_other".to_string(), other_function),
-        ]));
+        let all_instances = function_under_test_instances
+            .iter()
+            .chain(other_function_instances.iter())
+            .cloned()
+            .collect();
 
-        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let workflow = crate::ir::workflow::test::mock_workflow(
+            std::collections::HashMap::from([
+                (
+                    "fut".to_string(),
+                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
+                ),
+                (
+                    "f_other".to_string(),
+                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
+                ),
+            ]),
+            all_instances,
+        );
 
-        let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates, &workflow);
+        let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
+
+        let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered.get(0).unwrap().node_id, colocated_peer_id.node_id);
     }

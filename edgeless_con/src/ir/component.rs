@@ -10,7 +10,7 @@ pub enum ScalingMode {
     AllNodes,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct NodeFilters {
     pub node_ids_allowed: Option<Vec<edgeless_api::function_instance::NodeId>>,
     pub node_ids_denied: Option<Vec<edgeless_api::function_instance::NodeId>>,

@@ -23,24 +23,26 @@ impl PhysicalInteractionSpecializerState {
     }
 }
 
-impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for PhysicalInteractionSpecializer {
+impl super::StatefulPhysicalTransformation<PhysicalInteractionSpecializerState> for PhysicalInteractionSpecializer {
     #[tracing::instrument(name = "physical_interaction_specializer", skip_all)]
     fn apply(
         &mut self,
-        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         _peer_clusters: &crate::ir::Clusters,
         global_state: &PhysicalInteractionSpecializerState,
-    ) {
+    ) -> Vec<super::PhysicalChange> {
+        let mut required_changes = Vec::new();
+
         if workflow.original_request.annotations.contains_key("DISABLE_MULTICAST") {
-            return;
+            return vec![];
         }
 
         let mut reg = global_state.dialect_registry.blocking_lock();
 
         let Ok(interactions) = collect_physical_interactions(workflow, &mut reg) else {
             tracing::warn!("Failure Collecting Interactions");
-            return;
+            return vec![];
         };
 
         let mapped_interactions = interactions
@@ -58,7 +60,19 @@ impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for Phys
 
             match link_config {
                 interaction::LinkConfigurationResult::Ok(workflow_link) => {
-                    workflow.links.entry(workflow_link.id.clone()).or_insert(workflow_link);
+                    if let Some(existing) = workflow.links.get(&workflow_link.id) {
+                        if *existing != workflow_link {
+                            required_changes.push(super::PhysicalChange::Link(super::PhysicalLinkChange {
+                                link_id: workflow_link.id.clone(),
+                                action: super::PhysicalLinkChangeAction::Update(workflow_link),
+                            }));
+                        }
+                    } else {
+                        required_changes.push(super::PhysicalChange::Link(super::PhysicalLinkChange {
+                            link_id: workflow_link.id.clone(),
+                            action: super::PhysicalLinkChangeAction::Insert(workflow_link),
+                        }));
+                    }
                 }
                 interaction::LinkConfigurationResult::NoConfig => {
                     tracing::debug!("No Link Configuration Required");
@@ -72,6 +86,8 @@ impl super::StatefulTransformation<PhysicalInteractionSpecializerState> for Phys
         if let Err(e) = distribute_physical_interactions(mapped_interactions, workflow, &mut reg) {
             tracing::warn!("Failure distributing physical interactions: {e}");
         }
+
+        return required_changes;
     }
 }
 
@@ -155,7 +171,7 @@ fn try_map_interaction(
 }
 
 fn collect_physical_interactions(
-    workflow: &mut crate::ir::workflow::ActiveWorkflow,
+    workflow: &crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
 ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
     let mut port_collector = std::collections::BTreeMap::<
@@ -166,31 +182,29 @@ fn collect_physical_interactions(
         ),
     >::new();
 
-    for (_c_id, c) in workflow.components() {
-        let mut current = c.borrow_mut();
-        let (_logical_ports, physical_instances) = current.split_view();
-        for i in &physical_instances {
-            if let Some(i) = i.borrow_mut().try_unpack_active_mut() {
+    for (_c_id, _logical_component, instances) in workflow.components_with_instances() {
+        for i in instances {
+            if let Some(i) = i.component.try_unpack_active() {
                 let cloned_id = i.id().clone();
                 let ports = i.physical_ports();
 
-                for (out_id, out) in std::mem::take(&mut ports.physical_output_mapping) {
+                for (out_id, out) in &ports.physical_output_mapping {
                     port_collector.entry(out.dialect_type.clone()).or_default().0.push((
                         crate::ir::interaction::PhysicalPortId {
                             instance: cloned_id.clone(),
-                            port: out_id,
+                            port: out_id.clone(),
                         },
-                        out,
+                        out.clone(),
                     ));
                 }
 
-                for (input_id, input) in std::mem::take(&mut ports.physical_input_mapping) {
+                for (input_id, input) in &ports.physical_input_mapping {
                     port_collector.entry(input.dialect_type.clone()).or_default().1.push((
                         crate::ir::interaction::PhysicalPortId {
                             instance: cloned_id.clone(),
-                            port: input_id,
+                            port: input_id.clone(),
                         },
-                        input,
+                        input.clone(),
                     ));
                 }
             }
@@ -208,9 +222,9 @@ fn collect_physical_interactions(
 
 fn distribute_physical_interactions(
     mapped_interactions: Vec<crate::ir::interaction::InteractionMapping>,
-    workflow: &mut crate::ir::workflow::ActiveWorkflow,
+    workflow: &crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
-) -> Result<(), crate::ir::interaction::InteractionError> {
+) -> Result<Vec<super::PhysicalChange>, crate::ir::interaction::InteractionError> {
     let mut replacement_srcs = std::collections::BTreeMap::<
         edgeless_api::function_instance::InstanceId,
         std::collections::BTreeMap<edgeless_api::function_instance::PortId, interaction::SourcePortMapping>,
@@ -236,27 +250,45 @@ fn distribute_physical_interactions(
         }
     }
 
-    for (_c_id, c) in workflow.components() {
-        let mut current = c.borrow_mut();
-        let (_logical_ports, physical_instances) = current.split_view();
-        for i in &physical_instances {
-            if let Some(i) = i.borrow_mut().try_unpack_active_mut() {
-                let cloned_id = i.id();
-                let ports = i.physical_ports();
+    let mut required_changes = Vec::new();
+
+    for (_c_id, _logical_component, component_instances) in workflow.components_with_instances() {
+        for i in component_instances {
+            let mut cloned_instance = i.component.clone();
+            let mut changed = false;
+
+            if let Some(active_instance) = cloned_instance.try_unpack_active_mut() {
+                let cloned_id = active_instance.id();
+                let ports = active_instance.physical_ports_mut();
 
                 let inputs = replacement_dests.remove(&cloned_id).unwrap_or_default();
                 let outputs = replacement_srcs.remove(&cloned_id).unwrap_or_default();
 
                 for (input_port, port_mapping) in inputs {
-                    ports.physical_input_mapping.insert(input_port, port_mapping);
+                    let existing_value = ports.physical_input_mapping.insert(input_port, port_mapping.clone());
+
+                    if existing_value.is_none_or(|existing_value| existing_value != port_mapping) {
+                        changed = true;
+                    }
                 }
 
                 for (output_port, port_mapping) in outputs {
-                    ports.physical_output_mapping.insert(output_port, port_mapping);
+                    let existing_value = ports.physical_output_mapping.insert(output_port, port_mapping.clone());
+
+                    if existing_value.is_none_or(|existing_value| existing_value != port_mapping) {
+                        changed = true;
+                    }
+                }
+
+                if changed {
+                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                        component_id: i.component_id,
+                        action: super::PhysicalComponentChangeAction::Update(cloned_instance),
+                    }))
                 }
             }
         }
     }
 
-    Ok(())
+    Ok(required_changes)
 }

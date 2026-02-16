@@ -49,140 +49,163 @@ pub struct Candidate<'a> {
     pub(crate) runtime: crate::ir::Runtime<'a>,
 }
 
-impl<'a, P: strategy::PlacementStrategy> super::StatefulTransformation<PlacementState<'a, P>> for DefaultPlacement<P> {
+impl<'a, P: strategy::PlacementStrategy> super::StatefulPhysicalTransformation<PlacementState<'a, P>> for DefaultPlacement<P> {
     #[tracing::instrument(name = "placement", skip_all)]
     fn apply(
         &mut self,
-        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
         nodes: &crate::ir::Nodes,
         peer_clusters: &crate::ir::Clusters,
         global_state: &PlacementState<P>,
-    ) {
-        for (f_id, function) in &workflow.functions {
-            let mut function = function.borrow_mut();
-            self.process_actor(workflow, f_id, &mut *function, nodes, global_state);
-        }
+    ) -> Vec<super::PhysicalChange> {
+        let mut required_changes = Vec::new();
 
-        for (resource_id, resource) in &mut workflow.resources {
-            let mut resource = resource.borrow_mut();
+        for (f_id, function, instances) in workflow.components_with_instances() {
+            match function {
+                LogicalComponent::Actor(_logical_actor) => {
+                    required_changes.extend(self.process_component(workflow, f_id, function, instances, nodes, global_state))
+                }
+                LogicalComponent::Resource(logical_resource) => {
+                    let r_class_clone = logical_resource.class.to_string();
+                    let r_configuration_clone = logical_resource.configurations.clone();
 
-            let r_class_clone = resource.class.to_string();
-            let r_configuration_clone = resource.configurations.clone();
-
-            resource.instances.retain(|r| {
-                let mut r = r.borrow_mut();
-                match &*r {
-                    PhysicalComponentState::Requested(_extra_constraints) => {
-                        let dst = select_node_for_resource(&r_class_clone, nodes);
-                        if let Some(dst) = dst {
-                            *r = PhysicalComponentState::Materialized(Box::new(resource::PhysicalResource {
-                                id: edgeless_api::function_instance::InstanceId::new(dst),
-                                desired_mapping: PhysicalPorts::default(),
-                                materialized: None,
-                                creation_time: std::time::Instant::now(),
-                                class: r_class_clone.clone(),
-                                component_name: resource_id.clone(),
-                                configuration: r_configuration_clone.clone(),
-                            }));
-                        } else {
-                            return false;
+                    for resource_instance in instances {
+                        match &*resource_instance.component {
+                            PhysicalComponentState::Requested(_extra_constraints) => {
+                                let dst = select_node_for_resource(&r_class_clone, nodes);
+                                if let Some(dst) = dst {
+                                    let instance = PhysicalComponentState::Materialized(Box::new(resource::PhysicalResource {
+                                        id: edgeless_api::function_instance::InstanceId {
+                                            node_id: dst,
+                                            function_id: resource_instance.component_id,
+                                        },
+                                        desired_mapping: PhysicalPorts::default(),
+                                        materialized: None,
+                                        creation_time: std::time::Instant::now(),
+                                        class: r_class_clone.clone(),
+                                        component_name: f_id.to_string(),
+                                        configuration: r_configuration_clone.clone(),
+                                    }));
+                                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                                        component_id: resource_instance.component_id,
+                                        action: super::PhysicalComponentChangeAction::Update(instance),
+                                    }));
+                                } else {
+                                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                                        component_id: resource_instance.component_id,
+                                        action: super::PhysicalComponentChangeAction::Delete,
+                                    }));
+                                }
+                            }
+                            _ => {
+                                //NOOP
+                            }
                         }
-                    }
-                    _ => {
-                        //NOOP
                     }
                 }
-                true
-            });
-        }
+                LogicalComponent::SubApplication(logical_sub_flow) => {
+                    for s in instances {
+                        match &*s.component {
+                            PhysicalComponentState::Requested(_extra_constraints) => {
+                                let dst = select_cluster_for_subflow(&logical_sub_flow, peer_clusters);
+                                if let Some(dst) = dst {
+                                    let subflow_instance = PhysicalComponentState::Materialized(Box::new(subflow::PhysicalSubFlow {
+                                        id: edgeless_api::function_instance::InstanceId {
+                                            node_id: dst,
+                                            function_id: s.component_id,
+                                        },
+                                        desired_mapping: PhysicalPorts::default(),
+                                        materialized: None,
+                                        creation_time: std::time::Instant::now(),
+                                        internal_ports: InternalPorts::default(),
+                                    }));
 
-        for subflow in workflow.subflows.values_mut() {
-            let subflow = subflow.borrow_mut();
-
-            for s in &subflow.instances {
-                let mut s = s.borrow_mut();
-                match &*s {
-                    PhysicalComponentState::Requested(_extra_constraints) => {
-                        let dst = select_cluster_for_subflow(&subflow, peer_clusters);
-                        if let Some(dst) = dst {
-                            *s = PhysicalComponentState::Materialized(Box::new(subflow::PhysicalSubFlow {
-                                id: edgeless_api::function_instance::InstanceId::new(dst),
-                                desired_mapping: PhysicalPorts::default(),
-                                materialized: None,
-                                creation_time: std::time::Instant::now(),
-                                internal_ports: InternalPorts::default(),
-                            }));
+                                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                                        component_id: s.component_id,
+                                        action: super::PhysicalComponentChangeAction::Update(subflow_instance),
+                                    }));
+                                }
+                            }
+                            _ => {
+                                //NOOP
+                            }
                         }
                     }
-                    _ => {
-                        //NOOP
+                }
+                LogicalComponent::Proxy(logical_proxy) => {
+                    for p in instances {
+                        match p.component {
+                            PhysicalComponentState::Requested(_extra_constraints) => {
+                                let dst = select_node_for_proxy(logical_proxy, nodes);
+                                if let Some(dst) = dst {
+                                    let proxy_instance = PhysicalComponentState::Materialized(Box::new(proxy::PhyiscalProxy {
+                                        id: edgeless_api::function_instance::InstanceId {
+                                            node_id: dst,
+                                            function_id: p.component_id,
+                                        },
+                                        desired_mapping: PhysicalPorts::default(),
+                                        materialized: None,
+                                        creation_time: std::time::Instant::now(),
+                                        external_ports: ExternalPorts::default(),
+                                    }));
+
+                                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                                        component_id: p.component_id,
+                                        action: super::PhysicalComponentChangeAction::Update(proxy_instance),
+                                    }));
+                                }
+                            }
+                            _ => {
+                                //NOOP
+                            }
+                        }
                     }
                 }
             }
-
-            if subflow.instances.is_empty() && subflow.instances.is_empty() {}
         }
 
-        {
-            let proxy = workflow.proxy.borrow_mut();
-            for p in &proxy.instances {
-                let mut p = p.borrow_mut();
-                match &*p {
-                    PhysicalComponentState::Requested(_extra_constraints) => {
-                        let dst = select_node_for_proxy(&proxy, nodes);
-                        if let Some(dst) = dst {
-                            *p = PhysicalComponentState::Materialized(Box::new(proxy::PhyiscalProxy {
-                                id: edgeless_api::function_instance::InstanceId::new(dst),
-                                desired_mapping: PhysicalPorts::default(),
-                                materialized: None,
-                                creation_time: std::time::Instant::now(),
-                                external_ports: ExternalPorts::default(),
-                            }));
-                        }
-                    }
-                    _ => {
-                        //NOOP
-                    }
-                }
-            }
-        }
+        required_changes
     }
 }
 
 impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
-    fn process_actor(
+    fn process_component(
         &mut self,
         workflow: &crate::ir::workflow::ActiveWorkflow,
-        actor_id: &str,
-        actor: &mut crate::ir::actor::LogicalActor,
+        logical_component_id: &str,
+        actor: &crate::ir::logical_model::LogicalComponent,
+        actor_instances: crate::ir::workflow::InstanceIterator,
         nodes: &crate::ir::Nodes,
         global_state: &PlacementState<P>,
-    ) {
-        let num_instances = actor.instances.len();
-        let num_active_instances = actor.instances.iter().filter(|i| i.borrow().try_unpack_active().is_some()).count();
+    ) -> Vec<super::PhysicalChange> {
+        tracing::warn!("{:?}", actor_instances.clone().map(|p| p.component_id).collect::<Vec<_>>());
+        let num_instances = actor_instances.clone().count();
+        let num_active_instances = actor_instances.clone().filter_active().count();
 
-        let cloned_node_filters = actor.node_filter.clone();
-        let cloned_function_instance_len = actor.instances.len();
-        let cloned_init_on = actor.annotations.get("node_id_init_on").cloned();
+        let cloned_init_on = if let crate::ir::logical_model::LogicalComponent::Actor(logical_actor) = actor {
+            logical_actor.annotations.get("node_id_init_on").cloned()
+        } else {
+            None
+        };
 
-        let cloned_function = actor.clone();
-
-        global_state.image_chache.insert_blocking(actor.image.main_image.clone());
-        for extra in actor.image.extra_images.clone() {
-            tracing::debug!("Storing Extra Image in Cache: {:?}", extra.behavior_image_id);
-            global_state.image_chache.insert_blocking(extra);
+        if let crate::ir::logical_model::LogicalComponent::Actor(logical_actor) = actor {
+            global_state.image_chache.insert_blocking(logical_actor.image.main_image.clone());
+            for extra in logical_actor.image.extra_images.clone() {
+                tracing::debug!("Storing Extra Image in Cache: {:?}", extra.behavior_image_id);
+                global_state.image_chache.insert_blocking(extra);
+            }
         }
 
-        let mut new_instances = Vec::new();
+        let mut required_changes = Vec::new();
 
-        actor.instances.retain(|i| {
-            let mut i = i.borrow_mut();
-            match &mut *i {
+        for i in actor_instances {
+            // let mut i = i.borrow_mut();
+            match &*i.component {
                 PhysicalComponentState::Requested(extra_constraints) => {
                     let mut node_filters = if let Some(extra_constraints) = extra_constraints {
                         extra_constraints.clone()
                     } else {
-                        cloned_node_filters.clone()
+                        actor.node_filters()
                     };
 
                     // This was added for evaluation purposes
@@ -198,28 +221,36 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         urgent: num_active_instances < 1,
                     };
 
-                    let new_instance = self.spawn_new_actor(
+                    let new_instance = self.spawn_new_component_instance(
                         workflow,
-                        actor_id.to_string(),
-                        &cloned_function,
+                        i.component_id,
+                        logical_component_id.to_string(),
+                        &actor,
                         nodes,
                         global_state,
                         &placement_constraints,
                         workflow.feature_flags.disable_actor_optimization,
                     );
                     if let Some(new_instance) = new_instance {
-                        *i = new_instance;
+                        required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                            component_id: i.component_id,
+                            action: super::PhysicalComponentChangeAction::Update(new_instance),
+                        }));
+                        tracing::info!("Spawn worked");
                     } else {
                         tracing::debug!(
                             "Requested Instance: Found no viable node for {} in {}",
-                            &actor_id,
+                            &logical_component_id,
                             workflow.id.workflow_id
                         );
-                        return false;
+                        required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                            component_id: i.component_id,
+                            action: super::PhysicalComponentChangeAction::Delete,
+                        }));
                     }
                 }
                 PhysicalComponentState::MigrationRequested(c) => {
-                    let node_filters = cloned_node_filters.clone();
+                    let node_filters = actor.node_filters();
 
                     // This would allow to guarantee getting a different instance but that might be less efficient than the old instance.
                     // To properly do this, we might be required to also return the efficiency and compare it here.
@@ -227,10 +258,12 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
 
                     let placement_constraints = PlacementConstraints { node_filters, urgent: false };
 
-                    let new_instance = self.spawn_new_actor(
+                    let new_component_id = uuid::Uuid::new_v4();
+                    let new_instance = self.spawn_new_component_instance(
                         workflow,
-                        actor_id.to_string(),
-                        &cloned_function,
+                        new_component_id,
+                        logical_component_id.to_string(),
+                        &actor,
                         nodes,
                         global_state,
                         &placement_constraints,
@@ -241,43 +274,48 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         if new_id.node_id == c.id().node_id {
                             tracing::info!(
                                 "Migrating Instance: Node would be equal {}({}). {}",
-                                actor_id,
+                                logical_component_id,
                                 c.id(),
-                                cloned_function_instance_len
+                                num_instances
                             );
-                            i.abort_migration();
+                            required_changes.extend(i.abort_migration());
                         } else {
                             tracing::info!(
                                 "MigratingInstance: Found Replacement node for {} in {} ({}); Will migrate: {} -> {}",
-                                &actor_id,
+                                &logical_component_id,
                                 workflow.id.workflow_id,
                                 c.id(),
                                 c.id().node_id,
                                 new_id.node_id
                             );
-                            new_instances.push(std::cell::RefCell::new(new_instance));
-                            i.mark_migrating_away(new_id);
+                            required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                                component_id: new_component_id,
+                                action: super::PhysicalComponentChangeAction::Update(new_instance),
+                            }));
+                            required_changes.extend(i.mark_migrating_away(new_id));
                         }
                     } else {
                         tracing::debug!("Migration: Could not spawn replacement instance. Aborting.");
-                        i.abort_migration();
+                        required_changes.extend(i.abort_migration());
                     }
                 }
-                PhysicalComponentState::Lost(_) => match &cloned_function.scaling_mode {
+                PhysicalComponentState::Lost(_) => match &actor.scaling_mode() {
                     crate::ir::component::ScalingMode::AllNodes => {
-                        i.mark_stopped();
+                        required_changes.extend(i.mark_stopped());
                     }
                     _ => {
-                        let node_filters = cloned_node_filters.clone();
+                        let node_filters = actor.node_filters();
                         let placement_constraints = PlacementConstraints {
                             node_filters,
                             urgent: num_active_instances <= 1,
                         };
 
-                        let new_instance = self.spawn_new_actor(
+                        let new_component_id = uuid::Uuid::new_v4();
+                        let new_instance = self.spawn_new_component_instance(
                             workflow,
-                            actor_id.to_string(),
-                            &cloned_function,
+                            new_component_id,
+                            logical_component_id.to_string(),
+                            &actor,
                             nodes,
                             global_state,
                             &placement_constraints,
@@ -285,19 +323,22 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         );
                         if let Some(new_instance) = new_instance {
                             let new_id = new_instance.id().unwrap();
-                            new_instances.push(std::cell::RefCell::new(new_instance));
-                            i.mark_lost_replaced(new_id);
+                            required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                                component_id: new_component_id,
+                                action: super::PhysicalComponentChangeAction::Update(new_instance),
+                            }));
+                            required_changes.extend(i.mark_lost_replaced(new_id));
                         }
                     }
                 },
                 PhysicalComponentState::Dead(old_instance) => {
-                    let node_filters = match &cloned_function.scaling_mode {
+                    let node_filters = match &actor.scaling_mode() {
                         crate::ir::component::ScalingMode::AllNodes => {
-                            let mut filters = cloned_node_filters.clone();
+                            let mut filters = actor.node_filters();
                             filters.node_ids_allowed = Some(vec![old_instance.id().node_id.clone()]);
                             filters
                         }
-                        _ => cloned_node_filters.clone(),
+                        _ => actor.node_filters(),
                     };
 
                     let placement_constraints = PlacementConstraints {
@@ -305,10 +346,12 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         urgent: num_active_instances <= 1,
                     };
 
-                    let new_instance = self.spawn_new_actor(
+                    let new_component_id = uuid::Uuid::new_v4();
+                    let new_instance = self.spawn_new_component_instance(
                         workflow,
-                        actor_id.to_string(),
-                        &cloned_function,
+                        new_component_id,
+                        logical_component_id.to_string(),
+                        &actor,
                         nodes,
                         global_state,
                         &placement_constraints,
@@ -316,54 +359,81 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                     );
                     if let Some(new_instance) = new_instance {
                         let new_id = new_instance.id().unwrap();
-                        new_instances.push(std::cell::RefCell::new(new_instance));
-                        i.mark_dead_replaced(new_id);
+                        required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                            component_id: new_component_id,
+                            action: super::PhysicalComponentChangeAction::Update(new_instance),
+                        }));
+                        required_changes.extend(i.mark_dead_replaced(new_id));
                     }
                 }
                 _ => {
                     //NOOP
                 }
             }
-            true
-        });
-        actor.instances.extend(new_instances);
+        }
+        required_changes
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn spawn_new_actor(
+    fn spawn_new_component_instance(
         &mut self,
         workflow: &crate::ir::workflow::ActiveWorkflow,
+        component_id: uuid::Uuid,
         logical_name: String,
-        actor: &crate::ir::actor::LogicalActor,
+        component: &crate::ir::logical_model::LogicalComponent,
         nodes: &crate::ir::Nodes,
         global_state: &PlacementState<P>,
         placement_constraints: &PlacementConstraints,
         disable_actor_optimization: bool,
     ) -> Option<PhysicalComponentState> {
-        let candidates = find_candidates_for_actor(placement_constraints, actor, nodes, global_state.image_chache, disable_actor_optimization);
+        let candidates = match component {
+            LogicalComponent::Actor(logical_actor) => find_candidates_for_actor(
+                placement_constraints,
+                logical_actor,
+                nodes,
+                global_state.image_chache,
+                disable_actor_optimization,
+            ),
+            LogicalComponent::Resource(logical_resource) => todo!(),
+            LogicalComponent::SubApplication(logical_sub_flow) => todo!(),
+            LogicalComponent::Proxy(logical_proxy) => todo!(),
+        };
 
-        let mut filtered = self.dynamic_colocation_filter.filter_candidates(actor, candidates, workflow);
+        let mut filtered = self
+            .dynamic_colocation_filter
+            .filter_candidates(logical_name.clone(), component, candidates, workflow);
 
         if filtered.len() > 1 {
-            filtered = self.static_colocation_filter.filter_candidates(actor, filtered, workflow);
+            filtered = self
+                .static_colocation_filter
+                .filter_candidates(logical_name.clone(), component, filtered, workflow);
         };
 
         let dst = self.placement_strategy.select_candidate(filtered, global_state.strategy_state);
 
         if let Some(dst) = dst {
-            let new_id = edgeless_api::function_instance::InstanceId::new(dst.node_id);
-            let new_instance = actor::PhysicalActor {
-                id: new_id,
-                desired_mapping: PhysicalPorts::default(),
-                image: dst.dest_image,
-                behavior_spec: actor.image.spec.clone(),
-                materialized: None,
-                creation_time: std::time::Instant::now(),
-                component_name: logical_name,
-                annotations: actor.annotations.clone(),
+            let new_id = edgeless_api::function_instance::InstanceId {
+                function_id: component_id,
+                node_id: dst.node_id,
             };
 
-            let mut new_component_state = PhysicalComponentState::request_new_instance();
+            let new_instance = match component {
+                LogicalComponent::Actor(logical_actor) => actor::PhysicalActor {
+                    id: new_id,
+                    desired_mapping: PhysicalPorts::default(),
+                    image: dst.dest_image,
+                    behavior_spec: logical_actor.image.spec.clone(),
+                    materialized: None,
+                    creation_time: std::time::Instant::now(),
+                    component_name: logical_name,
+                    annotations: logical_actor.annotations.clone(),
+                },
+                LogicalComponent::Resource(logical_resource) => todo!(),
+                LogicalComponent::SubApplication(logical_sub_flow) => todo!(),
+                LogicalComponent::Proxy(logical_proxy) => todo!(),
+            };
+
+            let (_, new_component_state) = PhysicalComponentState::request_new_instance();
             new_component_state.plan_creation(Box::new(new_instance));
             Some(new_component_state)
         } else {

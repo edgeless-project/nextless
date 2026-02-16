@@ -60,14 +60,14 @@ impl Clone for Box<dyn TelemetryProvider> {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 #[allow(unused)]
 pub struct ExternalPorts {
     pub external_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
     pub external_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 #[allow(unused)]
 pub struct InternalPorts {
     pub internal_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalOutput>,

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 pub fn port_weights(
-    component: &dyn crate::ir::LogicalComponent,
+    component: &crate::ir::LogicalComponent,
+    component_instances: crate::ir::workflow::InstanceIterator,
     period: std::time::Duration,
 ) -> Option<Vec<(edgeless_api::function_instance::PortId, u8)>> {
     let mut materialized_instance_count = 0;
@@ -14,20 +15,20 @@ pub fn port_weights(
 
     let mut data = Vec::with_capacity(number_of_ports);
 
-    component.instances().iter().for_each(|i| {
-        if let Some(c) = i.borrow().try_unpack_active() {
+    component_instances.for_each(|i| {
+        if let Some(c) = i.component.try_unpack_active() {
             if let Some(materialized) = c.materialized_state() {
                 materialized_instance_count += 1;
-                for (i_port, input) in &mut materialized.borrow_mut().materialized_ports().materialized_inputs {
-                    if let Some(port_statistics) = &mut input.port_statistics {
+                for (i_port, input) in &materialized.materialized_ports().materialized_inputs {
+                    if let Some(port_statistics) = &input.port_statistics {
                         if let Some(port_rate) = port_statistics.message_rate_abs(period) {
                             total_port_rate += port_rate;
                             data.push((i_port.clone(), port_rate));
                         }
                     }
                 }
-                for (o_port, output) in &mut materialized.borrow_mut().materialized_ports().materialized_outputs {
-                    if let Some(port_statistics) = &mut output.port_statistics {
+                for (o_port, output) in &materialized.materialized_ports().materialized_outputs {
+                    if let Some(port_statistics) = &output.port_statistics {
                         if let Some(port_rate) = port_statistics.message_rate_abs(period) {
                             total_port_rate += port_rate;
                             data.push((o_port.clone(), port_rate));
@@ -62,7 +63,7 @@ pub fn port_weights(
 
 // This should be calculated from the physical representation but that is currently no possible as the inputs are not physically mapped.
 pub fn dynamic_port_link_cost(
-    component_instance: &mut dyn crate::ir::PhysicalComponent,
+    component_instance: &dyn crate::ir::PhysicalComponent,
     period: std::time::Duration,
 ) -> Option<Vec<(edgeless_api::function_instance::PortId, u8)>> {
     let mut materialized_instance_count = 0;
@@ -76,8 +77,8 @@ pub fn dynamic_port_link_cost(
 
     if let Some(materialized) = component_instance.materialized_state() {
         materialized_instance_count += 1;
-        for (i_port, input) in &mut materialized.borrow_mut().materialized_ports().materialized_inputs {
-            if let Some(port_statistics) = &mut input.port_statistics {
+        for (i_port, input) in &materialized.materialized_ports().materialized_inputs {
+            if let Some(port_statistics) = &input.port_statistics {
                 let mut port_total_rate = 0.0;
                 let peer_rates = port_statistics.message_rate_abs_by_peer(period);
                 for (_peer_id, rate) in &peer_rates {
@@ -97,8 +98,8 @@ pub fn dynamic_port_link_cost(
                 data.push((i_port.clone(), port_cost));
             }
         }
-        for (o_port, output) in &mut materialized.borrow_mut().materialized_ports().materialized_outputs {
-            if let Some(port_statistics) = &mut output.port_statistics {
+        for (o_port, output) in &materialized.materialized_ports().materialized_outputs {
+            if let Some(port_statistics) = &output.port_statistics {
                 let mut port_total = 0.0;
                 let peer_rates = port_statistics.message_rate_abs_by_peer(period);
                 for (_peer_id, rate) in &peer_rates {
@@ -144,7 +145,7 @@ pub fn dynamic_port_link_cost(
 }
 
 pub fn trafic_locality(component_instance: &dyn crate::ir::PhysicalComponent, period: std::time::Duration) -> u8 {
-    let mut materialized_state = component_instance.materialized_state().unwrap().borrow_mut();
+    let materialized_state = component_instance.materialized_state().unwrap();
     let p = materialized_state.materialized_ports();
 
     let mut local_rate = 0.0f64;
@@ -174,7 +175,7 @@ pub fn trafic_locality(component_instance: &dyn crate::ir::PhysicalComponent, pe
 pub fn traffic_per_node(component_instance: &dyn crate::ir::PhysicalComponent, period: std::time::Duration) -> Vec<(uuid::Uuid, u8)> {
     let mut local_rates = std::collections::HashMap::<uuid::Uuid, f64>::new();
 
-    let mut materialized_state = component_instance.materialized_state().unwrap().borrow_mut();
+    let materialized_state = component_instance.materialized_state().unwrap();
     let p = materialized_state.materialized_ports();
 
     let mut total_rate = 0.0f64;
@@ -207,7 +208,6 @@ pub fn traffic_per_node(component_instance: &dyn crate::ir::PhysicalComponent, p
 mod test {
     use super::*;
     use crate::ir::test::component_mock;
-    use crate::ir::LogicalComponent;
 
     #[test]
     fn port_weights_different_rates() {
@@ -218,8 +218,23 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 1.0), (remote_other_id, 9.0));
-        let port_rates = port_weights(&component_under_test, std::time::Duration::from_secs(60));
+        let (logical_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 1.0), (remote_other_id, 9.0));
+
+        let workflow_under_test = crate::ir::workflow::test::mock_workflow(
+            std::collections::HashMap::from([(
+                "test".to_string(),
+                (
+                    logical_component_under_test,
+                    instanced_under_test.iter().map(|(id, _)| id.clone()).collect(),
+                ),
+            )]),
+            instanced_under_test.iter().cloned().collect(),
+        );
+
+        let (c, i) = workflow_under_test.get_component_with_instances("test").unwrap();
+
+        let port_rates = port_weights(&c, i, std::time::Duration::from_secs(60));
         let port_rates = port_rates.unwrap();
         assert_eq!(port_rates.len(), 2);
         assert_eq!(
@@ -240,8 +255,24 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 1.05), (remote_other_id, 9.05));
-        let port_rates = port_weights(&component_under_test, std::time::Duration::from_secs(60));
+        let (logical_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 1.05), (remote_other_id, 9.05));
+
+        let workflow_under_test = crate::ir::workflow::test::mock_workflow(
+            std::collections::HashMap::from([(
+                "test".to_string(),
+                (
+                    logical_component_under_test,
+                    instanced_under_test.iter().map(|(id, _)| id.clone()).collect(),
+                ),
+            )]),
+            instanced_under_test.iter().cloned().collect(),
+        );
+
+        let (c, i) = workflow_under_test.get_component_with_instances("test").unwrap();
+
+        let port_rates = port_weights(c, i, std::time::Duration::from_secs(60));
+
         let port_rates = port_rates.unwrap();
         assert_eq!(port_rates.len(), 2);
         assert_eq!(
@@ -262,8 +293,23 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
-        let port_rates = port_weights(&component_under_test, std::time::Duration::from_secs(60));
+        let (logical_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
+
+        let workflow_under_test = crate::ir::workflow::test::mock_workflow(
+            std::collections::HashMap::from([(
+                "test".to_string(),
+                (
+                    logical_component_under_test,
+                    instanced_under_test.iter().map(|(id, _)| id.clone()).collect(),
+                ),
+            )]),
+            instanced_under_test.iter().cloned().collect(),
+        );
+
+        let (c, i) = workflow_under_test.get_component_with_instances("test").unwrap();
+
+        let port_rates = port_weights(c, i, std::time::Duration::from_secs(60));
         let port_rates = port_rates.unwrap();
         assert_eq!(port_rates.len(), 2);
         assert_eq!(
@@ -284,11 +330,9 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
-        let port_link_costs = dynamic_port_link_cost(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
+        let port_link_costs = dynamic_port_link_cost(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
         let port_link_costs = port_link_costs.unwrap();
         assert_eq!(port_link_costs.len(), 2);
         assert_eq!(
@@ -309,11 +353,9 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[0]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 5.0), (colocated_other_id2, 5.0));
-        let port_link_costs = dynamic_port_link_cost(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (colocated_other_id2, 5.0));
+        let port_link_costs = dynamic_port_link_cost(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
         let port_link_costs = port_link_costs.unwrap();
         assert_eq!(port_link_costs.len(), 2);
         assert_eq!(
@@ -334,11 +376,9 @@ mod test {
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
         let remote_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (remote_other_id2, 5.0), (remote_other_id, 5.0));
-        let port_link_costs = dynamic_port_link_cost(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (remote_other_id2, 5.0), (remote_other_id, 5.0));
+        let port_link_costs = dynamic_port_link_cost(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
         let port_link_costs = port_link_costs.unwrap();
         assert_eq!(port_link_costs.len(), 2);
         assert_eq!(
@@ -359,11 +399,9 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[0]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 5.0), (colocated_other_id2, 5.0));
-        let port_link_costs = trafic_locality(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (colocated_other_id2, 5.0));
+        let port_link_costs = trafic_locality(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
         assert_eq!(port_link_costs, 100);
     }
 
@@ -376,11 +414,9 @@ mod test {
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
         let remote_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (remote_other_id, 5.0), (remote_other_id2, 5.0));
-        let port_link_costs = trafic_locality(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (remote_other_id, 5.0), (remote_other_id2, 5.0));
+        let port_link_costs = trafic_locality(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
         assert_eq!(port_link_costs, 0);
     }
 
@@ -393,11 +429,9 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (remote_other_id, 5.0), (colocated_other_id, 5.0));
-        let port_link_costs = trafic_locality(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (remote_other_id, 5.0), (colocated_other_id, 5.0));
+        let port_link_costs = trafic_locality(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
         assert_eq!(port_link_costs, 50);
     }
 
@@ -410,11 +444,9 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let colocated_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[0]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 5.0), (colocated_other_id2, 5.0));
-        let result = traffic_per_node(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (colocated_other_id2, 5.0));
+        let result = traffic_per_node(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
         assert_eq!(result, vec![(nodes[0], 100)]);
     }
 
@@ -427,11 +459,9 @@ mod test {
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
         let remote_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (remote_other_id, 5.0), (remote_other_id2, 5.0));
-        let result = traffic_per_node(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (remote_other_id, 5.0), (remote_other_id2, 5.0));
+        let result = traffic_per_node(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
         assert_eq!(result, vec![(nodes[1], 100)]);
     }
 
@@ -444,11 +474,9 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (remote_other_id, 5.0), (colocated_other_id, 5.0));
-        let result = traffic_per_node(
-            component_under_test.instances()[0].borrow_mut().try_unpack_materialized_mut().unwrap(),
-            std::time::Duration::from_secs(60),
-        );
+        let (_component_under_test, instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (remote_other_id, 5.0), (colocated_other_id, 5.0));
+        let result = traffic_per_node(instanced_under_test[0].1.try_unpack_active().unwrap(), std::time::Duration::from_secs(60));
 
         assert!(result.len() == 2);
         assert!(result.iter().find(|x| x.0 == nodes[0] && x.1 == 50).is_some());

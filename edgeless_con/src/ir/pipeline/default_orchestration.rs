@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::super::transformations::placement::strategy::PlacementStrategy;
-use crate::ir::transformations::{StatefulTransformation, StatelessTransformation};
+use crate::ir::transformations::{StatefulPhysicalTransformation, StatelessPhysicalTransformation};
 
 pub struct DefaultOrchestrationPipeline<P: PlacementStrategy> {
     scaler: super::super::transformations::scaler::Scaler,
@@ -42,9 +42,17 @@ impl<'a, P: PlacementStrategy> super::TransformationPipeline<crate::ir::transfor
         peer_clusters: &crate::ir::Clusters,
         global_state: &crate::ir::transformations::placement::PlacementState<P>,
     ) {
-        self.scaler.apply(workflow, nodes, peer_clusters);
-        self.colocation_optimizer.apply(workflow, nodes, peer_clusters);
-        self.migration_finalizer.apply(workflow, nodes, peer_clusters);
-        self.placement.apply(workflow, nodes, peer_clusters, global_state);
+        let changes = self.scaler.apply(workflow, nodes, peer_clusters);
+        tracing::info!("Scaler: {changes:?}");
+        workflow.apply_physical_changes(changes);
+        let changes = self.colocation_optimizer.apply(workflow, nodes, peer_clusters);
+        tracing::info!("Colocation Optimizer: {changes:?}");
+        workflow.apply_physical_changes(changes);
+        let changes = self.migration_finalizer.apply(workflow, nodes, peer_clusters);
+        tracing::info!("Migration Finalizer: {changes:?}");
+        workflow.apply_physical_changes(changes);
+        let changes = self.placement.apply(workflow, nodes, peer_clusters, global_state);
+        tracing::info!("Placement: {changes:?}");
+        workflow.apply_physical_changes(changes);
     }
 }
