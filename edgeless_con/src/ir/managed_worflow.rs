@@ -57,29 +57,32 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         peer_clusters: &crate::ir::Clusters,
         global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
-        if self.remove_nodes(removed_node_ids) {
-            self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
-            self.materialize()
-        } else {
-            Vec::new()
+        let node_removal_changes = self.remove_nodes(removed_node_ids);
+        if node_removal_changes.is_empty() {
+            return vec![];
         }
+
+        self.wf.apply_physical_changes(node_removal_changes);
+        self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
+        self.materialize()
     }
 
     #[tracing::instrument(name = "engine_patch_external_links", skip_all, fields(workflow_id = self.wf.id.to_string()))]
     pub fn patch_external_links(
         &mut self,
-        update: edgeless_api::common::PatchRequest,
-        nodes: &crate::ir::Nodes,
-        peer_clusters: &crate::ir::Clusters,
-        global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
+        _update: edgeless_api::common::PatchRequest,
+        _nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+        _global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
-        {
-            let mut prx = self.wf.proxy.borrow_mut();
-            prx.external_ports.external_input_mapping = crate::ir::physical_model::parse_api_input_mapping(update.input_mapping);
-            prx.external_ports.external_output_mapping = crate::ir::physical_model::parse_api_output_mapping(update.output_mapping);
-        }
-        self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
-        self.materialize()
+        todo!("Proxy handling not implemented yet")
+        // {
+        //     let mut prx = self.wf.proxy.borrow_mut();
+        //     prx.external_ports.external_input_mapping = crate::ir::physical_model::parse_api_input_mapping(update.input_mapping);
+        //     prx.external_ports.external_output_mapping = crate::ir::physical_model::parse_api_output_mapping(update.output_mapping);
+        // }
+        // self.pipeline.apply_dynamic(&mut self.wf, nodes, peer_clusters, global_state);
+        // self.materialize()
     }
 
     #[allow(unused)]
@@ -88,15 +91,16 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
     }
 
     pub fn stop(&mut self) -> Vec<super::RequiredChange> {
-        for (_, component_state) in self.wf.components() {
-            let component_state = component_state.borrow();
-            for instance in &mut component_state.instances() {
-                let mut instance = instance.borrow_mut();
-                if instance.try_unpack_active().is_some() {
-                    instance.plan_stop();
+        let mut planned_changes = Vec::new();
+        for (_, _logical_component, component_instances) in self.wf.components_with_instances() {
+            for instance in component_instances {
+                if instance.component.try_unpack_active().is_some() {
+                    planned_changes.extend(instance.plan_stop());
                 }
             }
         }
+
+        self.wf.apply_physical_changes(planned_changes);
 
         self.materialize()
     }
@@ -104,19 +108,21 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
     #[tracing::instrument(name = "calculate_required_changes", skip_all)]
     fn materialize(&mut self) -> Vec<super::RequiredChange> {
         let mut changes = Vec::new();
+        let mut model_changes = Vec::new();
 
-        tracing::debug!("Number of Links: {}", self.wf.links.len());
-
-        for (link_id, link) in &mut self.wf.links {
+        for (link_id, link) in &self.wf.links {
+            let mut changed = false;
+            let mut cloned_link = link.clone();
             if !link.materialized {
                 changes.push(super::RequiredChange::InstantiateLinkControlPlane {
                     link_id: link_id.clone(),
                     class: link.class.clone(),
                 });
-                link.materialized = true;
+                cloned_link.materialized = true;
+                changed = true;
             }
 
-            for (node, link_provider_id, node_config, node_materialized) in &mut link.nodes {
+            for (node, link_provider_id, node_config, node_materialized) in &mut cloned_link.nodes {
                 if !*node_materialized {
                     changes.push(super::RequiredChange::CreateLinkOnNode {
                         node_id: *node,
@@ -125,28 +131,36 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                         config: node_config.clone(),
                     });
                     *node_materialized = true;
+                    changed = true;
                 }
+            }
+
+            if changed {
+                model_changes.push(crate::ir::transformations::PhysicalChange::Link(
+                    crate::ir::transformations::PhysicalLinkChange {
+                        link_id: link_id.clone(),
+                        action: crate::ir::transformations::PhysicalLinkChangeAction::Update(cloned_link),
+                    },
+                ));
             }
         }
 
-        tracing::debug!("Number of Components: {}", self.wf.components().len());
-
-        for (_c_name, function) in self.wf.components() {
-            let function = function.borrow_mut();
-            tracing::debug!("Number of Instances: {}", function.instances().len());
-            for i in function.instances().iter() {
-                let mut current = i.borrow_mut();
-                match &mut *current {
+        for (_c_name, _logical_component, component_instances) in self.wf.components_with_instances() {
+            for i in component_instances {
+                match i.component {
                     super::PhysicalComponentState::Planned(planned_instance) => {
-                        changes.extend(planned_instance.materialize(&self.telemetry_provider));
-                        current.mark_materialized();
+                        let (instance_model_changes, material_changes) = planned_instance.materialize(&self.telemetry_provider);
+                        changes.extend(material_changes);
+                        model_changes.extend(instance_model_changes);
                     }
                     super::PhysicalComponentState::Materialized(maybe_dirty_instance) => {
-                        changes.extend(maybe_dirty_instance.materialize(&self.telemetry_provider));
+                        let (instance_model_changes, material_changes) = maybe_dirty_instance.materialize(&self.telemetry_provider);
+                        changes.extend(material_changes);
+                        model_changes.extend(instance_model_changes);
                     }
                     super::PhysicalComponentState::StopPlanned { old, .. } => {
                         changes.extend(old.stop());
-                        current.mark_stopped();
+                        model_changes.extend(i.mark_stopped());
                     }
                     _ => {
                         // NOOP
@@ -154,24 +168,25 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
                 }
             }
         }
+        self.wf.apply_physical_changes(model_changes);
 
         changes
     }
 
-    fn remove_nodes(&mut self, node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>) -> bool {
-        let mut changed = false;
-        for (_, component_state) in self.wf.components() {
-            let component_state = component_state.borrow();
-            for instance in &mut component_state.instances() {
-                let mut instance = instance.borrow_mut();
-                if let super::PhysicalComponentState::Materialized(component_instance) = &*instance {
+    fn remove_nodes(
+        &self,
+        node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>,
+    ) -> Vec<crate::ir::transformations::PhysicalChange> {
+        let mut required_changes = Vec::new();
+        for (_, _logical_component, component_instances) in self.wf.components_with_instances() {
+            for instance in component_instances {
+                if let super::PhysicalComponentState::Materialized(component_instance) = instance.component {
                     if node_ids.contains(&component_instance.id().node_id) {
-                        instance.mark_lost();
-                        changed = true;
+                        required_changes.extend(instance.mark_lost());
                     }
                 }
             }
         }
-        changed
+        required_changes
     }
 }

@@ -177,14 +177,15 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             node_mapping: self
                 .wf
                 .wf
-                .components()
-                .iter()
-                .filter_map(|(id, a)| {
-                    let instances: Vec<_> = a.borrow_mut().instance_ids().iter().map(|i| i.node_id.to_string()).collect();
-                    if !instances.is_empty() {
+                .components_with_instances()
+                .filter_map(|(id, _a, component_instances)| {
+                    let instance_nodes: Vec<_> = component_instances
+                        .filter_map(|i| i.component.id().map(|id| id.node_id.to_string()))
+                        .collect();
+                    if !instance_nodes.is_empty() {
                         Some(edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: id.to_string(),
-                            node_ids: instances,
+                            node_ids: instance_nodes,
                         })
                     } else {
                         None

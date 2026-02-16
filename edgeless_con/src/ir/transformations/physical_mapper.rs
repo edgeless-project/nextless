@@ -15,16 +15,25 @@ impl PhysicalConnectionMapper {
     }
 }
 
-impl super::StatelessTransformation for PhysicalConnectionMapper {
+impl super::StatelessPhysicalTransformation for PhysicalConnectionMapper {
     #[tracing::instrument(name = "physical_mapper", skip_all)]
-    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
+    fn apply(
+        &mut self,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
+        _nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+    ) -> Vec<super::PhysicalChange> {
+        let mut required_changes = Vec::new();
+
         let components = targetable_component_instances(workflow);
 
         for component_id in components.keys() {
-            let mut component = workflow.get_component(component_id).unwrap().borrow_mut();
-            let (logical_ports, physical_instances) = component.split_view();
+            let (component, component_instances) = workflow.get_component_with_instances(component_id).unwrap();
 
-            for (output_id, output) in &logical_ports.logical_output_mapping {
+            let mut cloned_component_instances: std::collections::HashMap<_, _> =
+                component_instances.map(|c| (c.component_id, (c.component.clone(), false))).collect();
+
+            for (output_id, output) in &component.logical_ports().logical_output_mapping {
                 let m = output.mapping.as_ref() as &dyn std::any::Any;
                 let p = m.downcast_ref::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort>();
 
@@ -35,25 +44,59 @@ impl super::StatelessTransformation for PhysicalConnectionMapper {
 
                 match &logical_output.destination {
                     interaction::dialect::logical_overlay::DestinationMapping::Unicast(logical_port_id) => {
-                        map_unicast(&physical_instances, output_id, logical_port_id, &components, &workflow.cluster_id);
+                        map_unicast(
+                            &mut cloned_component_instances,
+                            output_id,
+                            logical_port_id,
+                            &components,
+                            &workflow.cluster_id,
+                        );
                     }
                     interaction::dialect::logical_overlay::DestinationMapping::Anycast(logical_port_ids) => {
-                        map_anycast(&physical_instances, output_id, logical_port_ids, &components, &workflow.cluster_id);
+                        map_anycast(
+                            &mut cloned_component_instances,
+                            output_id,
+                            logical_port_ids,
+                            &components,
+                            &workflow.cluster_id,
+                        );
                     }
                     interaction::dialect::logical_overlay::DestinationMapping::Multicast(logical_port_ids) => {
-                        map_multicast(&physical_instances, output_id, logical_port_ids, &components, &workflow.cluster_id);
+                        map_multicast(
+                            &mut cloned_component_instances,
+                            output_id,
+                            logical_port_ids,
+                            &components,
+                            &workflow.cluster_id,
+                        );
                     }
                 }
 
                 // We do not map the input ports here as they will be automatically generated from the source ports in the next step (physical_interaction_specializer).
                 // If the next step required them to be normalized, we need to add a pass of port_to_interaction and interaction_to_port here.
             }
+
+            for (component_id, (component, changed)) in cloned_component_instances {
+                if !changed {
+                    continue;
+                }
+                tracing::info!("Mapping Changed");
+
+                let component_update = crate::ir::transformations::PhysicalChange::Component(crate::ir::transformations::PhysicalComponentChange {
+                    component_id,
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(component),
+                });
+
+                required_changes.push(component_update);
+            }
         }
+
+        return required_changes;
     }
 }
 
 fn map_unicast(
-    physical_instances: &Vec<&std::cell::RefCell<PhysicalComponentState>>,
+    physical_instances: &mut std::collections::HashMap<uuid::Uuid, (crate::ir::PhysicalComponentState, bool)>,
     source_port_id: &edgeless_api::function_instance::PortId,
     logical_target_port_id: &interaction::LogicalPortId,
     component_instance_map: &std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>,
@@ -64,8 +107,8 @@ fn map_unicast(
 
     let target_instances = component_instance_map.get(target_component).unwrap().clone();
 
-    for c_instance in physical_instances {
-        if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
+    for (_component_instance_id, (component, changed)) in physical_instances {
+        if let Some(c_instance) = component.try_unpack_active_mut() {
             let target_instance = if target_instances.len() == 1 {
                 Some(target_instances[0].clone())
             } else {
@@ -89,19 +132,29 @@ fn map_unicast(
                 }),
             });
 
-            c_instance.physical_ports().physical_output_mapping.insert(
-                source_port_id.clone(),
-                crate::ir::interaction::SourcePortMapping {
-                    dialect_type: dialect_type(cluster_id),
-                    mapping: mapping,
-                },
-            );
+            let new_mapping = crate::ir::interaction::SourcePortMapping {
+                dialect_type: dialect_type(cluster_id),
+                mapping: mapping,
+            };
+
+            let old_mapping = c_instance
+                .physical_ports_mut()
+                .physical_output_mapping
+                .insert(source_port_id.clone(), new_mapping.clone());
+
+            if let Some(old_mapping) = old_mapping {
+                if old_mapping != new_mapping {
+                    *changed = true;
+                }
+            } else {
+                *changed = true;
+            }
         }
     }
 }
 
 fn map_anycast<'a>(
-    physical_instances: &Vec<&std::cell::RefCell<PhysicalComponentState>>,
+    physical_instances: &mut std::collections::HashMap<uuid::Uuid, (crate::ir::PhysicalComponentState, bool)>,
     source_port_id: &edgeless_api::function_instance::PortId,
     logical_target_port_ids: impl IntoIterator<Item = &'a interaction::LogicalPortId>,
     component_instance_map: &std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>,
@@ -125,25 +178,32 @@ fn map_anycast<'a>(
         )
     }
 
-    for c_instance in physical_instances {
-        if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
-            c_instance.physical_ports().physical_output_mapping.insert(
-                source_port_id.clone(),
-                crate::ir::interaction::SourcePortMapping {
-                    dialect_type: dialect_type(cluster_id),
-                    mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
-                        destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(
-                            instances.iter().cloned().collect(),
-                        ),
-                    }),
-                },
-            );
+    for (_component_instance_id, (component, changed)) in physical_instances {
+        if let Some(c_instance) = component.try_unpack_active_mut() {
+            let new_mapping = crate::ir::interaction::SourcePortMapping {
+                dialect_type: dialect_type(cluster_id),
+                mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                    destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(instances.iter().cloned().collect()),
+                }),
+            };
+
+            let old_mapping = c_instance
+                .physical_ports_mut()
+                .physical_output_mapping
+                .insert(source_port_id.clone(), new_mapping.clone());
+            if let Some(old_mapping) = old_mapping {
+                if old_mapping != new_mapping {
+                    *changed = true;
+                }
+            } else {
+                *changed = true;
+            }
         }
     }
 }
 
 fn map_multicast<'a>(
-    physical_instances: &Vec<&std::cell::RefCell<PhysicalComponentState>>,
+    physical_instances: &mut std::collections::HashMap<uuid::Uuid, (crate::ir::PhysicalComponentState, bool)>,
     source_port_id: &edgeless_api::function_instance::PortId,
     logical_target_port_ids: impl IntoIterator<Item = &'a interaction::LogicalPortId>,
     component_instance_map: &std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>,
@@ -165,19 +225,29 @@ fn map_multicast<'a>(
                 .collect(),
         )
     }
-    for c_instance in physical_instances {
-        if let Some(c_instance) = c_instance.borrow_mut().try_unpack_active_mut() {
-            c_instance.physical_ports().physical_output_mapping.insert(
-                source_port_id.clone(),
-                crate::ir::interaction::SourcePortMapping {
-                    dialect_type: dialect_type(cluster_id),
-                    mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
-                        destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(
-                            instances.iter().cloned().collect(),
-                        ),
-                    }),
-                },
-            );
+    for (_component_instance_id, (component, changed)) in physical_instances {
+        if let Some(c_instance) = component.try_unpack_active_mut() {
+            let new_mapping = crate::ir::interaction::SourcePortMapping {
+                dialect_type: dialect_type(cluster_id),
+                mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                    destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(
+                        instances.iter().cloned().collect(),
+                    ),
+                }),
+            };
+
+            let old_mapping = c_instance
+                .physical_ports_mut()
+                .physical_output_mapping
+                .insert(source_port_id.clone(), new_mapping.clone());
+
+            if let Some(old_mapping) = old_mapping {
+                if old_mapping != new_mapping {
+                    *changed = true;
+                }
+            } else {
+                *changed = true;
+            }
         }
     }
 }
@@ -215,25 +285,68 @@ fn targetable_component_instances(
     workflow: &crate::ir::workflow::ActiveWorkflow,
 ) -> std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>> {
     workflow
-        .components()
+        .components_with_instances()
         .into_iter()
-        .map(|(id, spec)| {
+        .map(|(id, _spec, instances)| {
             (
                 id.to_string(),
-                spec.borrow_mut()
-                    .instances()
-                    .iter()
-                    .filter_map(|instance| {
-                        let instance_borrow = instance.borrow();
-
-                        match &*instance_borrow {
-                            PhysicalComponentState::Planned(physical_component) => Some(physical_component.id()),
-                            PhysicalComponentState::Materialized(physical_component) => Some(physical_component.id()),
-                            _ => None,
-                        }
+                instances
+                    .filter_map(|instance| match &*instance.component {
+                        PhysicalComponentState::Planned(physical_component) => Some(physical_component.id()),
+                        PhysicalComponentState::Materialized(physical_component) => Some(physical_component.id()),
+                        _ => None,
                     })
                     .collect(),
             )
         })
         .collect::<std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>>()
+}
+
+#[cfg(test)]
+mod test {
+    use edgeless_api::function_instance::PortId;
+
+    use crate::ir::{
+        interaction::{dialect::DialectDescriptor, LogicalPortId, SourcePortMapping},
+        test::mock_logical_actor,
+        LogicalPorts,
+    };
+
+    #[test]
+    fn unicast_mapping_single_target() {
+        let actor_under_test = mock_logical_actor(LogicalPorts {
+            logical_output_mapping: std::collections::HashMap::from([(
+                PortId("output1".to_string()),
+                SourcePortMapping {
+                    dialect_type: DialectDescriptor {
+                        base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                        constraints: Default::default(),
+                    },
+                    mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
+                        destination: crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(LogicalPortId {
+                            component: "other_component".to_string(),
+                            port: PortId("port_1".to_string()),
+                        }),
+                    }),
+                },
+            )]),
+            logical_input_mapping: Default::default(),
+        });
+
+        // instance under test
+        //
+        // other actor with instance
+    }
+
+    #[test]
+    fn unicast_mapping_closer_node() {}
+
+    #[test]
+    fn unicast_mapping_random_node() {}
+
+    #[test]
+    fn anycast_mapping() {}
+
+    #[test]
+    fn multicast_mapping() {}
 }

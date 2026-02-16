@@ -3,6 +3,11 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+pub struct PhysicalInstance<'a> {
+    pub component_id: uuid::Uuid,
+    pub component: &'a PhysicalComponentState,
+}
+
 #[derive(Clone)]
 pub enum PhysicalComponentState {
     Invalid,
@@ -41,12 +46,17 @@ pub enum PhysicalComponentState {
 pub trait PhysicalComponent: Send + PhysicalComponentClone {
     fn id(&self) -> edgeless_api::function_instance::InstanceId;
     fn creation_time(&self) -> std::time::Instant;
-    fn physical_ports(&mut self) -> &mut PhysicalPorts;
-    fn materialize(&mut self, telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>) -> Vec<super::RequiredChange>;
-    fn stop(&mut self) -> Vec<super::RequiredChange>;
-    fn materialized_state(&self) -> Option<&std::cell::RefCell<dyn MaterializedComponent>>;
+    fn physical_ports(&self) -> &PhysicalPorts;
+    fn physical_ports_mut(&mut self) -> &mut PhysicalPorts;
+    fn materialize(
+        &self,
+        telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>,
+    ) -> (Vec<crate::ir::transformations::PhysicalChange>, Vec<super::RequiredChange>);
+    fn stop(&self) -> Vec<super::RequiredChange>;
+    fn materialized_state(&self) -> Option<&dyn MaterializedComponent>;
     fn as_actor(&self) -> Option<&super::actor::PhysicalActor>;
     fn as_actor_mut(&mut self) -> Option<&mut super::actor::PhysicalActor>;
+    fn logical_parent(&self) -> String;
 }
 
 // https://stackoverflow.com/a/30353928
@@ -70,7 +80,7 @@ impl Clone for Box<dyn PhysicalComponent> {
 }
 
 pub trait MaterializedComponent {
-    fn materialized_ports(&mut self) -> &mut MaterializedPorts;
+    fn materialized_ports(&self) -> &MaterializedPorts;
     fn runtime_statistics(&self) -> Option<&dyn ComponentRuntimeStatistics>;
 }
 
@@ -427,170 +437,294 @@ impl PhysicalComponentState {
         }
     }
 
-    pub(crate) fn request_new_instance() -> Self {
-        PhysicalComponentState::Requested(None)
+    pub(crate) fn request_new_instance() -> (uuid::Uuid, Self) {
+        (uuid::Uuid::new_v4(), PhysicalComponentState::Requested(None))
     }
 
-    pub(crate) fn request_new_instance_with_extra_constraints(extra_constraints: crate::ir::component::NodeFilters) -> Self {
-        PhysicalComponentState::Requested(Some(extra_constraints))
+    pub(crate) fn request_new_instance_with_extra_constraints(extra_constraints: crate::ir::component::NodeFilters) -> (uuid::Uuid, Self) {
+        (uuid::Uuid::new_v4(), PhysicalComponentState::Requested(Some(extra_constraints)))
     }
 
-    pub(crate) fn plan_creation(&mut self, instance: Box<dyn PhysicalComponent>) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Requested(_) => PhysicalComponentState::Planned(instance),
+    pub(crate) fn plan_creation(&self, instance: Box<dyn PhysicalComponent>) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Requested(_) => Some(PhysicalComponentState::Planned(instance)),
             _ => {
                 tracing::error!("Tried to plan creation of component in state other than 'requested'");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
 
-    pub(crate) fn mark_materialized(&mut self) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Planned(inner) => PhysicalComponentState::Materialized(inner),
+    pub(crate) fn mark_materialized(&self) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Planned(inner) => Some(PhysicalComponentState::Materialized(inner.clone())),
             _ => {
                 tracing::error!("Tried to mark function in state other than 'planned' as materialized");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
 
-    pub(crate) fn plan_stop(&mut self) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Planned(instance) => PhysicalComponentState::Stopped {
-                dead_instance: instance,
+    pub fn logical_component_id(&self) -> Option<String> {
+        if let Some(c) = self.try_unpack_active() {
+            return Some(c.logical_parent());
+        }
+        None
+    }
+
+    pub(crate) fn plan_stop(&self) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Planned(instance) => Some(PhysicalComponentState::Stopped {
+                dead_instance: instance.clone(),
                 replacement: None,
-            },
-            PhysicalComponentState::Materialized(instance) => PhysicalComponentState::StopPlanned {
-                old: instance,
+            }),
+            PhysicalComponentState::Materialized(instance) => Some(PhysicalComponentState::StopPlanned {
+                old: instance.clone(),
                 replacement: None,
-            },
-            PhysicalComponentState::MigrationRequested(instance) => PhysicalComponentState::StopPlanned {
-                old: instance,
+            }),
+            PhysicalComponentState::MigrationRequested(instance) => Some(PhysicalComponentState::StopPlanned {
+                old: instance.clone(),
                 replacement: None,
-            },
-            PhysicalComponentState::MigratingAway { old, new } => PhysicalComponentState::StopPlanned { old, replacement: Some(new) },
-            PhysicalComponentState::StopPlanned { old, replacement } => PhysicalComponentState::StopPlanned {
-                old: old,
-                replacement: replacement,
-            },
-            PhysicalComponentState::Dead(old) => PhysicalComponentState::Stopped {
-                dead_instance: old,
+            }),
+            PhysicalComponentState::MigratingAway { old, new } => Some(PhysicalComponentState::StopPlanned {
+                old: old.clone(),
+                replacement: Some(new.clone()),
+            }),
+            PhysicalComponentState::StopPlanned { old, replacement } => Some(PhysicalComponentState::StopPlanned {
+                old: old.clone(),
+                replacement: replacement.clone(),
+            }),
+            PhysicalComponentState::Dead(old) => Some(PhysicalComponentState::Stopped {
+                dead_instance: old.clone(),
                 replacement: None,
-            },
-            PhysicalComponentState::Lost(old) => PhysicalComponentState::Stopped {
-                dead_instance: old,
+            }),
+            PhysicalComponentState::Lost(old) => Some(PhysicalComponentState::Stopped {
+                dead_instance: old.clone(),
                 replacement: None,
-            },
+            }),
             _ => {
                 tracing::error!("Tried to request stop of function that is not in a running state.");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
-    pub(crate) fn mark_migrating_away(&mut self, new_id: edgeless_api::function_instance::InstanceId) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Materialized(inner) => PhysicalComponentState::MigratingAway { old: inner, new: new_id },
-            PhysicalComponentState::MigrationRequested(inner) => PhysicalComponentState::MigratingAway { old: inner, new: new_id },
+    pub(crate) fn mark_migrating_away(&self, new_id: edgeless_api::function_instance::InstanceId) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Materialized(inner) => Some(PhysicalComponentState::MigratingAway {
+                old: inner.clone(),
+                new: new_id,
+            }),
+            PhysicalComponentState::MigrationRequested(inner) => Some(PhysicalComponentState::MigratingAway {
+                old: inner.clone(),
+                new: new_id,
+            }),
             _ => {
                 tracing::error!("Tried to mark function that is not currently running normaly as migrating.");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
 
-    pub(crate) fn mark_stopped(&mut self) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Planned(instance) => PhysicalComponentState::Stopped {
-                dead_instance: instance,
+    pub(crate) fn mark_stopped(&self) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Planned(instance) => Some(PhysicalComponentState::Stopped {
+                dead_instance: instance.clone(),
                 replacement: None,
-            },
-            PhysicalComponentState::StopPlanned { old, replacement } => PhysicalComponentState::Stopped {
-                dead_instance: old,
-                replacement,
-            },
-            PhysicalComponentState::Dead(old) => PhysicalComponentState::Stopped {
-                dead_instance: old,
+            }),
+            PhysicalComponentState::StopPlanned { old, replacement } => Some(PhysicalComponentState::Stopped {
+                dead_instance: old.clone(),
+                replacement: replacement.clone(),
+            }),
+            PhysicalComponentState::Dead(old) => Some(PhysicalComponentState::Stopped {
+                dead_instance: old.clone(),
                 replacement: None,
-            },
-            PhysicalComponentState::Lost(old) => PhysicalComponentState::Stopped {
-                dead_instance: old,
+            }),
+            PhysicalComponentState::Lost(old) => Some(PhysicalComponentState::Stopped {
+                dead_instance: old.clone(),
                 replacement: None,
-            },
+            }),
             _ => {
                 tracing::error!("Tried to mark function in wrong state stopped");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
 
-    pub(crate) fn mark_lost(&mut self) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Materialized(inner) => PhysicalComponentState::Lost(inner),
+    pub(crate) fn mark_lost(&self) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Materialized(inner) => Some(PhysicalComponentState::Lost(inner.clone())),
             _ => {
                 tracing::error!("Tried to mark non-active function as lost");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
 
-    pub(crate) fn mark_lost_replaced(&mut self, replacement: edgeless_api::function_instance::InstanceId) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Lost(old) => PhysicalComponentState::LostReplaced { old, replacement },
+    pub(crate) fn mark_lost_replaced(&self, replacement: edgeless_api::function_instance::InstanceId) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Lost(old) => Some(PhysicalComponentState::LostReplaced {
+                old: old.clone(),
+                replacement,
+            }),
             _ => {
                 tracing::error!("Tried to mark function that is not lost as lost_replaced");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
 
-    pub(crate) fn mark_dead_replaced(&mut self, replacement: edgeless_api::function_instance::InstanceId) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Dead(old) => PhysicalComponentState::DeadReplaced { old, replacement },
+    pub(crate) fn mark_dead_replaced(&self, replacement: edgeless_api::function_instance::InstanceId) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Dead(old) => Some(PhysicalComponentState::DeadReplaced {
+                old: old.clone(),
+                replacement,
+            }),
             _ => {
                 tracing::error!("Tried to mark function that is not dead as dead_replaced");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
 
-    pub(crate) fn plan_migration(&mut self) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::Materialized(inner) => PhysicalComponentState::MigrationRequested(inner),
+    pub(crate) fn plan_migration(&self) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::Materialized(inner) => Some(PhysicalComponentState::MigrationRequested(inner.clone())),
             _ => {
                 tracing::error!("Tried to migrate function in wrong state");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
     }
 
-    pub(crate) fn abort_migration(&mut self) {
-        let old = std::mem::replace(self, PhysicalComponentState::Invalid);
-        let new = match old {
-            PhysicalComponentState::MigrationRequested(inner) => PhysicalComponentState::Materialized(inner),
+    pub(crate) fn abort_migration(&self) -> Option<PhysicalComponentState> {
+        match self {
+            PhysicalComponentState::MigrationRequested(inner) => Some(PhysicalComponentState::Materialized(inner.clone())),
             _ => {
                 tracing::error!("Tried to abort migration on a component that is not in the migration state.");
-                old
+                None
             }
-        };
-        let _ = std::mem::replace(self, new);
+        }
+    }
+}
+
+impl<'a> PhysicalInstance<'a> {
+    pub(crate) fn plan_creation(&self, component_instance: Box<dyn PhysicalComponent>) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.plan_creation(component_instance) {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn abort_migration(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.abort_migration() {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn mark_migrating_away(&self, new_id: edgeless_api::function_instance::InstanceId) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.mark_migrating_away(new_id) {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn mark_lost(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.mark_lost() {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn mark_lost_replaced(&self, new_id: edgeless_api::function_instance::InstanceId) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.mark_lost_replaced(new_id) {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn mark_dead_replaced(&self, new_id: edgeless_api::function_instance::InstanceId) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.mark_dead_replaced(new_id) {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn mark_stopped(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.mark_stopped() {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn mark_materialized(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.mark_materialized() {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn plan_stop(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.plan_stop() {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
+    }
+
+    pub(crate) fn plan_migration(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
+        match self.component.plan_migration() {
+            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
+                },
+            )],
+            None => vec![],
+        }
     }
 }

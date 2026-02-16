@@ -1,10 +1,7 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-pub fn peer_weights(
-    component: &dyn crate::ir::LogicalComponent,
-    port_weights: Vec<(edgeless_api::function_instance::PortId, u8)>,
-) -> Vec<(String, u8)> {
+pub fn peer_weights(component: &crate::ir::LogicalComponent, port_weights: Vec<(edgeless_api::function_instance::PortId, u8)>) -> Vec<(String, u8)> {
     let port_weights: std::collections::HashMap<_, _> = port_weights.iter().map(|(port_id, weight)| (port_id.0.clone(), *weight)).collect();
 
     let mut logical_peers = std::collections::HashMap::<String, f64>::new();
@@ -76,7 +73,7 @@ pub fn peer_weights(
     data_normalized
 }
 
-pub fn port_weights(component: &dyn crate::ir::LogicalComponent) -> Vec<(edgeless_api::function_instance::PortId, u8)> {
+pub fn port_weights(component: &crate::ir::LogicalComponent) -> Vec<(edgeless_api::function_instance::PortId, u8)> {
     let number_of_inputs = component.logical_ports().logical_input_mapping.len();
     let number_of_outputs = component.logical_ports().logical_output_mapping.len();
     let number_of_ports = number_of_inputs + number_of_outputs;
@@ -118,7 +115,8 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
+        let (component_under_test, _instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
         let port_weights = port_weights(&component_under_test);
 
         let weights = peer_weights(&component_under_test, port_weights);
@@ -136,7 +134,8 @@ mod test {
         let colocated_other_id = edgeless_api::function_instance::InstanceId::new(nodes[0]);
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
-        let component_under_test = component_mock(component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
+        let (component_under_test, _instanced_under_test) =
+            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
         let port_rates = port_weights(&component_under_test);
         assert_eq!(port_rates.len(), 2);
         assert_eq!(

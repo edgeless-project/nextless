@@ -5,43 +5,19 @@
 
 // use super::MaybePhyiscalInstance;
 
+#[derive(Clone, Debug)]
 pub struct LogicalProxy {
     pub logical_ports: super::LogicalPorts,
-
     pub external_ports: super::ExternalPorts,
-
-    pub instances: Vec<std::cell::RefCell<super::PhysicalComponentState>>,
 }
 
-impl super::LogicalComponent for LogicalProxy {
+impl super::LogicalComponentTrait for LogicalProxy {
     fn logical_ports(&self) -> &super::LogicalPorts {
         &self.logical_ports
     }
 
     fn logical_ports_mut(&mut self) -> &mut super::LogicalPorts {
         &mut self.logical_ports
-    }
-
-    fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId> {
-        self.instances.iter().filter_map(|i| i.borrow().id()).collect()
-    }
-
-    fn split_view(&mut self) -> (&mut super::LogicalPorts, Vec<&std::cell::RefCell<super::PhysicalComponentState>>) {
-        (
-            &mut self.logical_ports,
-            self.instances
-                .iter()
-                // .map(|i| i as &std::cell::RefCell<dyn super::MaybePhyiscalInstance>)
-                .collect(),
-        )
-    }
-
-    fn instances(&self) -> Vec<&std::cell::RefCell<super::PhysicalComponentState>> {
-        self.instances.iter().collect()
-    }
-
-    fn instances_mut(&mut self) -> &mut Vec<std::cell::RefCell<super::PhysicalComponentState>> {
-        &mut self.instances
     }
 
     fn scaling_mode(&self) -> crate::ir::component::ScalingMode {
@@ -58,19 +34,21 @@ pub struct PhyiscalProxy {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
     pub(crate) external_ports: super::ExternalPorts,
     pub(crate) desired_mapping: super::PhysicalPorts,
-    pub(crate) materialized: Option<std::cell::RefCell<MaterializedProxy>>,
+    pub(crate) materialized: Option<MaterializedProxy>,
     pub(crate) creation_time: std::time::Instant,
 }
 
 impl super::PhysicalComponent for PhyiscalProxy {
-    fn physical_ports(&mut self) -> &mut super::PhysicalPorts {
+    fn physical_ports(&self) -> &super::PhysicalPorts {
+        &self.desired_mapping
+    }
+
+    fn physical_ports_mut(&mut self) -> &mut super::PhysicalPorts {
         &mut self.desired_mapping
     }
 
-    fn materialized_state(&self) -> Option<&std::cell::RefCell<dyn super::MaterializedComponent>> {
-        self.materialized
-            .as_ref()
-            .map(|v| v as &std::cell::RefCell<dyn super::MaterializedComponent>)
+    fn materialized_state(&self) -> Option<&dyn super::MaterializedComponent> {
+        self.materialized.as_ref().map(|v| v as &dyn super::MaterializedComponent)
     }
 
     fn id(&self) -> edgeless_api::function_instance::InstanceId {
@@ -81,32 +59,14 @@ impl super::PhysicalComponent for PhyiscalProxy {
         self.creation_time
     }
 
-    fn materialize(&mut self, _telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>) -> Vec<super::RequiredChange> {
-        let mut changes = Vec::new();
-        if let Some(materialized) = &self.materialized {
-            let materialized = materialized.borrow_mut();
-            if !materialized.mapping.is_current_mapping(&self.desired_mapping) {
-                changes.push(super::RequiredChange::PatchProxy {
-                    proxy_id: self.id,
-                    internal_inputs: self.desired_mapping.physical_input_mapping.clone(),
-                    internal_outputs: self.desired_mapping.physical_output_mapping.clone(),
-                    external_inputs: self.external_ports.external_input_mapping.clone(),
-                    external_outputs: self.external_ports.external_output_mapping.clone(),
-                })
-            } else {
-                changes.push(super::RequiredChange::CrateProxy {
-                    proxy_id: self.id,
-                    internal_inputs: self.desired_mapping.physical_input_mapping.clone(),
-                    internal_outputs: self.desired_mapping.physical_output_mapping.clone(),
-                    external_inputs: self.external_ports.external_input_mapping.clone(),
-                    external_outputs: self.external_ports.external_output_mapping.clone(),
-                });
-            }
-        }
-        changes
+    fn materialize(
+        &self,
+        _telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>,
+    ) -> (Vec<crate::ir::transformations::PhysicalChange>, Vec<super::RequiredChange>) {
+        todo!("Proxy Not Implemented Yet");
     }
 
-    fn stop(&mut self) -> Vec<super::RequiredChange> {
+    fn stop(&self) -> Vec<super::RequiredChange> {
         vec![super::RequiredChange::StopFunction { function_id: self.id }]
     }
 
@@ -117,6 +77,10 @@ impl super::PhysicalComponent for PhyiscalProxy {
     fn as_actor_mut(&mut self) -> Option<&mut super::actor::PhysicalActor> {
         None
     }
+
+    fn logical_parent(&self) -> String {
+        todo!("Not Implemented Yet");
+    }
 }
 
 #[derive(Clone)]
@@ -126,8 +90,8 @@ pub struct MaterializedProxy {
 }
 
 impl super::MaterializedComponent for MaterializedProxy {
-    fn materialized_ports(&mut self) -> &mut super::MaterializedPorts {
-        &mut self.mapping
+    fn materialized_ports(&self) -> &super::MaterializedPorts {
+        &self.mapping
     }
 
     fn runtime_statistics(&self) -> Option<&dyn super::ComponentRuntimeStatistics> {
@@ -169,7 +133,6 @@ impl LogicalProxy {
                     .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.external_output.clone().into()))
                     .collect(),
             },
-            instances: Vec::new(),
         }
     }
 }

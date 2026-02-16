@@ -7,21 +7,29 @@ pub use super::super::*;
 
 pub struct DeadComponentRemoval {}
 
-impl super::StatelessTransformation for DeadComponentRemoval {
+impl super::StatelessLogicalTransformation for DeadComponentRemoval {
     #[tracing::instrument(name = "dead_component_removal", skip_all)]
-    fn apply(&mut self, workflow: &mut crate::ir::workflow::ActiveWorkflow, _nodes: &crate::ir::Nodes, _peer_clusters: &crate::ir::Clusters) {
+    fn apply(&mut self, workflow: &crate::ir::workflow::ActiveWorkflow) -> Vec<super::LogicalChange> {
         if workflow.feature_flags.disable_application_optimization {
-            return;
+            return vec![];
         }
+
+        let mut cloned_components: std::collections::HashMap<String, crate::ir::logical_model::LogicalComponent> = workflow
+            .components_with_instances()
+            .map(|(id, component, _)| (id.to_string(), component.clone()))
+            .collect();
+
         let mut changed = true;
         while changed {
             changed = false;
-            changed = Self::remove_unused_inputs(workflow) || changed;
-            changed = Self::remove_unused_outputs(workflow) || changed;
+            changed = Self::remove_unused_inputs(&mut cloned_components) || changed;
+            changed = Self::remove_unused_outputs(&mut cloned_components) || changed;
             if changed {
-                Self::remove_unused_functions(workflow);
+                Self::remove_unused_functions(&mut cloned_components);
             }
         }
+
+        return vec![];
     }
 }
 
@@ -30,15 +38,18 @@ impl DeadComponentRemoval {
         Self {}
     }
 
-    fn remove_unused_outputs(slf: &mut workflow::ActiveWorkflow) -> bool {
+    fn remove_unused_outputs(slf: &mut std::collections::HashMap<String, crate::ir::logical_model::LogicalComponent>) -> bool {
         let mut changed = false;
 
         let mut input_links_to_remove = Vec::new();
 
-        for (f_id, f) in &mut slf.functions {
-            let mut f = f.borrow_mut();
+        for (f_id, f) in slf.iter_mut() {
+            let crate::ir::logical_model::LogicalComponent::Actor(actor) = f else {
+                continue;
+            };
+
             let inner: std::collections::BTreeMap<edgeless_api::function_instance::MappingNode, Vec<edgeless_api::function_instance::MappingNode>> =
-                f.image.spec.inner_structure.clone();
+                actor.image.spec.inner_structure.clone();
             let ports = &mut f.logical_ports_mut();
             ports.logical_output_mapping.retain(|output_id, output_spec: &mut LogicalOutput| {
                 // assert!(!std::matches!(output_spec, super::super::LogicalOutput::Topic(_)));
@@ -100,8 +111,7 @@ impl DeadComponentRemoval {
         }
 
         for ((target_component_id, target_port_id), (source_component_id, source_port_id)) in &input_links_to_remove {
-            if let Some(source) = slf.functions.get_mut(target_component_id) {
-                let mut source = source.borrow_mut();
+            if let Some(source) = slf.get_mut(target_component_id) {
                 let mut remove = false;
 
                 if let Some(input_spec) = source.logical_ports_mut().logical_input_mapping.get_mut(target_port_id) {
@@ -125,14 +135,17 @@ impl DeadComponentRemoval {
         changed
     }
 
-    fn remove_unused_inputs(slf: &mut workflow::ActiveWorkflow) -> bool {
+    fn remove_unused_inputs(slf: &mut std::collections::HashMap<String, crate::ir::logical_model::LogicalComponent>) -> bool {
         let mut changed = false;
 
         let mut output_links_to_remove = Vec::new();
 
-        for (f_id, f) in &mut slf.functions {
-            let mut f = f.borrow_mut();
-            let behavior = f.image.clone();
+        for (f_id, f) in slf.iter_mut() {
+            let crate::ir::logical_model::LogicalComponent::Actor(actor) = f else {
+                continue;
+            };
+
+            let behavior = actor.image.clone();
             let f_ports = &mut f.logical_ports_mut();
             f_ports.logical_input_mapping.retain(|input_id, input_spec| {
                 let m = input_spec.mapping.as_mut() as &mut dyn std::any::Any;
@@ -179,8 +192,7 @@ impl DeadComponentRemoval {
         }
 
         for ((source_id, source_port_id), (dest_id, dest_port_id)) in &output_links_to_remove {
-            if let Some(source) = slf.functions.get_mut(source_id) {
-                let mut source = source.borrow_mut();
+            if let Some(source) = slf.get_mut(source_id) {
                 let mut remove = false;
                 if let Some(source_port) = source.logical_ports_mut().logical_output_mapping.get_mut(source_port_id) {
                     let m = source_port.mapping.as_mut() as &mut dyn std::any::Any;
@@ -221,9 +233,9 @@ impl DeadComponentRemoval {
         changed
     }
 
-    fn remove_unused_functions(slf: &mut workflow::ActiveWorkflow) {
-        slf.functions.retain(|_f_id, f_spec| {
-            !f_spec.borrow().logical_ports.logical_input_mapping.is_empty() || !f_spec.borrow().logical_ports.logical_output_mapping.is_empty()
+    fn remove_unused_functions(slf: &mut std::collections::HashMap<String, crate::ir::logical_model::LogicalComponent>) {
+        slf.retain(|_f_id, f_spec| {
+            !f_spec.logical_ports().logical_input_mapping.is_empty() || !f_spec.logical_ports().logical_output_mapping.is_empty()
         });
     }
 }

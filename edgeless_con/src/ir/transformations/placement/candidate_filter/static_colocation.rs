@@ -6,7 +6,8 @@ pub struct StaticColocation {}
 impl super::FilterStrategy for StaticColocation {
     fn filter_candidates<'b>(
         &mut self,
-        logical_component: &dyn crate::ir::LogicalComponent,
+        _logical_component_id: String,
+        logical_component: &crate::ir::LogicalComponent,
         candidates: Vec<crate::ir::transformations::placement::Candidate<'b>>,
         workflow: &crate::ir::workflow::ActiveWorkflow,
     ) -> Vec<crate::ir::transformations::placement::Candidate<'b>> {
@@ -23,14 +24,18 @@ impl super::FilterStrategy for StaticColocation {
 
         let mut physical_peers = std::collections::HashMap::<edgeless_api::function_instance::NodeId, u64>::new();
 
-        for (c_id, c) in workflow.components() {
+        for (c_id, _c, c_instances) in workflow.components_with_instances() {
             let logical_peer_weight = if let Some(link) = logical_peer_weights.get(c_id) {
                 link
             } else {
                 continue;
             };
 
-            for instance_id in c.borrow_mut().instance_ids() {
+            for instance_id in c_instances
+                .clone()
+                .filter_active()
+                .filter_map(|physical_instance| physical_instance.component.id())
+            {
                 *physical_peers.entry(instance_id.node_id).or_insert(0) += logical_peer_weight;
             }
         }
@@ -83,17 +88,32 @@ mod test {
         let (node_ids, candidates) = mock_nodes_and_candidates(3, &runtime, actor_image.main_image.behavior_image_id);
         let colocated_peer_id = edgeless_api::function_instance::InstanceId::new(node_ids[0]);
 
-        let function_under_test = mock_function_under_test(vec![]);
-        let other_function = mock_peer_function(vec![colocated_peer_id]);
+        let (function_under_test, function_under_test_instances) = mock_function_under_test(vec![]);
+        let (other_function, other_function_instances) = mock_peer_function(vec![colocated_peer_id]);
 
-        let workflow = mock_workflow(std::collections::HashMap::from([
-            ("fut".to_string(), function_under_test),
-            ("f_other".to_string(), other_function),
-        ]));
+        let all_instances = function_under_test_instances
+            .iter()
+            .chain(other_function_instances.iter())
+            .cloned()
+            .collect();
 
-        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let workflow = crate::ir::workflow::test::mock_workflow(
+            std::collections::HashMap::from([
+                (
+                    "fut".to_string(),
+                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
+                ),
+                (
+                    "f_other".to_string(),
+                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
+                ),
+            ]),
+            all_instances,
+        );
 
-        let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates, &workflow);
+        let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
+
+        let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered.get(0).unwrap().node_id, colocated_peer_id.node_id);
     }
@@ -108,17 +128,32 @@ mod test {
         let colocated_peer_id = edgeless_api::function_instance::InstanceId::new(node_ids[0]);
         let colocated_peer_id2 = edgeless_api::function_instance::InstanceId::new(node_ids[1]);
 
-        let function_under_test = mock_function_under_test(vec![]);
-        let other_function = mock_peer_function(vec![colocated_peer_id, colocated_peer_id2]);
+        let (function_under_test, function_under_test_instances) = mock_function_under_test(vec![]);
+        let (other_function, other_function_instances) = mock_peer_function(vec![colocated_peer_id, colocated_peer_id2]);
 
-        let workflow = mock_workflow(std::collections::HashMap::from([
-            ("fut".to_string(), function_under_test),
-            ("f_other".to_string(), other_function),
-        ]));
+        let all_instances = function_under_test_instances
+            .iter()
+            .chain(other_function_instances.iter())
+            .cloned()
+            .collect();
 
-        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let workflow = crate::ir::workflow::test::mock_workflow(
+            std::collections::HashMap::from([
+                (
+                    "fut".to_string(),
+                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
+                ),
+                (
+                    "f_other".to_string(),
+                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
+                ),
+            ]),
+            all_instances,
+        );
 
-        let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates, &workflow);
+        let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
+
+        let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 2);
 
         let filtered_candidate_node_ids: std::collections::HashSet<uuid::Uuid> = filtered.into_iter().map(|i| i.node_id).collect();
@@ -138,17 +173,32 @@ mod test {
         let colocated_peer_id2 = edgeless_api::function_instance::InstanceId::new(node_ids[0]);
         let colocated_peer_id3 = edgeless_api::function_instance::InstanceId::new(node_ids[1]);
 
-        let function_under_test = mock_function_under_test(vec![]);
-        let other_function = mock_peer_function(vec![colocated_peer_id, colocated_peer_id2, colocated_peer_id3]);
+        let (function_under_test, function_under_test_instances) = mock_function_under_test(vec![]);
+        let (other_function, other_function_instances) = mock_peer_function(vec![colocated_peer_id, colocated_peer_id2, colocated_peer_id3]);
 
-        let workflow = mock_workflow(std::collections::HashMap::from([
-            ("fut".to_string(), function_under_test),
-            ("f_other".to_string(), other_function),
-        ]));
+        let all_instances = function_under_test_instances
+            .iter()
+            .chain(other_function_instances.iter())
+            .cloned()
+            .collect();
 
-        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let workflow = crate::ir::workflow::test::mock_workflow(
+            std::collections::HashMap::from([
+                (
+                    "fut".to_string(),
+                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
+                ),
+                (
+                    "f_other".to_string(),
+                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
+                ),
+            ]),
+            all_instances,
+        );
 
-        let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates, &workflow);
+        let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
+
+        let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered.get(0).unwrap().node_id, node_ids[0]);
     }
@@ -161,21 +211,35 @@ mod test {
         let actor_image = crate::ir::test::mock_actor_image();
         let (_node_ids, candidates) = mock_nodes_and_candidates(3, &runtime, actor_image.main_image.behavior_image_id);
 
-        let function_under_test = mock_function_under_test(vec![]);
-        let other_function = mock_peer_function(vec![
+        let (function_under_test, function_under_test_instances) = mock_function_under_test(vec![]);
+        let (other_function, other_function_instances) = mock_peer_function(vec![
             edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
             edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
             edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
         ]);
 
-        let workflow = mock_workflow(std::collections::HashMap::from([
-            ("fut".to_string(), function_under_test),
-            ("f_other".to_string(), other_function),
-        ]));
+        let all_instances = function_under_test_instances
+            .iter()
+            .chain(other_function_instances.iter())
+            .cloned()
+            .collect();
 
-        let fut_ref = workflow.get_component("fut").unwrap().borrow_mut();
+        let workflow = crate::ir::workflow::test::mock_workflow(
+            std::collections::HashMap::from([
+                (
+                    "fut".to_string(),
+                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
+                ),
+                (
+                    "f_other".to_string(),
+                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
+                ),
+            ]),
+            all_instances,
+        );
+        let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
 
-        let filtered = colocation_filter.filter_candidates(&*fut_ref, candidates.clone(), &workflow);
+        let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates.clone(), &workflow);
         assert_eq!(filtered.len(), 3);
 
         let filtered_candidate_node_ids: std::collections::HashSet<uuid::Uuid> = filtered.into_iter().map(|i| i.node_id).collect();

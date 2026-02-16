@@ -17,20 +17,18 @@ impl LogicalInteractionNormalizer {
     }
 }
 
-impl super::StatefulTransformation<LogicalInteractionNormalizerState> for LogicalInteractionNormalizer {
+impl super::StatefulLogicalTransformation<LogicalInteractionNormalizerState> for LogicalInteractionNormalizer {
     #[tracing::instrument(name = "logical_interaction_normalizer", skip_all)]
     fn apply(
         &mut self,
-        workflow: &mut crate::ir::workflow::ActiveWorkflow,
-        _nodes: &crate::ir::Nodes,
-        _peer_clusters: &crate::ir::Clusters,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
         global_state: &LogicalInteractionNormalizerState,
-    ) {
+    ) -> Vec<super::LogicalChange> {
         let mut reg = global_state.dialect_registry.blocking_lock();
 
         let Ok(interactions) = collect_logical_interactions(workflow, &mut reg) else {
             tracing::warn!("Failed collecting logical interactions.");
-            return;
+            return vec![];
         };
 
         let mapped_interactions = interactions
@@ -62,14 +60,18 @@ impl super::StatefulTransformation<LogicalInteractionNormalizerState> for Logica
             })
             .collect();
 
-        if let Err(e) = distribute_logical_interactions(mapped_interactions, workflow, &mut reg) {
-            tracing::warn!("Failure distributing logical interactions: {e}")
+        match distribute_logical_interactions(mapped_interactions, workflow, &mut reg) {
+            Ok(changes) => changes,
+            Err(e) => {
+                tracing::warn!("Failure distributing logical interactions: {e}");
+                vec![]
+            }
         }
     }
 }
 
 fn collect_logical_interactions(
-    workflow: &mut crate::ir::workflow::ActiveWorkflow,
+    workflow: &crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
 ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
     let mut port_collector = std::collections::BTreeMap::<
@@ -79,32 +81,27 @@ fn collect_logical_interactions(
             Vec<(crate::ir::interaction::LogicalPortId, crate::ir::interaction::DestiantionPortMapping)>,
         ),
     >::new();
-    for (cid, component) in &mut workflow.components() {
-        let mut component = component.borrow_mut();
-        let ports = component.logical_ports_mut();
+    for (cid, component, _instances) in workflow.components_with_instances() {
+        let ports = component.logical_ports();
 
-        std::mem::take(&mut ports.logical_input_mapping)
-            .into_iter()
-            .for_each(|(port_id, port_mapping)| {
-                port_collector.entry(port_mapping.dialect_type.clone()).or_default().1.push((
-                    interaction::LogicalPortId {
-                        component: cid.to_string(),
-                        port: port_id,
-                    },
-                    port_mapping,
-                ))
-            });
-        std::mem::take(&mut ports.logical_output_mapping)
-            .into_iter()
-            .for_each(|(port_id, port_mapping)| {
-                port_collector.entry(port_mapping.dialect_type.clone()).or_default().0.push((
-                    interaction::LogicalPortId {
-                        component: cid.to_string(),
-                        port: port_id.clone(),
-                    },
-                    port_mapping,
-                ))
-            });
+        ports.logical_input_mapping.iter().for_each(|(port_id, port_mapping)| {
+            port_collector.entry(port_mapping.dialect_type.clone()).or_default().1.push((
+                interaction::LogicalPortId {
+                    component: cid.to_string(),
+                    port: port_id.clone(),
+                },
+                port_mapping.clone(),
+            ))
+        });
+        ports.logical_output_mapping.iter().for_each(|(port_id, port_mapping)| {
+            port_collector.entry(port_mapping.dialect_type.clone()).or_default().0.push((
+                interaction::LogicalPortId {
+                    component: cid.to_string(),
+                    port: port_id.clone(),
+                },
+                port_mapping.clone(),
+            ))
+        });
     }
 
     Ok(port_collector
@@ -118,9 +115,9 @@ fn collect_logical_interactions(
 
 fn distribute_logical_interactions(
     mapped_interactions: Vec<crate::ir::interaction::InteractionMapping>,
-    workflow: &mut crate::ir::workflow::ActiveWorkflow,
+    workflow: &crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
-) -> Result<(), crate::ir::interaction::InteractionError> {
+) -> Result<Vec<super::LogicalChange>, crate::ir::interaction::InteractionError> {
     let mut replacement_source_ports = std::collections::BTreeMap::<
         String,
         std::collections::BTreeMap<edgeless_api::function_instance::PortId, interaction::SourcePortMapping>,
@@ -146,21 +143,36 @@ fn distribute_logical_interactions(
         }
     }
 
-    for (cid, component) in &mut workflow.components() {
-        let mut c = component.borrow_mut();
-        let ports = c.logical_ports_mut();
+    let mut required_changes = Vec::new();
+    for (cid, component, _) in workflow.components_with_instances() {
+        let mut component_clone = component.clone();
+        let ports = component_clone.logical_ports_mut();
+        let mut changed = false;
 
         let inputs = replacement_destination_ports.remove(&cid.to_string()).unwrap_or_default();
         let outputs = replacement_source_ports.remove(&cid.to_string()).unwrap_or_default();
 
         for (input_port_id, input_port_spec) in inputs {
-            ports.logical_input_mapping.insert(input_port_id, input_port_spec.clone());
+            let old_mapping = ports.logical_input_mapping.insert(input_port_id, input_port_spec.clone());
+            if old_mapping.is_none_or(|old_mapping| old_mapping != input_port_spec) {
+                changed = true;
+            }
         }
 
         for (ouput_port_id, output_port_spec) in outputs {
-            ports.logical_output_mapping.insert(ouput_port_id, output_port_spec.clone());
+            let old_mapping = ports.logical_output_mapping.insert(ouput_port_id, output_port_spec.clone());
+            if old_mapping.is_none_or(|old_mapping| old_mapping != output_port_spec) {
+                changed = true;
+            }
+        }
+
+        if changed {
+            required_changes.push(super::LogicalChange::Component(super::LogicalComponentChange {
+                component_id: cid.to_string(),
+                action: super::LogicalComponentChangeAction::Update(component_clone),
+            }))
         }
     }
 
-    Ok(())
+    Ok(required_changes)
 }
