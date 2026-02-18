@@ -156,11 +156,11 @@ impl ActiveWorkflow {
         }
     }
 
-    pub(crate) fn components_with_instances(&self) -> PhyiscalComponentIterator {
+    pub(crate) fn components_with_instances<'a>(&'a self) -> PhyiscalComponentIterator<'a> {
         PhyiscalComponentIterator::new(self)
     }
 
-    pub(crate) fn get_component_with_instances(&self, component_name: &str) -> Option<(&LogicalComponent, InstanceIterator)> {
+    pub(crate) fn get_component_with_instances<'a>(&'a self, component_name: &str) -> Option<(&'a LogicalComponent, InstanceIterator<'a>)> {
         if let Some((component, component_instance_ids)) = self.components.get(component_name) {
             let instance_iterator = InstanceIterator::new(self, component_instance_ids.iter());
             Some((component, instance_iterator))
@@ -183,18 +183,20 @@ impl ActiveWorkflow {
                 transformations::PhysicalChange::Component(physical_component_change) => {
                     self.apply_physical_component_change(physical_component_change)
                 }
-                transformations::PhysicalChange::Link(physical_link_change) => todo!(),
+                transformations::PhysicalChange::Link(physical_link_change) => {
+                    self.apply_link_change(physical_link_change);
+                }
             }
         }
     }
 
-    pub fn apply_logical_component_change(&mut self, change: crate::ir::transformations::LogicalComponentChange) {
+    fn apply_logical_component_change(&mut self, change: crate::ir::transformations::LogicalComponentChange) {
         match change.action {
             transformations::LogicalComponentChangeAction::Delete => {
                 if let Some((_c, instances)) = self.components.remove(&change.component_id) {
                     for instance_id in instances {
                         self.component_instances.remove(&instance_id);
-                        // TODO: Properly Handle this
+                        // TODO: properly handle this
                         tracing::warn!("Dropped component instance without stopping it.");
                     }
                 }
@@ -206,7 +208,7 @@ impl ActiveWorkflow {
 
                 if let Some((_existing_logical_component, existing_instances)) = existing_component {
                     if existing_instances.len() > 0 {
-                        // TODO: Proper stop handling
+                        // TODO: properly handle this
                         tracing::warn!("Not updating existing instances.")
                     }
                 } else {
@@ -221,23 +223,33 @@ impl ActiveWorkflow {
                 if let Some((_existing_logical_component, existing_instances)) = existing_component {
                     tracing::warn!("Overwriting existing component.");
                     if existing_instances.len() > 0 {
-                        // TODO: Proper stop handling
+                        // TODO: properly handle this
                         tracing::warn!("Not updating existing instances.")
                     }
                 } else {
+                    tracing::warn!("Insert replaced existing component.");
                 }
             }
         }
     }
 
-    pub fn apply_physical_component_change(&mut self, change: crate::ir::transformations::PhysicalComponentChange) {
+    fn apply_physical_component_change(&mut self, change: crate::ir::transformations::PhysicalComponentChange) {
         match change.action {
             transformations::PhysicalComponentChangeAction::Delete => {
                 tracing::debug!("Delete Instance");
                 let instance = self.component_instances.remove(&change.component_id);
                 if let Some(instance) = instance {
-                    //TODO: Proper handling
-                    tracing::warn!("Not removing logical link");
+                    if let Some(logical_component_id) = instance.logical_component_id() {
+                        let found_instance = self
+                            .components
+                            .get_mut(&logical_component_id)
+                            .map(|item| item.1.remove(&change.component_id))
+                            .unwrap_or(false);
+
+                        if !found_instance {
+                            tracing::warn!("Inconsistent Workflow State");
+                        }
+                    }
                 } else {
                     tracing::warn!("Tried removing unknown component instance");
                 }
@@ -245,20 +257,50 @@ impl ActiveWorkflow {
             transformations::PhysicalComponentChangeAction::Update(physical_component_state) => {
                 tracing::debug!("Update Instance");
                 if let Some(component) = physical_component_state.logical_component_id() {
-                    if let Some((parent, parent_links)) = self.components.get_mut(&component) {
+                    if let Some((_parent, parent_links)) = self.components.get_mut(&component) {
                         parent_links.insert(change.component_id);
                     }
                 }
                 let old = self.component_instances.insert(change.component_id, physical_component_state);
-                //TODO: Error handling
+                if old.is_none() {
+                    tracing::warn!("Physical Component Update inserted new physical instance.");
+                }
             }
             transformations::PhysicalComponentChangeAction::Insert(logical_component_id, physical_component_state) => {
                 tracing::debug!("Insert Instance");
-                if let Some((parent, parent_links)) = self.components.get_mut(&logical_component_id) {
+                if let Some((_parent, parent_links)) = self.components.get_mut(&logical_component_id) {
                     parent_links.insert(change.component_id);
                 }
                 let old = self.component_instances.insert(change.component_id, physical_component_state);
-                //TODO: Error handling
+                if old.is_some() {
+                    tracing::warn!("Physical Component Insert replaced existing physical instance.");
+                }
+            }
+        }
+    }
+
+    fn apply_link_change(&mut self, change: crate::ir::transformations::PhysicalLinkChange) {
+        match change.action {
+            transformations::PhysicalLinkChangeAction::Delete => {
+                let old = self.links.remove(&change.link_id);
+
+                if old.is_none() {
+                    tracing::warn!("Tried to remove link that does not exist");
+                }
+            }
+            transformations::PhysicalLinkChangeAction::Update(workflow_link) => {
+                let old = self.links.insert(change.link_id, workflow_link);
+
+                if old.is_none() {
+                    tracing::warn!("Link Update inserted new link.");
+                }
+            }
+            transformations::PhysicalLinkChangeAction::Insert(workflow_link) => {
+                let old = self.links.insert(change.link_id, workflow_link);
+
+                if old.is_some() {
+                    tracing::warn!("Link Update replaced existing link.");
+                }
             }
         }
     }
@@ -292,32 +334,66 @@ impl FeatureFlags {
 }
 
 #[cfg(test)]
-pub(crate) mod test {
-    use crate::ir::test::component_mock_basic;
-
-    pub(crate) fn mock_workflow(
-        functions: std::collections::HashMap<String, (crate::ir::logical_model::LogicalComponent, std::collections::BTreeSet<uuid::Uuid>)>,
-        component_instances: std::collections::BTreeMap<uuid::Uuid, crate::ir::physical_model::PhysicalComponentState>,
-    ) -> crate::ir::workflow::ActiveWorkflow {
-        crate::ir::workflow::ActiveWorkflow {
-            id: edgeless_api::workflow_instance::WorkflowId {
-                workflow_id: uuid::Uuid::new_v4(),
-            },
-            cluster_id: uuid::Uuid::new_v4(),
-            original_request: edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                workflow_functions: vec![],
-                workflow_resources: vec![],
-                workflow_ingress_proxies: vec![],
-                workflow_egress_proxies: vec![],
-                annotations: std::collections::HashMap::new(),
-            },
-            links: std::collections::HashMap::new(),
-            feature_flags: crate::ir::workflow::FeatureFlags::default(),
-            components: functions,
-            component_instances: component_instances,
-        }
+pub(crate) mod mock_workflow {
+    #[derive(Default)]
+    pub struct MockWorkflowBuilder {
+        id: Option<uuid::Uuid>,
+        cluster_id: Option<uuid::Uuid>,
+        links: std::collections::HashMap<edgeless_api::link::LinkInstanceId, crate::ir::link::WorkflowLink>,
+        components: std::collections::HashMap<String, (crate::ir::LogicalComponent, Vec<(uuid::Uuid, crate::ir::PhysicalComponentState)>)>,
     }
 
+    impl MockWorkflowBuilder {
+        pub fn with_component(
+            mut self,
+            id: &str,
+            logical: &crate::ir::LogicalComponent,
+            phyiscal_components: &[(uuid::Uuid, crate::ir::PhysicalComponentState)],
+        ) -> Self {
+            self.components.insert(id.to_string(), (logical.clone(), phyiscal_components.to_vec()));
+            self
+        }
+
+        pub fn build(self) -> crate::ir::workflow::ActiveWorkflow {
+            let id = edgeless_api::workflow_instance::WorkflowId {
+                workflow_id: self.id.unwrap_or_else(|| uuid::Uuid::new_v4()),
+            };
+
+            let components = self
+                .components
+                .iter()
+                .map(|(id, (component, instances))| (id.clone(), (component.clone(), instances.iter().map(|(id, _)| id.clone()).collect())))
+                .collect();
+
+            let component_instances = self
+                .components
+                .iter()
+                .flat_map(|(_, (_, instances))| instances.iter().map(|(id, instance)| (id.clone(), instance.clone())))
+                .collect();
+
+            let workfow = crate::ir::workflow::ActiveWorkflow {
+                id,
+                cluster_id: self.cluster_id.unwrap_or_else(|| uuid::Uuid::new_v4()),
+                original_request: edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                    workflow_functions: vec![],
+                    workflow_resources: vec![],
+                    workflow_ingress_proxies: vec![],
+                    workflow_egress_proxies: vec![],
+                    annotations: std::collections::HashMap::new(),
+                },
+                links: self.links,
+                feature_flags: crate::ir::workflow::FeatureFlags::default(),
+                components,
+                component_instances,
+            };
+
+            workfow
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test {
     #[test]
     fn parse_request() {
         let behavior_id = edgeless_api::behavior::BehaviorId {
@@ -374,39 +450,30 @@ pub(crate) mod test {
 
     #[test]
     fn logical_component_insert() {
-        let component_id = edgeless_api::function_instance::InstanceId {
-            node_id: uuid::Uuid::from_bytes([1; 16]),
-            function_id: uuid::Uuid::from_bytes([2; 16]),
-        };
+        let (component_id, component) = crate::ir::actor::mock_actor::MockActorBuilder::default().build();
 
-        let (component, _instances) = component_mock_basic("test".to_string(), component_id);
-
-        let mut test_wf = mock_workflow(Default::default(), Default::default());
+        let mut test_wf = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default().build();
 
         assert_eq!(test_wf.components_with_instances().count(), 0);
 
         test_wf.apply_logical_changes(vec![crate::ir::transformations::LogicalChange::Component(
             crate::ir::transformations::LogicalComponentChange {
-                component_id: "test".to_string(),
+                component_id: component_id.clone(),
                 action: crate::ir::transformations::LogicalComponentChangeAction::Insert(component),
             },
         )]);
 
         assert_eq!(test_wf.components_with_instances().count(), 1);
+        assert_eq!(test_wf.components_with_instances().next().unwrap().0, component_id);
     }
 
     #[test]
     fn logical_component_update() {
-        let component_id = edgeless_api::function_instance::InstanceId {
-            node_id: uuid::Uuid::from_bytes([1; 16]),
-            function_id: uuid::Uuid::from_bytes([2; 16]),
-        };
+        let (component_id, component) = crate::ir::actor::mock_actor::MockActorBuilder::default().build();
 
-        let (component, _instances) = component_mock_basic("test".to_string(), component_id);
-
-        let components = std::collections::HashMap::from([("test".to_string(), (component.clone(), Default::default()))]);
-
-        let mut test_wf = mock_workflow(components, Default::default());
+        let mut test_wf = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&component_id, &component, &[])
+            .build();
 
         assert_eq!(test_wf.components_with_instances().count(), 1);
         let (_, before_component, _) = test_wf.components_with_instances().next().unwrap();
@@ -437,16 +504,48 @@ pub(crate) mod test {
     }
 
     #[test]
+    fn logical_component_delete() {
+        let (component_id, component) = crate::ir::actor::mock_actor::MockActorBuilder::default().build();
+
+        let (_, component_instance_id, component_instance) =
+            crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&component_id, &component).build();
+
+        let mut test_wf = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&component_id, &component, &[(component_instance_id, component_instance.clone())])
+            .build();
+
+        // Pre Update State
+        {
+            assert_eq!(test_wf.components_with_instances().count(), 1);
+            let (_c_id, _logical_component, instances) = test_wf.components_with_instances().next().unwrap();
+            assert_eq!(instances.clone().count(), 1);
+            assert_eq!(test_wf.component_instances.len(), 1);
+        }
+
+        test_wf.apply_logical_changes(vec![crate::ir::transformations::LogicalChange::Component(
+            crate::ir::transformations::LogicalComponentChange {
+                component_id: component_id.clone(),
+                action: crate::ir::transformations::LogicalComponentChangeAction::Delete,
+            },
+        )]);
+
+        // Post Update State
+        {
+            assert_eq!(test_wf.components_with_instances().count(), 0);
+            assert_eq!(test_wf.component_instances.len(), 0);
+        }
+    }
+
+    #[test]
     fn phyiscal_component_insert() {
-        let component_id = edgeless_api::function_instance::InstanceId {
-            node_id: uuid::Uuid::from_bytes([1; 16]),
-            function_id: uuid::Uuid::from_bytes([2; 16]),
-        };
+        let (component_id, component) = crate::ir::actor::mock_actor::MockActorBuilder::default().build();
 
-        let (component, instances) = component_mock_basic("test".to_string(), component_id);
-        let components = std::collections::HashMap::from([("test".to_string(), (component, Default::default()))]);
+        let mut test_wf = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&component_id, &component, &[])
+            .build();
 
-        let mut test_wf = mock_workflow(components, Default::default());
+        let (_, component_instance_id, component_instance) =
+            crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&component_id, &component).build();
 
         // Pre Insert State
         {
@@ -457,34 +556,29 @@ pub(crate) mod test {
 
         test_wf.apply_physical_changes(vec![crate::ir::transformations::PhysicalChange::Component(
             crate::ir::transformations::PhysicalComponentChange {
-                component_id: instances[0].0,
-                action: crate::ir::transformations::PhysicalComponentChangeAction::Insert("test".to_string(), instances[0].1.clone()),
+                component_id: component_instance_id.clone(),
+                action: crate::ir::transformations::PhysicalComponentChangeAction::Insert("test".to_string(), component_instance.clone()),
             },
         )]);
 
         {
             assert_eq!(test_wf.components_with_instances().count(), 1);
-
             let (_c_id, _logical_component, instances) = test_wf.components_with_instances().next().unwrap();
-
             assert_eq!(instances.clone().count(), 1);
+            assert_eq!(instances.clone().next().unwrap().component_id, component_instance_id);
         }
     }
 
     #[test]
     fn phyiscal_component_update() {
-        let component_id = edgeless_api::function_instance::InstanceId {
-            node_id: uuid::Uuid::from_bytes([1; 16]),
-            function_id: uuid::Uuid::from_bytes([2; 16]),
-        };
+        let (component_id, component) = crate::ir::actor::mock_actor::MockActorBuilder::default().build();
 
-        let (component, instances) = component_mock_basic("test".to_string(), component_id);
-        let components = std::collections::HashMap::from([(
-            "test".to_string(),
-            (component, std::collections::BTreeSet::from([instances[0].0.clone()])),
-        )]);
+        let (_, component_instance_id, component_instance) =
+            crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&component_id, &component).build();
 
-        let mut test_wf = mock_workflow(components, instances.iter().cloned().collect());
+        let mut test_wf = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&component_id, &component, &[(component_instance_id, component_instance.clone())])
+            .build();
 
         // Pre Update State
         {
@@ -495,11 +589,11 @@ pub(crate) mod test {
             assert!(std::matches!(updated.component, crate::ir::PhysicalComponentState::Materialized(_)));
         }
 
-        let new_instance = instances[0].1.mark_lost().unwrap();
+        let new_instance = component_instance.mark_lost().unwrap();
 
         test_wf.apply_physical_changes(vec![crate::ir::transformations::PhysicalChange::Component(
             crate::ir::transformations::PhysicalComponentChange {
-                component_id: instances[0].0,
+                component_id: component_instance_id,
                 action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_instance),
             },
         )]);
@@ -515,31 +609,27 @@ pub(crate) mod test {
 
     #[test]
     fn phyiscal_component_delete() {
-        let component_id = edgeless_api::function_instance::InstanceId {
-            node_id: uuid::Uuid::from_bytes([1; 16]),
-            function_id: uuid::Uuid::from_bytes([2; 16]),
-        };
+        let (component_id, component) = crate::ir::actor::mock_actor::MockActorBuilder::default().build();
 
-        let (component, instances) = component_mock_basic("test".to_string(), component_id);
-        let components = std::collections::HashMap::from([(
-            "test".to_string(),
-            (component, std::collections::BTreeSet::from([instances[0].0.clone()])),
-        )]);
+        let (_, component_instance_id, component_instance) =
+            crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&component_id, &component).build();
 
-        let mut test_wf = mock_workflow(components, instances.iter().cloned().collect());
+        let mut test_wf = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&component_id, &component, &[(component_instance_id, component_instance.clone())])
+            .build();
 
         // Pre Update State
         {
             assert_eq!(test_wf.components_with_instances().count(), 1);
-            let (_c_id, _logical_component, mut instances) = test_wf.components_with_instances().next().unwrap();
+            let (_c_id, _logical_component, instances) = test_wf.components_with_instances().next().unwrap();
             assert_eq!(instances.clone().count(), 1);
-            let updated = instances.next().unwrap();
-            assert!(std::matches!(updated.component, crate::ir::PhysicalComponentState::Materialized(_)));
+            // Ensure internal state is consistent
+            assert_eq!(test_wf.components.get(&component_id).unwrap().1.len(), 1);
         }
 
         test_wf.apply_physical_changes(vec![crate::ir::transformations::PhysicalChange::Component(
             crate::ir::transformations::PhysicalComponentChange {
-                component_id: instances[0].0,
+                component_id: component_instance_id,
                 action: crate::ir::transformations::PhysicalComponentChangeAction::Delete,
             },
         )]);
@@ -548,6 +638,8 @@ pub(crate) mod test {
             assert_eq!(test_wf.components_with_instances().count(), 1);
             let (_c_id, _logical_component, instances) = test_wf.components_with_instances().next().unwrap();
             assert_eq!(instances.clone().count(), 0);
+            // Ensure internal state is consistent
+            assert_eq!(test_wf.components.get(&component_id).unwrap().1.len(), 0);
         }
     }
 }

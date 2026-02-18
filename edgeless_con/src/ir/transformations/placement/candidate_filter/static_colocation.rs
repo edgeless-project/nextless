@@ -91,25 +91,10 @@ mod test {
         let (function_under_test, function_under_test_instances) = mock_function_under_test(vec![]);
         let (other_function, other_function_instances) = mock_peer_function(vec![colocated_peer_id]);
 
-        let all_instances = function_under_test_instances
-            .iter()
-            .chain(other_function_instances.iter())
-            .cloned()
-            .collect();
-
-        let workflow = crate::ir::workflow::test::mock_workflow(
-            std::collections::HashMap::from([
-                (
-                    "fut".to_string(),
-                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
-                ),
-                (
-                    "f_other".to_string(),
-                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
-                ),
-            ]),
-            all_instances,
-        );
+        let workflow = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component("fut", &function_under_test, function_under_test_instances.as_slice())
+            .with_component("f_other", &other_function, other_function_instances.as_slice())
+            .build();
 
         let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
 
@@ -131,25 +116,10 @@ mod test {
         let (function_under_test, function_under_test_instances) = mock_function_under_test(vec![]);
         let (other_function, other_function_instances) = mock_peer_function(vec![colocated_peer_id, colocated_peer_id2]);
 
-        let all_instances = function_under_test_instances
-            .iter()
-            .chain(other_function_instances.iter())
-            .cloned()
-            .collect();
-
-        let workflow = crate::ir::workflow::test::mock_workflow(
-            std::collections::HashMap::from([
-                (
-                    "fut".to_string(),
-                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
-                ),
-                (
-                    "f_other".to_string(),
-                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
-                ),
-            ]),
-            all_instances,
-        );
+        let workflow = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component("fut", &function_under_test, function_under_test_instances.as_slice())
+            .with_component("f_other", &other_function, other_function_instances.as_slice())
+            .build();
 
         let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
 
@@ -176,25 +146,10 @@ mod test {
         let (function_under_test, function_under_test_instances) = mock_function_under_test(vec![]);
         let (other_function, other_function_instances) = mock_peer_function(vec![colocated_peer_id, colocated_peer_id2, colocated_peer_id3]);
 
-        let all_instances = function_under_test_instances
-            .iter()
-            .chain(other_function_instances.iter())
-            .cloned()
-            .collect();
-
-        let workflow = crate::ir::workflow::test::mock_workflow(
-            std::collections::HashMap::from([
-                (
-                    "fut".to_string(),
-                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
-                ),
-                (
-                    "f_other".to_string(),
-                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
-                ),
-            ]),
-            all_instances,
-        );
+        let workflow = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component("fut", &function_under_test, function_under_test_instances.as_slice())
+            .with_component("f_other", &other_function, other_function_instances.as_slice())
+            .build();
 
         let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
 
@@ -218,25 +173,11 @@ mod test {
             edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
         ]);
 
-        let all_instances = function_under_test_instances
-            .iter()
-            .chain(other_function_instances.iter())
-            .cloned()
-            .collect();
+        let workflow = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component("fut", &function_under_test, function_under_test_instances.as_slice())
+            .with_component("f_other", &other_function, other_function_instances.as_slice())
+            .build();
 
-        let workflow = crate::ir::workflow::test::mock_workflow(
-            std::collections::HashMap::from([
-                (
-                    "fut".to_string(),
-                    (function_under_test, function_under_test_instances.iter().map(|i| i.0.clone()).collect()),
-                ),
-                (
-                    "f_other".to_string(),
-                    ((other_function, other_function_instances.iter().map(|i| i.0.clone()).collect())),
-                ),
-            ]),
-            all_instances,
-        );
         let (fut_ref, _component_instances) = workflow.get_component_with_instances("fut").unwrap();
 
         let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates.clone(), &workflow);

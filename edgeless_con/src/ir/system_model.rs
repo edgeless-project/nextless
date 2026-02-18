@@ -89,3 +89,60 @@ pub type ResourceProviders<'a> = std::collections::HashMap<String, &'a dyn Resou
 pub trait Cluster {}
 
 pub type Clusters<'a> = std::collections::HashMap<edgeless_api::function_instance::NodeId, &'a dyn Cluster>;
+
+#[cfg(test)]
+pub mod mock_node {
+    #[derive(Default, derive_builder::Builder)]
+    pub(crate) struct MockNode<'a> {
+        #[builder(default)]
+        id: uuid::Uuid,
+        #[builder(default)]
+        cluster_id: uuid::Uuid,
+        #[builder(default)]
+        runtimes: crate::ir::Runtimes<'a>,
+        #[builder(default)]
+        resource_providers: crate::ir::ResourceProviders<'a>,
+        #[builder(default)]
+        link_providers: crate::ir::LinkProviders,
+        #[builder(default)]
+        interaction_dialects: Vec<crate::ir::interaction::dialect::DialectDescriptor>,
+        #[builder(default)]
+        labels: Vec<String>,
+    }
+
+    impl<'a> MockNode<'a> {}
+
+    impl crate::ir::Node for MockNode<'_> {
+        fn node_id(&self) -> edgeless_api::function_instance::NodeId {
+            self.id
+        }
+
+        fn cluster_id(&self) -> edgeless_api::function_instance::NodeId {
+            self.cluster_id
+        }
+
+        fn available_runtimes<'a>(&'a self) -> crate::ir::Runtimes<'a> {
+            self.runtimes.clone()
+        }
+
+        fn available_resource_providers<'a>(&'a self) -> crate::ir::ResourceProviders<'a> {
+            self.resource_providers.clone()
+        }
+
+        fn available_link_types(&self) -> crate::ir::LinkProviders {
+            self.link_providers.clone()
+        }
+
+        fn available_interaction_dialects(&self) -> Vec<crate::ir::interaction::dialect::DialectDescriptor> {
+            self.interaction_dialects.clone()
+        }
+
+        fn labels(&self) -> Vec<String> {
+            self.labels.clone()
+        }
+
+        fn is_proxy(&self) -> bool {
+            false
+        }
+    }
+}

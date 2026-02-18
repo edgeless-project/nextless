@@ -1,19 +1,9 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use std::time::Duration;
+
 use crate::ir::actor::ImageState;
-
-#[derive(Clone)]
-pub(crate) struct PhysicalMock {
-    id: edgeless_api::function_instance::InstanceId,
-    physical_ports: super::PhysicalPorts,
-    materialized: MaterializedMock,
-}
-
-#[derive(Clone)]
-pub(crate) struct MaterializedMock {
-    materialized_ports: super::MaterializedPorts,
-}
 
 #[derive(Clone)]
 pub(crate) struct MockPortStats {
@@ -50,63 +40,6 @@ impl crate::ir::PortStatistics for MockPortStats {
 
     fn message_size_mean_byte_by_peer(&self, _period: std::time::Duration) -> Vec<(edgeless_api::function_instance::InstanceId, f64)> {
         self.message_sizes.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-    }
-}
-
-impl super::PhysicalComponent for PhysicalMock {
-    fn id(&self) -> edgeless_api::function_instance::InstanceId {
-        self.id
-    }
-
-    fn creation_time(&self) -> std::time::Instant {
-        std::time::Instant::now() - std::time::Duration::from_secs(120)
-    }
-
-    fn physical_ports(&self) -> &super::PhysicalPorts {
-        &self.physical_ports
-    }
-
-    fn materialize(
-        &self,
-        _telemetry_provider: &Option<Box<dyn super::TelemetryProvider>>,
-    ) -> (Vec<crate::ir::transformations::PhysicalChange>, Vec<super::RequiredChange>) {
-        println!("Called Materialize on a PhysicalMock!");
-        (vec![], vec![])
-    }
-
-    fn materialized_state(&self) -> Option<&dyn super::MaterializedComponent> {
-        Some(&self.materialized)
-    }
-
-    fn stop(&self) -> Vec<super::RequiredChange> {
-        println!("Called Stop on a PhysicalMock!");
-        vec![]
-    }
-
-    fn as_actor_mut(&mut self) -> Option<&mut super::actor::PhysicalActor> {
-        None
-    }
-
-    fn as_actor(&self) -> Option<&super::actor::PhysicalActor> {
-        None
-    }
-
-    fn physical_ports_mut(&mut self) -> &mut super::PhysicalPorts {
-        &mut self.physical_ports
-    }
-
-    fn logical_parent(&self) -> String {
-        "todo".to_string()
-    }
-}
-
-impl super::MaterializedComponent for MaterializedMock {
-    fn materialized_ports(&self) -> &super::MaterializedPorts {
-        &self.materialized_ports
-    }
-
-    fn runtime_statistics(&self) -> Option<&dyn super::ComponentRuntimeStatistics> {
-        None
     }
 }
 
@@ -238,32 +171,6 @@ pub(crate) fn component_mock(
     (mock_logical, mock_instances)
 }
 
-pub(crate) fn component_mock_basic(
-    logical_id: String,
-    component_id: edgeless_api::function_instance::InstanceId,
-) -> (
-    crate::ir::logical_model::LogicalComponent,
-    Vec<(uuid::Uuid, crate::ir::physical_model::PhysicalComponentState)>,
-) {
-    let cut_logical_ports = crate::ir::LogicalPorts {
-        logical_output_mapping: std::collections::HashMap::new(),
-        logical_input_mapping: std::collections::HashMap::new(),
-    };
-
-    let instance_1 = (
-        component_id,
-        crate::ir::MaterializedPorts {
-            materialized_outputs: Default::default(),
-            materialized_inputs: std::collections::HashMap::new(),
-        },
-    );
-
-    let mock_logical = mock_logical_actor(cut_logical_ports);
-    let mock_instances = mock_physical_actors(logical_id.clone(), vec![instance_1]);
-
-    (mock_logical, mock_instances)
-}
-
 pub(crate) fn mock_logical_actor(logical_ports: super::LogicalPorts) -> crate::ir::logical_model::LogicalComponent {
     crate::ir::logical_model::LogicalComponent::Actor(crate::ir::actor::LogicalActor {
         image: mock_actor_image(),
@@ -283,9 +190,12 @@ pub(crate) fn mock_physical_actors(
         .map(|(id, materialized_ports)| {
             let instance = crate::ir::actor::PhysicalActor {
                 id,
-                materialized: None,
+                materialized: Some(crate::ir::actor::MaterializedActor {
+                    mapping: materialized_ports.clone(),
+                    runtime_statistics: None,
+                }),
                 component_name: component_name.clone(),
-                creation_time: std::time::Instant::now(),
+                creation_time: std::time::Instant::now() - Duration::from_secs(60),
                 image: ImageState::Existing(mock_actor_image().main_image),
                 behavior_spec: mock_actor_image().spec,
                 desired_mapping: crate::ir::PhysicalPorts {

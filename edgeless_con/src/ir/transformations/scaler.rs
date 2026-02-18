@@ -205,3 +205,77 @@ fn scale_scalable(
     //
     required_changes
 }
+
+#[cfg(test)]
+mod test {
+    use crate::ir::transformations::StatelessPhysicalTransformation;
+
+    #[test]
+    fn scale_missing_singleton_actor() {
+        let (logical_component_id, logical_component_under_test) = crate::ir::actor::mock_actor::MockActorBuilder::default()
+            .with_scaling_mode(crate::ir::component::ScalingMode::Singleton)
+            .build();
+
+        let workflow_under_test = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&logical_component_id, &logical_component_under_test, &[])
+            .build();
+
+        let example_node_id = uuid::Uuid::new_v4();
+
+        let mock_node = crate::ir::system_model::mock_node::MockNodeBuilder::default()
+            .id(example_node_id.clone())
+            .build()
+            .unwrap();
+
+        let nodes = std::collections::HashMap::from([(example_node_id.clone(), &mock_node as &dyn crate::ir::Node)]);
+
+        let mut scaler = super::Scaler::new();
+        let changes = scaler.apply(&workflow_under_test, &nodes, &crate::ir::Clusters::default());
+
+        assert_eq!(changes.len(), 1);
+
+        let change = changes[0].clone();
+
+        let crate::ir::transformations::PhysicalChange::Component(component_change) = change else {
+            panic!("Not the expected change");
+        };
+
+        let crate::ir::transformations::PhysicalComponentChangeAction::Insert(logical_id, _instance) = component_change.action else {
+            panic!("Not the expected change");
+        };
+
+        assert_eq!("test", logical_id.as_str());
+    }
+
+    #[test]
+    fn dont_update_existing_singleton_actor() {
+        let (logical_component_id, logical_component_under_test) = crate::ir::actor::mock_actor::MockActorBuilder::default()
+            .with_scaling_mode(crate::ir::component::ScalingMode::Singleton)
+            .build();
+
+        let (_, physical_component_id, physical_component) =
+            crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&logical_component_id, &logical_component_under_test).build();
+
+        let workflow_under_test = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(
+                &logical_component_id,
+                &logical_component_under_test,
+                &[(physical_component_id, physical_component)],
+            )
+            .build();
+
+        let example_node_id = uuid::Uuid::new_v4();
+
+        let mock_node = crate::ir::system_model::mock_node::MockNodeBuilder::default()
+            .id(example_node_id.clone())
+            .build()
+            .unwrap();
+
+        let nodes = std::collections::HashMap::from([(example_node_id.clone(), &mock_node as &dyn crate::ir::Node)]);
+
+        let mut scaler = super::Scaler::new();
+        let changes = scaler.apply(&workflow_under_test, &nodes, &crate::ir::Clusters::default());
+
+        assert_eq!(changes.len(), 0);
+    }
+}

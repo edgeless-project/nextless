@@ -12,24 +12,6 @@ pub struct LogicalResource {
     pub(crate) node_filters: crate::ir::component::NodeFilters,
 }
 
-impl super::LogicalComponentTrait for LogicalResource {
-    fn logical_ports(&self) -> &super::LogicalPorts {
-        &self.logical_ports
-    }
-
-    fn logical_ports_mut(&mut self) -> &mut super::LogicalPorts {
-        &mut self.logical_ports
-    }
-
-    fn scaling_mode(&self) -> crate::ir::component::ScalingMode {
-        self.scaling_mode.clone()
-    }
-
-    fn node_filters(&self) -> crate::ir::component::NodeFilters {
-        self.node_filters.clone()
-    }
-}
-
 #[derive(Clone)]
 pub struct PhysicalResource {
     pub(crate) id: edgeless_api::function_instance::InstanceId,

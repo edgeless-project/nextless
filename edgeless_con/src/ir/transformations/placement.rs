@@ -433,9 +433,8 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                 LogicalComponent::Proxy(logical_proxy) => todo!(),
             };
 
-            let (_, new_component_state) = PhysicalComponentState::request_new_instance();
-            new_component_state.plan_creation(Box::new(new_instance));
-            Some(new_component_state)
+            let (_, empty_component_state) = PhysicalComponentState::request_new_instance();
+            empty_component_state.plan_creation(Box::new(new_instance)).map(|x| x)
         } else {
             None
         }
@@ -615,4 +614,49 @@ fn select_cluster_for_subflow(
     //     return Some(*cluster_id);
     // }
     None
+}
+
+#[cfg(test)]
+mod test {
+    use crate::ir::transformations::{placement::strategy::PlacementStrategy, StatefulPhysicalTransformation};
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn place_actor_on_single_node() {
+        let (actor_id, logical_actor) = crate::ir::actor::mock_actor::MockActorBuilder::default().build();
+        let (_, actor_instance_id, actor_instance) =
+            crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&actor_id, &logical_actor)
+                .with_state(crate::ir::actor::mock_actor::DesiredPhysicalComponentState::Requested)
+                .build();
+
+        let workflow = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&actor_id, &logical_actor, &[(actor_instance_id, actor_instance)])
+            .build();
+
+        let example_node_id = uuid::Uuid::new_v4();
+
+        let mock_runtime = crate::ir::test::MockWasmRuntime {};
+        let mock_node = crate::ir::system_model::mock_node::MockNodeBuilder::default()
+            .id(example_node_id.clone())
+            .runtimes(crate::ir::Runtimes::from([(
+                "WASM".to_string(),
+                crate::ir::Runtime::WasmBase(&mock_runtime, Default::default()),
+            )]))
+            .build()
+            .unwrap();
+
+        let nodes = std::collections::HashMap::from([(example_node_id.clone(), &mock_node as &dyn crate::ir::Node)]);
+
+        let mut transformation = super::DefaultPlacement::<super::strategy::random::Random>::new(super::strategy::random::Random::new());
+
+        let image_cache = crate::ir::support::image_cache::ImageCache::new();
+
+        let placement_state = super::PlacementState {
+            strategy_state: &(),
+            image_chache: &image_cache,
+        };
+
+        let changes = tokio::task::block_in_place(|| transformation.apply(&workflow, &nodes, &Default::default(), &placement_state));
+
+        assert_eq!(changes.len(), 1);
+    }
 }

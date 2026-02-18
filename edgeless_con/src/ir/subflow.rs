@@ -19,24 +19,6 @@ pub struct LogicalSubFlow {
     pub(crate) annotations: std::collections::HashMap<String, String>,
 }
 
-impl super::LogicalComponentTrait for LogicalSubFlow {
-    fn logical_ports(&self) -> &super::LogicalPorts {
-        &self.logical_ports
-    }
-
-    fn logical_ports_mut(&mut self) -> &mut super::LogicalPorts {
-        &mut self.logical_ports
-    }
-
-    fn scaling_mode(&self) -> crate::ir::component::ScalingMode {
-        crate::ir::component::ScalingMode::Singleton
-    }
-
-    fn node_filters(&self) -> crate::ir::component::NodeFilters {
-        crate::ir::component::NodeFilters::default()
-    }
-}
-
 #[derive(Clone)]
 pub struct PhysicalSubFlow {
     pub(crate) id: edgeless_api::function_instance::InstanceId,

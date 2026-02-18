@@ -150,6 +150,7 @@ impl Clone for Box<dyn PortStatistics> {
 pub type PhysicalOutput = crate::ir::interaction::SourcePortMapping;
 pub type PhysicalInput = crate::ir::interaction::DestiantionPortMapping;
 
+#[allow(unused)]
 pub fn parse_api_output_mapping(
     mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
 ) -> std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping> {
@@ -208,6 +209,7 @@ impl From<edgeless_api::common::Output> for PhysicalOutput {
     }
 }
 
+#[allow(unused)]
 pub fn parse_api_input_mapping(
     mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
 ) -> std::collections::HashMap<edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping> {
@@ -455,16 +457,6 @@ impl PhysicalComponentState {
         }
     }
 
-    pub(crate) fn mark_materialized(&self) -> Option<PhysicalComponentState> {
-        match self {
-            PhysicalComponentState::Planned(inner) => Some(PhysicalComponentState::Materialized(inner.clone())),
-            _ => {
-                tracing::error!("Tried to mark function in state other than 'planned' as materialized");
-                None
-            }
-        }
-    }
-
     pub fn logical_component_id(&self) -> Option<String> {
         if let Some(c) = self.try_unpack_active() {
             return Some(c.logical_parent());
@@ -608,18 +600,6 @@ impl PhysicalComponentState {
 }
 
 impl<'a> PhysicalInstance<'a> {
-    pub(crate) fn plan_creation(&self, component_instance: Box<dyn PhysicalComponent>) -> Vec<crate::ir::transformations::PhysicalChange> {
-        match self.component.plan_creation(component_instance) {
-            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
-                crate::ir::transformations::PhysicalComponentChange {
-                    component_id: self.component_id.clone(),
-                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
-                },
-            )],
-            None => vec![],
-        }
-    }
-
     pub(crate) fn abort_migration(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
         match self.component.abort_migration() {
             Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
@@ -682,18 +662,6 @@ impl<'a> PhysicalInstance<'a> {
 
     pub(crate) fn mark_stopped(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
         match self.component.mark_stopped() {
-            Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
-                crate::ir::transformations::PhysicalComponentChange {
-                    component_id: self.component_id.clone(),
-                    action: crate::ir::transformations::PhysicalComponentChangeAction::Update(new_component),
-                },
-            )],
-            None => vec![],
-        }
-    }
-
-    pub(crate) fn mark_materialized(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
-        match self.component.mark_materialized() {
             Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(
                 crate::ir::transformations::PhysicalComponentChange {
                     component_id: self.component_id.clone(),

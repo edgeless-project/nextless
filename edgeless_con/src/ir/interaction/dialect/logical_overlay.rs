@@ -215,6 +215,45 @@ impl super::InteractionDialect for LogicalOverlayDialect {
     }
 }
 
+#[cfg(test)]
+pub(crate) mod mock_ports {
+    pub(crate) fn mock_source_port(
+        id: &edgeless_api::function_instance::PortId,
+        destination_mapping: crate::ir::interaction::dialect::logical_overlay::DestinationMapping,
+    ) -> (edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping) {
+        (
+            id.clone(),
+            crate::ir::interaction::SourcePortMapping {
+                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                    base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                    constraints: Default::default(),
+                },
+                mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
+                    destination: destination_mapping,
+                }),
+            },
+        )
+    }
+
+    pub(crate) fn mock_destination_port(
+        id: &edgeless_api::function_instance::PortId,
+        sources: &[crate::ir::interaction::LogicalPortId],
+    ) -> (edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping) {
+        (
+            id.clone(),
+            crate::ir::interaction::DestiantionPortMapping {
+                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                    base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                    constraints: Default::default(),
+                },
+                mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDestinationPort {
+                    sources: sources.iter().cloned().collect(),
+                }),
+            },
+        )
+    }
+}
+
 // These tests have been copied over from the phyiscal overlay.
 // We might be able to merge the implementation and/or tests,
 // but this might change if we change the available mappings.
