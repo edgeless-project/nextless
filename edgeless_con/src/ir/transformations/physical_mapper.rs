@@ -306,36 +306,120 @@ fn targetable_component_instances(
 mod test {
     use edgeless_api::function_instance::PortId;
 
-    use crate::ir::{
-        interaction::{dialect::DialectDescriptor, LogicalPortId, SourcePortMapping},
-        test::mock_logical_actor,
-        LogicalPorts,
-    };
+    use crate::ir::transformations::StatelessPhysicalTransformation;
 
     #[test]
     fn unicast_mapping_single_target() {
-        let actor_under_test = mock_logical_actor(LogicalPorts {
-            logical_output_mapping: std::collections::HashMap::from([(
-                PortId("output1".to_string()),
-                SourcePortMapping {
-                    dialect_type: DialectDescriptor {
-                        base_type: crate::ir::interaction::dialect::logical_overlay::ID,
-                        constraints: Default::default(),
-                    },
-                    mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
-                        destination: crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(LogicalPortId {
-                            component: "other_component".to_string(),
-                            port: PortId("port_1".to_string()),
-                        }),
-                    }),
-                },
-            )]),
-            logical_input_mapping: Default::default(),
-        });
+        let example_node_id = uuid::Uuid::new_v4();
 
-        // instance under test
-        //
-        // other actor with instance
+        let mock_node = crate::ir::system_model::mock_node::MockNodeBuilder::default()
+            .id(example_node_id.clone())
+            .build()
+            .unwrap();
+
+        let nodes = std::collections::HashMap::from([(example_node_id.clone(), &mock_node as &dyn crate::ir::Node)]);
+
+        let source_port_id = PortId("output1".to_string());
+        let destination_port_id = PortId("port_1".to_string());
+
+        let (actor_a_id, actor_a) = crate::ir::actor::mock_actor::MockActorBuilder::default()
+            .with_logical_id("actor_under_test".to_string())
+            .with_logical_ports(crate::ir::LogicalPorts {
+                logical_output_mapping: std::collections::HashMap::from([(
+                    source_port_id.clone(),
+                    crate::ir::interaction::SourcePortMapping {
+                        dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                            base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                            constraints: Default::default(),
+                        },
+                        mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
+                            destination: crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(
+                                crate::ir::interaction::LogicalPortId {
+                                    component: "other_component".to_string(),
+                                    port: destination_port_id.clone(),
+                                },
+                            ),
+                        }),
+                    },
+                )]),
+                logical_input_mapping: Default::default(),
+            })
+            .build();
+
+        let (_, instance_a_id, instance_a) = crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&actor_a_id, &actor_a)
+            .with_node_id(example_node_id)
+            .build();
+
+        let (actor_b_id, actor_b) = crate::ir::actor::mock_actor::MockActorBuilder::default()
+            .with_logical_id("other_component".to_string())
+            .with_logical_ports(crate::ir::LogicalPorts {
+                logical_output_mapping: Default::default(),
+                logical_input_mapping: std::collections::HashMap::from([(
+                    destination_port_id.clone(),
+                    crate::ir::interaction::DestiantionPortMapping {
+                        dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                            base_type: crate::ir::interaction::dialect::logical_overlay::ID,
+                            constraints: Default::default(),
+                        },
+                        mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlayDestinationPort {
+                            sources: std::collections::BTreeSet::from([crate::ir::interaction::LogicalPortId {
+                                component: actor_a_id.clone(),
+                                port: source_port_id.clone(),
+                            }]),
+                        }),
+                    },
+                )]),
+            })
+            .build();
+
+        let (_, instance_b_id, instance_b) = crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&actor_b_id, &actor_b)
+            .with_state(crate::ir::actor::mock_actor::DesiredPhysicalComponentState::Planned)
+            .with_node_id(example_node_id)
+            .build();
+
+        let mut workflow = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&actor_a_id, &actor_a, &[(instance_a_id, instance_a)])
+            .with_component(&actor_b_id, &actor_b, &[(instance_b_id, instance_b.clone())])
+            .build();
+
+        let mut mapper = super::PhysicalConnectionMapper::new();
+        let changes = mapper.apply(&mut workflow, &nodes, &crate::ir::Clusters::default());
+
+        assert_eq!(changes.len(), 1);
+
+        let change = changes[0].clone();
+
+        let crate::ir::transformations::PhysicalChange::Component(component_change) = change else {
+            panic!("Not the expected change");
+        };
+
+        assert_eq!(component_change.component_id, instance_a_id.clone());
+
+        let crate::ir::transformations::PhysicalComponentChangeAction::Update(instance) = component_change.action else {
+            panic!("Not the expected change");
+        };
+
+        let instance = instance.try_unpack_active().unwrap();
+
+        assert_eq!(instance.physical_ports().physical_input_mapping.len(), 0);
+        assert_eq!(instance.physical_ports().physical_output_mapping.len(), 1);
+
+        let mapping = instance.physical_ports().physical_output_mapping.get(&source_port_id).unwrap();
+
+        assert_eq!(mapping.dialect_type.base_type, crate::ir::interaction::dialect::physical_overlay::ID);
+        assert_eq!(mapping.dialect_type.constraints.len(), 1);
+
+        use crate::ir::interaction::dialect::AsConcreteSourcePort;
+        let physical_mapping =
+            crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort::as_concrete(mapping.mapping.as_ref()).unwrap();
+
+        assert_eq!(
+            physical_mapping.destination,
+            crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(crate::ir::interaction::PhysicalPortId {
+                instance: instance_b.id().unwrap(),
+                port: destination_port_id,
+            })
+        )
     }
 
     #[test]

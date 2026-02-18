@@ -8,30 +8,14 @@
 #[derive(Clone, Debug)]
 pub struct LogicalProxy {
     pub logical_ports: super::LogicalPorts,
+    #[allow(unused)]
     pub external_ports: super::ExternalPorts,
-}
-
-impl super::LogicalComponentTrait for LogicalProxy {
-    fn logical_ports(&self) -> &super::LogicalPorts {
-        &self.logical_ports
-    }
-
-    fn logical_ports_mut(&mut self) -> &mut super::LogicalPorts {
-        &mut self.logical_ports
-    }
-
-    fn scaling_mode(&self) -> crate::ir::component::ScalingMode {
-        crate::ir::component::ScalingMode::Singleton
-    }
-
-    fn node_filters(&self) -> crate::ir::component::NodeFilters {
-        crate::ir::component::NodeFilters::default()
-    }
 }
 
 #[derive(Clone)]
 pub struct PhyiscalProxy {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
+    #[allow(unused)]
     pub(crate) external_ports: super::ExternalPorts,
     pub(crate) desired_mapping: super::PhysicalPorts,
     pub(crate) materialized: Option<MaterializedProxy>,

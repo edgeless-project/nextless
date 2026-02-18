@@ -66,6 +66,12 @@ impl PartialMatch {
 }
 
 impl ImageCache {
+    // This is actually used by tests.
+    #[allow(unused)]
+    pub fn new() -> Self {
+        Self { inner: Default::default() }
+    }
+
     pub async fn get(&self, ident: &crate::ir::behavior::BehaviorImageId) -> CacheResult {
         let lck = self.inner.lock().await;
 

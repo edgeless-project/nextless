@@ -153,6 +153,7 @@ mod tests {
                             edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out2".to_string())),
                             edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("err".to_string())),
                             edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("log".to_string())),
+                            edgeless_api::function_instance::MappingNode::SideEffect,
                         ],
                     ),
                 ]),

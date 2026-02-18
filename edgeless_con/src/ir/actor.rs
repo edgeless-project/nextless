@@ -31,24 +31,6 @@ pub enum ImageState {
     Existing(super::behavior::BehaviorImage),
 }
 
-impl super::LogicalComponentTrait for LogicalActor {
-    fn logical_ports(&self) -> &super::LogicalPorts {
-        &self.logical_ports
-    }
-
-    fn logical_ports_mut(&mut self) -> &mut super::LogicalPorts {
-        &mut self.logical_ports
-    }
-
-    fn scaling_mode(&self) -> crate::ir::component::ScalingMode {
-        self.scaling_mode.clone()
-    }
-
-    fn node_filters(&self) -> crate::ir::component::NodeFilters {
-        self.node_filter.clone()
-    }
-}
-
 impl super::PhysicalComponent for PhysicalActor {
     fn physical_ports(&self) -> &super::PhysicalPorts {
         &self.desired_mapping
@@ -195,6 +177,198 @@ impl From<edgeless_api::workflow_instance::WorkflowFunction> for LogicalActor {
             },
             scaling_mode,
             node_filter: node_filters,
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod mock_actor {
+    #[derive(Default)]
+    pub struct MockActorBuilder {
+        logical_id: Option<String>,
+        image: Option<crate::ir::behavior::Behavior>,
+        annotations: std::collections::HashMap<String, String>,
+        scaling_mode: Option<crate::ir::component::ScalingMode>,
+        node_filters: Option<crate::ir::component::NodeFilters>,
+        logical_ports: Option<crate::ir::LogicalPorts>,
+    }
+
+    pub enum DesiredPhysicalComponentState {
+        Requested,
+        Planned,
+        Materialized,
+    }
+
+    pub struct MockActorInstanceBuilder {
+        node_id: Option<uuid::Uuid>,
+        component_id: Option<uuid::Uuid>,
+        image: crate::ir::actor::ImageState,
+        behavior_spec: crate::ir::behavior::BehaviorSpec,
+        component_name: String,
+        creation_time: Option<std::time::Instant>,
+        desired_mapping: Option<crate::ir::PhysicalPorts>,
+        annotations: std::collections::HashMap<String, String>,
+        desired_state: DesiredPhysicalComponentState,
+        materialized_state: Option<crate::ir::actor::MaterializedActor>,
+        runtime_statistics: Option<Box<dyn crate::ir::ComponentRuntimeStatistics>>,
+    }
+
+    impl MockActorInstanceBuilder {
+        pub fn new_for_logical(logical_id: &str, logical_component: &crate::ir::LogicalComponent) -> Self {
+            let crate::ir::LogicalComponent::Actor(logical_actor) = logical_component else {
+                panic!("Bad Component Type");
+            };
+
+            Self {
+                node_id: None,
+                component_id: None,
+                image: crate::ir::actor::ImageState::Existing(logical_actor.image.main_image.clone()),
+                behavior_spec: logical_actor.image.spec.clone(),
+                component_name: logical_id.to_string(),
+                creation_time: None,
+                desired_mapping: None,
+                annotations: logical_actor.annotations.clone(),
+                desired_state: DesiredPhysicalComponentState::Materialized,
+                materialized_state: None,
+                runtime_statistics: None,
+            }
+        }
+
+        pub fn build(self) -> (String, uuid::Uuid, crate::ir::physical_model::PhysicalComponentState) {
+            let id = edgeless_api::function_instance::InstanceId {
+                node_id: self.node_id.unwrap_or_else(|| uuid::Uuid::new_v4()),
+                function_id: self.component_id.unwrap_or_else(|| uuid::Uuid::new_v4()),
+            };
+
+            let desired_mapping = self.desired_mapping.clone().unwrap_or_default();
+
+            let materialized_state = self.materialized_state.unwrap_or_else(|| crate::ir::actor::MaterializedActor {
+                mapping: crate::ir::MaterializedPorts {
+                    materialized_outputs: desired_mapping
+                        .physical_output_mapping
+                        .iter()
+                        .map(|(k, v)| {
+                            (
+                                k.clone(),
+                                crate::ir::MaterializedOutput {
+                                    mapping: v.clone(),
+                                    port_statistics: None,
+                                },
+                            )
+                        })
+                        .collect(),
+                    materialized_inputs: desired_mapping
+                        .physical_input_mapping
+                        .iter()
+                        .map(|(k, v)| {
+                            (
+                                k.clone(),
+                                crate::ir::MaterializedInput {
+                                    mapping: v.clone(),
+                                    port_statistics: None,
+                                },
+                            )
+                        })
+                        .collect(),
+                },
+                runtime_statistics: self.runtime_statistics,
+            });
+
+            let instance = crate::ir::actor::PhysicalActor {
+                id: id.clone(),
+                component_name: self.component_name.clone(),
+                creation_time: self
+                    .creation_time
+                    .unwrap_or_else(|| std::time::Instant::now() - std::time::Duration::from_secs(60)),
+                image: self.image,
+                behavior_spec: self.behavior_spec,
+                desired_mapping: desired_mapping,
+                materialized: match self.desired_state {
+                    DesiredPhysicalComponentState::Materialized => Some(materialized_state),
+                    DesiredPhysicalComponentState::Planned => None,
+                    DesiredPhysicalComponentState::Requested => None,
+                },
+                annotations: self.annotations,
+            };
+
+            let physical_component = match self.desired_state {
+                DesiredPhysicalComponentState::Materialized => crate::ir::physical_model::PhysicalComponentState::Materialized(Box::new(instance)),
+                DesiredPhysicalComponentState::Planned => crate::ir::PhysicalComponentState::Planned(Box::new(instance)),
+                DesiredPhysicalComponentState::Requested => crate::ir::PhysicalComponentState::Requested(None),
+            };
+
+            (self.component_name, id.function_id, physical_component)
+        }
+
+        #[allow(unused)]
+        pub fn with_state(mut self, state: DesiredPhysicalComponentState) -> Self {
+            self.desired_state = state;
+            self
+        }
+
+        pub fn with_node_id(mut self, node_id: uuid::Uuid) -> Self {
+            self.node_id = Some(node_id);
+            self
+        }
+
+        #[allow(unused)]
+        pub fn with_component_id(mut self, component_id: uuid::Uuid) -> Self {
+            self.component_id = Some(component_id);
+            self
+        }
+    }
+
+    impl MockActorBuilder {
+        pub fn build(self) -> (String, crate::ir::logical_model::LogicalComponent) {
+            let id = self.logical_id.unwrap_or("test".to_string());
+
+            let actor = crate::ir::actor::LogicalActor {
+                image: self.image.unwrap_or_else(|| crate::ir::test::mock_actor_image()),
+                annotations: self.annotations,
+                scaling_mode: self.scaling_mode.unwrap_or_else(|| crate::ir::component::ScalingMode::Singleton),
+                node_filter: self.node_filters.unwrap_or_default(),
+                logical_ports: self.logical_ports.unwrap_or_default(),
+            };
+
+            (id, crate::ir::logical_model::LogicalComponent::Actor(actor))
+        }
+
+        pub fn with_logical_id(mut self, id: String) -> Self {
+            self.logical_id = Some(id);
+            self
+        }
+
+        pub fn with_image(mut self, image: crate::ir::behavior::Behavior) -> Self {
+            self.image = Some(image);
+            self
+        }
+
+        #[allow(unused)]
+        pub fn with_annotations(mut self, annotations: std::collections::HashMap<String, String>) -> Self {
+            self.annotations = annotations;
+            self
+        }
+
+        #[allow(unused)]
+        pub fn with_annotation(mut self, key: &str, val: &str) -> Self {
+            self.annotations.insert(key.to_string(), val.to_string());
+            self
+        }
+
+        pub fn with_scaling_mode(mut self, scaling_mode: crate::ir::component::ScalingMode) -> Self {
+            self.scaling_mode = Some(scaling_mode);
+            self
+        }
+
+        #[allow(unused)]
+        pub fn with_node_filters(mut self, node_filters: crate::ir::component::NodeFilters) -> Self {
+            self.node_filters = Some(node_filters);
+            self
+        }
+
+        pub fn with_logical_ports(mut self, logical_ports: crate::ir::LogicalPorts) -> Self {
+            self.logical_ports = Some(logical_ports);
+            self
         }
     }
 }

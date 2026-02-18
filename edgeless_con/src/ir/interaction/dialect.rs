@@ -222,7 +222,7 @@ pub trait PhysicalInteraction {
     fn relevant_nodes(&self) -> Vec<edgeless_api::function_instance::NodeId>;
 }
 
-trait AsConcreteInteraction {
+pub trait AsConcreteInteraction {
     fn as_concrete(a: &dyn Interaction) -> Result<&Self, super::InteractionError>;
 }
 
@@ -233,7 +233,7 @@ impl<T: Interaction> AsConcreteInteraction for T {
     }
 }
 
-trait AsConcreteSourcePort {
+pub trait AsConcreteSourcePort {
     fn as_concrete(a: &dyn SourcePort) -> Result<&Self, super::InteractionError>;
 }
 
@@ -244,7 +244,7 @@ impl<T: SourcePort> AsConcreteSourcePort for T {
     }
 }
 
-trait AsConcreteDestinationPort {
+pub trait AsConcreteDestinationPort {
     fn as_concrete(a: &dyn DestinationPort) -> Result<&Self, super::InteractionError>;
 }
 

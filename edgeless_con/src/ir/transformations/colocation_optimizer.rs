@@ -151,16 +151,9 @@ mod test {
 
         let (logical_component_under_test, physical_instances) =
             component_mock("test".to_string(), component_id, (colocated_other_id, 1.0), (remote_other_id, 9.0));
-        let mut workflow_under_test = crate::ir::workflow::test::mock_workflow(
-            std::collections::HashMap::from([(
-                "test".to_string(),
-                (
-                    logical_component_under_test,
-                    physical_instances.iter().map(|(id, _)| id.clone()).collect(),
-                ),
-            )]),
-            physical_instances.iter().cloned().collect(),
-        );
+        let mut workflow_under_test = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component("test", &logical_component_under_test, physical_instances.as_slice())
+            .build();
 
         let mut optimizer = ColocationOptimizer::new();
         let changes = optimizer.apply(
@@ -200,16 +193,9 @@ mod test {
 
         let (logical_component_under_test, physical_instances) =
             component_mock("test".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
-        let mut workflow_under_test = crate::ir::workflow::test::mock_workflow(
-            std::collections::HashMap::from([(
-                "test".to_string(),
-                (
-                    logical_component_under_test,
-                    physical_instances.iter().map(|(id, _)| id.clone()).collect(),
-                ),
-            )]),
-            physical_instances.iter().cloned().collect(),
-        );
+        let mut workflow_under_test = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component("test", &logical_component_under_test, physical_instances.as_slice())
+            .build();
 
         let mut optimizer = ColocationOptimizer::new();
         let changes = optimizer.apply(
@@ -232,16 +218,10 @@ mod test {
 
         let (logical_component_under_test, physical_instances) =
             component_mock("test".to_string(), component_id, (remote_other_id2, 1.0), (remote_other_id, 9.0));
-        let mut workflow_under_test = crate::ir::workflow::test::mock_workflow(
-            std::collections::HashMap::from([(
-                "test".to_string(),
-                (
-                    logical_component_under_test,
-                    physical_instances.iter().map(|(id, _)| id.clone()).collect(),
-                ),
-            )]),
-            physical_instances.iter().cloned().collect(),
-        );
+
+        let mut workflow_under_test = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component("test", &logical_component_under_test, physical_instances.as_slice())
+            .build();
 
         let mut optimizer = ColocationOptimizer::new();
         let changes = optimizer.apply(

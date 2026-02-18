@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
+#![allow(unused_assignments)]
+
 use futures::FutureExt;
 
 #[derive(Clone)]

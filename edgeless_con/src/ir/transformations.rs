@@ -58,34 +58,36 @@ pub struct LogicalComponentChange {
 pub enum LogicalComponentChangeAction {
     Delete,
     Update(super::logical_model::LogicalComponent),
+    #[allow(unused)]
     Insert(super::logical_model::LogicalComponent),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PhysicalChange {
     Component(PhysicalComponentChange),
     Link(PhysicalLinkChange),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PhysicalLinkChange {
     pub link_id: edgeless_api::link::LinkInstanceId,
     pub action: PhysicalLinkChangeAction,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PhysicalLinkChangeAction {
     Delete,
     Update(crate::ir::link::WorkflowLink),
     Insert(crate::ir::link::WorkflowLink),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PhysicalComponentChange {
     pub component_id: uuid::Uuid,
     pub action: PhysicalComponentChangeAction,
 }
 
+#[derive(Clone)]
 pub enum PhysicalComponentChangeAction {
     Delete,
     Update(super::physical_model::PhysicalComponentState),
