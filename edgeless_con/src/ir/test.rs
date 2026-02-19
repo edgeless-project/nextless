@@ -1,10 +1,6 @@
 // SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use std::time::Duration;
-
-use crate::ir::actor::ImageState;
-
 #[derive(Clone)]
 pub(crate) struct MockPortStats {
     message_rates: std::collections::HashMap<edgeless_api::function_instance::InstanceId, f64>,
@@ -12,6 +8,42 @@ pub(crate) struct MockPortStats {
 }
 
 pub(crate) struct MockWasmRuntime {}
+
+#[derive(Debug, Clone, derive_builder::Builder)]
+pub(crate) struct MockRuntimeStatistics {
+    #[builder(default)]
+    invocation_rate: f64,
+    #[builder(default)]
+    invocation_rate_by_port: Vec<(edgeless_api::function_instance::PortId, f64)>,
+    #[builder(default)]
+    duration_mean_secs: f64,
+    #[builder(default)]
+    duration_soft_limit_rate_rel: f64,
+    #[builder(default)]
+    error_rate_rel: f64,
+}
+
+impl super::ComponentRuntimeStatistics for MockRuntimeStatistics {
+    fn invocation_rate_abs(&self, _period: std::time::Duration) -> Option<f64> {
+        Some(self.invocation_rate)
+    }
+
+    fn invocations_rate_abs_by_port(&self, _period: std::time::Duration) -> Vec<(edgeless_api::function_instance::PortId, f64)> {
+        self.invocation_rate_by_port.clone()
+    }
+
+    fn duration_mean_secs(&self, _period: std::time::Duration) -> Option<f64> {
+        Some(self.duration_mean_secs)
+    }
+
+    fn duration_soft_limit_rate_rel(&self, _period: std::time::Duration) -> Option<f64> {
+        Some(self.duration_soft_limit_rate_rel)
+    }
+
+    fn error_rate_rel(&self, _period: std::time::Duration) -> Option<f64> {
+        Some(self.error_rate_rel)
+    }
+}
 
 impl MockPortStats {
     pub(crate) fn new(
@@ -61,7 +93,7 @@ impl crate::ir::WasmRuntime for MockWasmRuntime {
     }
 }
 
-pub(crate) fn component_mock(
+pub(crate) fn multi_output_materialized_actor(
     logical_id: String,
     component_id: edgeless_api::function_instance::InstanceId,
     output_1: (edgeless_api::function_instance::InstanceId, f64),
@@ -70,154 +102,102 @@ pub(crate) fn component_mock(
     crate::ir::logical_model::LogicalComponent,
     Vec<(uuid::Uuid, crate::ir::physical_model::PhysicalComponentState)>,
 ) {
+    let output_rates = std::collections::HashMap::from([("output_1", output_1), ("output_2", output_2)]);
+
     let cut_logical_ports = crate::ir::LogicalPorts {
         logical_output_mapping: std::collections::HashMap::from([
-            (
-                edgeless_api::function_instance::PortId("output_1".to_string()),
-                crate::ir::interaction::SourcePortMapping {
-                    dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
-                        base_type: crate::ir::interaction::dialect::logical_overlay::ID,
-                        constraints: std::collections::BTreeSet::new(),
-                    },
-                    mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
-                        destination: crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(
-                            crate::ir::interaction::LogicalPortId {
-                                component: "other_1".to_string(),
-                                port: edgeless_api::function_instance::PortId("input_1".to_string()),
-                            },
-                        ),
-                    }),
-                },
+            crate::ir::interaction::dialect::logical_overlay::mock_ports::mock_source_port(
+                &edgeless_api::function_instance::PortId("output_1".to_string()),
+                crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(crate::ir::interaction::LogicalPortId {
+                    component: "other_1".to_string(),
+                    port: edgeless_api::function_instance::PortId("input_1".to_string()),
+                }),
             ),
-            (
-                edgeless_api::function_instance::PortId("output_2".to_string()),
-                crate::ir::interaction::SourcePortMapping {
-                    dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
-                        base_type: crate::ir::interaction::dialect::logical_overlay::ID,
-                        constraints: std::collections::BTreeSet::new(),
-                    },
-                    mapping: Box::new(crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort {
-                        destination: crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(
-                            crate::ir::interaction::LogicalPortId {
-                                component: "other_2".to_string(),
-                                port: edgeless_api::function_instance::PortId("input_1".to_string()),
-                            },
-                        ),
-                    }),
-                },
+            crate::ir::interaction::dialect::logical_overlay::mock_ports::mock_source_port(
+                &edgeless_api::function_instance::PortId("output_2".to_string()),
+                crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(crate::ir::interaction::LogicalPortId {
+                    component: "other_2".to_string(),
+                    port: edgeless_api::function_instance::PortId("input_1".to_string()),
+                }),
             ),
         ]),
         logical_input_mapping: std::collections::HashMap::new(),
     };
 
+    let default_cluster_id = uuid::Uuid::from_u128(1234);
+
+    let output_port_1 = edgeless_api::function_instance::PortId("output_1".to_string());
+    let output_port_2 = edgeless_api::function_instance::PortId("output_2".to_string());
+    let input_port_1 = edgeless_api::function_instance::PortId("input_1".to_string());
+    let instance_1_desired_outputs = std::collections::HashMap::from([
+        crate::ir::interaction::dialect::physical_overlay::mock_ports::mock_source_port(
+            default_cluster_id,
+            &output_port_1,
+            crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(crate::ir::interaction::PhysicalPortId {
+                instance: output_1.0.clone(),
+                port: input_port_1.clone(),
+            }),
+        ),
+        crate::ir::interaction::dialect::physical_overlay::mock_ports::mock_source_port(
+            default_cluster_id,
+            &output_port_2,
+            crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(crate::ir::interaction::PhysicalPortId {
+                instance: output_2.0.clone(),
+                port: input_port_1.clone(),
+            }),
+        ),
+    ]);
+
+    let instance_1_materialized_outputs = instance_1_desired_outputs
+        .iter()
+        .map(|(id, mapping)| {
+            (
+                id.clone(),
+                crate::ir::MaterializedOutput {
+                    mapping: mapping.clone(),
+                    port_statistics: Some(Box::new(crate::ir::test::MockPortStats::new(
+                        std::collections::HashMap::from([output_rates.get(id.0.as_str()).unwrap().clone()]),
+                        std::collections::HashMap::new(),
+                    ))),
+                },
+            )
+        })
+        .collect();
+
     let instance_1 = (
         component_id,
+        crate::ir::PhysicalPorts {
+            physical_output_mapping: instance_1_desired_outputs,
+            physical_input_mapping: std::collections::HashMap::new(),
+        },
         crate::ir::MaterializedPorts {
-            materialized_outputs: std::collections::HashMap::from([
-                (
-                    edgeless_api::function_instance::PortId("output_1".to_string()),
-                    crate::ir::MaterializedOutput {
-                        mapping: crate::ir::interaction::SourcePortMapping {
-                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
-                                base_type: crate::ir::interaction::dialect::physical_overlay::ID,
-                                constraints: std::collections::BTreeSet::new(),
-                            },
-                            mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
-                                destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(
-                                    crate::ir::interaction::PhysicalPortId {
-                                        instance: output_1.0.clone(),
-                                        port: edgeless_api::function_instance::PortId("input_1".to_string()),
-                                    },
-                                ),
-                            }),
-                        },
-                        port_statistics: Some(Box::new(crate::ir::test::MockPortStats::new(
-                            std::collections::HashMap::from([output_1.clone()]),
-                            std::collections::HashMap::new(),
-                        ))),
-                    },
-                ),
-                (
-                    edgeless_api::function_instance::PortId("output_2".to_string()),
-                    crate::ir::MaterializedOutput {
-                        mapping: crate::ir::interaction::SourcePortMapping {
-                            dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
-                                base_type: crate::ir::interaction::dialect::physical_overlay::ID,
-                                constraints: std::collections::BTreeSet::new(),
-                            },
-                            mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
-                                destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Unicast(
-                                    crate::ir::interaction::PhysicalPortId {
-                                        instance: output_2.0.clone(),
-                                        port: edgeless_api::function_instance::PortId("input_1".to_string()),
-                                    },
-                                ),
-                            }),
-                        },
-                        port_statistics: Some(Box::new(crate::ir::test::MockPortStats::new(
-                            std::collections::HashMap::from([output_2.clone()]),
-                            std::collections::HashMap::new(),
-                        ))),
-                    },
-                ),
-            ]),
+            materialized_outputs: instance_1_materialized_outputs,
             materialized_inputs: std::collections::HashMap::new(),
         },
     );
 
-    let mock_logical = mock_logical_actor(cut_logical_ports);
-    let mock_instances = mock_physical_actors(logical_id.clone(), vec![instance_1]);
+    let (logical_id, logical_instance) = crate::ir::actor::mock_actor::MockActorBuilder::default()
+        .with_logical_id(logical_id)
+        .with_logical_ports(cut_logical_ports)
+        .build();
 
-    (mock_logical, mock_instances)
-}
-
-pub(crate) fn mock_logical_actor(logical_ports: super::LogicalPorts) -> crate::ir::logical_model::LogicalComponent {
-    crate::ir::logical_model::LogicalComponent::Actor(crate::ir::actor::LogicalActor {
-        image: mock_actor_image(),
-        annotations: std::collections::HashMap::new(),
-        scaling_mode: super::component::ScalingMode::Singleton,
-        node_filter: super::component::NodeFilters::default(),
-        logical_ports,
-    })
-}
-
-pub(crate) fn mock_physical_actors(
-    component_name: String,
-    instances: Vec<(edgeless_api::function_instance::InstanceId, super::MaterializedPorts)>,
-) -> Vec<(uuid::Uuid, crate::ir::physical_model::PhysicalComponentState)> {
-    instances
-        .into_iter()
-        .map(|(id, materialized_ports)| {
-            let instance = crate::ir::actor::PhysicalActor {
-                id,
-                materialized: Some(crate::ir::actor::MaterializedActor {
+    let mock_instances = vec![instance_1]
+        .iter()
+        .map(|(instance_id, desired_ports, materialized_ports)| {
+            let (_, id, instance) = crate::ir::actor::mock_actor::MockActorInstanceBuilder::new_for_logical(&logical_id, &logical_instance)
+                .with_component_id(instance_id.function_id)
+                .with_node_id(instance_id.node_id)
+                .with_desired_mapping(desired_ports.clone())
+                .with_materialized_actor(crate::ir::actor::MaterializedActor {
                     mapping: materialized_ports.clone(),
                     runtime_statistics: None,
-                }),
-                component_name: component_name.clone(),
-                creation_time: std::time::Instant::now() - Duration::from_secs(60),
-                image: ImageState::Existing(mock_actor_image().main_image),
-                behavior_spec: mock_actor_image().spec,
-                desired_mapping: crate::ir::PhysicalPorts {
-                    physical_output_mapping: materialized_ports
-                        .materialized_outputs
-                        .iter()
-                        .map(|(id, port)| (id.clone(), port.mapping.clone()))
-                        .collect(),
-                    physical_input_mapping: materialized_ports
-                        .materialized_inputs
-                        .iter()
-                        .map(|(id, port)| (id.clone(), port.mapping.clone()))
-                        .collect(),
-                },
-                annotations: Default::default(),
-            };
-            (
-                id.function_id.clone(),
-                crate::ir::PhysicalComponentState::Materialized(Box::new(instance)),
-            )
+                })
+                .build();
+            (id, instance)
         })
-        .collect()
+        .collect();
+
+    (logical_instance, mock_instances)
 }
 
 pub(crate) fn mock_nodes_and_candidates<'a>(

@@ -45,10 +45,12 @@ pub trait StatefulLogicalTransformation<G>: Send + Sync {
     fn apply(&mut self, workflow: &super::workflow::ActiveWorkflow, global_state: &G) -> Vec<LogicalChange>;
 }
 
+#[derive(Debug)]
 pub enum LogicalChange {
     Component(LogicalComponentChange),
 }
 
+#[derive(Debug)]
 pub struct LogicalComponentChange {
     pub component_id: String,
     pub action: LogicalComponentChangeAction,

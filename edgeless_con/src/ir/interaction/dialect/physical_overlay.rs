@@ -245,6 +245,57 @@ impl super::InteractionDialect for PhysicalOverlayDialect {
 }
 
 #[cfg(test)]
+pub(crate) mod mock_ports {
+    pub(crate) fn mock_source_port(
+        cluster: uuid::Uuid,
+        id: &edgeless_api::function_instance::PortId,
+        destination_mapping: crate::ir::interaction::dialect::physical_overlay::DestinationMapping,
+    ) -> (edgeless_api::function_instance::PortId, crate::ir::interaction::SourcePortMapping) {
+        (
+            id.clone(),
+            crate::ir::interaction::SourcePortMapping {
+                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                    base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                    constraints: std::collections::BTreeSet::from([crate::ir::interaction::dialect::DialectConstraintContainer {
+                        dialect: crate::ir::interaction::dialect::physical_overlay::ID,
+                        constraint: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(
+                            cluster,
+                        )),
+                    }]),
+                },
+                mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
+                    destination: destination_mapping,
+                }),
+            },
+        )
+    }
+
+    pub(crate) fn mock_destination_port(
+        cluster: uuid::Uuid,
+        id: &edgeless_api::function_instance::PortId,
+        sources: &[crate::ir::interaction::PhysicalPortId],
+    ) -> (edgeless_api::function_instance::PortId, crate::ir::interaction::DestiantionPortMapping) {
+        (
+            id.clone(),
+            crate::ir::interaction::DestiantionPortMapping {
+                dialect_type: crate::ir::interaction::dialect::DialectDescriptor {
+                    base_type: crate::ir::interaction::dialect::physical_overlay::ID,
+                    constraints: std::collections::BTreeSet::from([crate::ir::interaction::dialect::DialectConstraintContainer {
+                        dialect: crate::ir::interaction::dialect::physical_overlay::ID,
+                        constraint: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayConstraint::Cluster(
+                            cluster,
+                        )),
+                    }]),
+                },
+                mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlayDestinationPort {
+                    sources: sources.iter().cloned().collect(),
+                }),
+            },
+        )
+    }
+}
+
+#[cfg(test)]
 mod port_interaction_test {
     use crate::ir::interaction::{
         dialect::{AsConcreteDestinationPort, AsConcreteInteraction, AsConcreteSourcePort, InteractionPortUtils},

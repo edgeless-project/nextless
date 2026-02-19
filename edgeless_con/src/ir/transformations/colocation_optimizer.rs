@@ -137,7 +137,7 @@ fn optimize_component_multiple_active_ports(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ir::test::component_mock;
+    use crate::ir::test::multi_output_materialized_actor;
     use crate::ir::transformations::StatelessPhysicalTransformation;
 
     #[test]
@@ -150,7 +150,7 @@ mod test {
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
         let (logical_component_under_test, physical_instances) =
-            component_mock("test".to_string(), component_id, (colocated_other_id, 1.0), (remote_other_id, 9.0));
+            multi_output_materialized_actor("test".to_string(), component_id, (colocated_other_id, 1.0), (remote_other_id, 9.0));
         let mut workflow_under_test = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
             .with_component("test", &logical_component_under_test, physical_instances.as_slice())
             .build();
@@ -192,7 +192,7 @@ mod test {
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
         let (logical_component_under_test, physical_instances) =
-            component_mock("test".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
+            multi_output_materialized_actor("test".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
         let mut workflow_under_test = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
             .with_component("test", &logical_component_under_test, physical_instances.as_slice())
             .build();
@@ -217,7 +217,7 @@ mod test {
         let remote_other_id2 = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
         let (logical_component_under_test, physical_instances) =
-            component_mock("test".to_string(), component_id, (remote_other_id2, 1.0), (remote_other_id, 9.0));
+            multi_output_materialized_actor("test".to_string(), component_id, (remote_other_id2, 1.0), (remote_other_id, 9.0));
 
         let mut workflow_under_test = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
             .with_component("test", &logical_component_under_test, physical_instances.as_slice())
