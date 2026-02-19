@@ -316,6 +316,16 @@ pub(crate) mod mock_actor {
             self.component_id = Some(component_id);
             self
         }
+
+        pub fn with_materialized_actor(mut self, materialized_actor: crate::ir::actor::MaterializedActor) -> Self {
+            self.materialized_state = Some(materialized_actor);
+            self
+        }
+
+        pub fn with_desired_mapping(mut self, mapping: crate::ir::PhysicalPorts) -> Self {
+            self.desired_mapping = Some(mapping);
+            self
+        }
     }
 
     impl MockActorBuilder {

@@ -25,10 +25,12 @@ impl super::StatelessLogicalTransformation for DeadComponentRemoval {
             iteration_change = false;
             iteration_change = Self::remove_unused_inputs(&mut cloned_components) || iteration_change;
             iteration_change = Self::remove_unused_outputs(&mut cloned_components) || iteration_change;
-            iteration_change = Self::remove_unused_functions(&mut cloned_components) || iteration_change;
             if iteration_change {
                 total_change = true;
             }
+        }
+        if Self::remove_unused_functions(&mut cloned_components) {
+            total_change = true;
         }
 
         if !total_change {
@@ -289,7 +291,7 @@ impl DeadComponentRemoval {
     fn remove_unused_functions(slf: &mut std::collections::HashMap<String, (crate::ir::logical_model::LogicalComponent, bool)>) -> bool {
         let before = slf.len();
 
-        slf.retain(|f_id, (f_spec, _)| {
+        slf.retain(|_f_id, (f_spec, _)| {
             let crate::ir::logical_model::LogicalComponent::Actor(actor) = &f_spec else {
                 return true;
             };
@@ -356,147 +358,30 @@ mod test {
     use crate::ir::{interaction::dialect::AsConcreteSourcePort, transformations::StatelessLogicalTransformation};
 
     #[test]
-    fn remove_unused_chain() {
+    fn remove_unused_actor() {
         //        - sink
         // source
         //        - processor - (unused output)
-        //
+
         let source_id = "source".to_string();
-        let source_port_1 = edgeless_api::function_instance::PortId("source_1".to_string());
-        let source_port_2 = edgeless_api::function_instance::PortId("source_2".to_string());
-        let mut source_image = crate::ir::test::mock_actor_image();
-        source_image.spec.output_ports.insert(
-            source_port_1.clone(),
-            edgeless_api::function_instance::Port {
-                id: source_port_1.clone(),
-                method: edgeless_api::function_instance::PortMethod::Cast,
-                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
-                return_data_type: None,
-            },
-        );
-        source_image.spec.output_ports.insert(
-            source_port_2.clone(),
-            edgeless_api::function_instance::Port {
-                id: source_port_2.clone(),
-                method: edgeless_api::function_instance::PortMethod::Cast,
-                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
-                return_data_type: None,
-            },
-        );
-        source_image.spec.inner_structure.insert(
-            edgeless_api::function_instance::MappingNode::SideEffect,
-            vec![
-                edgeless_api::function_instance::MappingNode::Port(source_port_1.clone()),
-                edgeless_api::function_instance::MappingNode::Port(source_port_2.clone()),
-            ],
-        );
-
         let sink_id = "sink".to_string();
-        let sink_input = edgeless_api::function_instance::PortId("sink_input".to_string());
-        let mut sink_image = crate::ir::test::mock_actor_image();
-        sink_image.spec.inner_structure.insert(
-            edgeless_api::function_instance::MappingNode::Port(sink_input.clone()),
-            vec![edgeless_api::function_instance::MappingNode::SideEffect],
-        );
-        sink_image.spec.input_ports.insert(
-            sink_input.clone(),
-            edgeless_api::function_instance::Port {
-                id: sink_input.clone(),
-                method: edgeless_api::function_instance::PortMethod::Cast,
-                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
-                return_data_type: None,
-            },
-        );
-
         let processor_id = "processor".to_string();
-        let processor_input = edgeless_api::function_instance::PortId("processor_input".to_string());
-        let processor_output = edgeless_api::function_instance::PortId("processor_output".to_string());
-        let mut processor_image = crate::ir::test::mock_actor_image();
-        processor_image.spec.inner_structure.insert(
-            edgeless_api::function_instance::MappingNode::Port(processor_input.clone()),
-            vec![edgeless_api::function_instance::MappingNode::Port(processor_output.clone())],
-        );
-        processor_image.spec.input_ports.insert(
-            processor_input.clone(),
-            edgeless_api::function_instance::Port {
-                id: processor_input.clone(),
-                method: edgeless_api::function_instance::PortMethod::Cast,
-                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
-                return_data_type: None,
-            },
-        );
-        processor_image.spec.output_ports.insert(
-            processor_output.clone(),
-            edgeless_api::function_instance::Port {
-                id: processor_output.clone(),
-                method: edgeless_api::function_instance::PortMethod::Cast,
-                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
-                return_data_type: None,
-            },
-        );
 
-        let (source_id, source_actor) = crate::ir::actor::mock_actor::MockActorBuilder::default()
-            .with_logical_id(source_id.clone())
-            .with_image(source_image)
-            .with_logical_ports(crate::ir::LogicalPorts {
-                logical_output_mapping: std::collections::HashMap::from([
-                    super::interaction::dialect::logical_overlay::mock_ports::mock_source_port(
-                        &source_port_1,
-                        crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(crate::ir::interaction::LogicalPortId {
-                            component: sink_id.clone(),
-                            port: sink_input.clone(),
-                        }),
-                    ),
-                    super::interaction::dialect::logical_overlay::mock_ports::mock_source_port(
-                        &source_port_2,
-                        crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(crate::ir::interaction::LogicalPortId {
-                            component: processor_id.clone(),
-                            port: processor_input.clone(),
-                        }),
-                    ),
-                ]),
-                logical_input_mapping: Default::default(),
-            })
-            .build();
+        let (sink_id, sink_actor) = sink_actor(sink_id, source_id.clone(), source_port_1());
 
-        let (sink_id, sink_actor) = crate::ir::actor::mock_actor::MockActorBuilder::default()
-            .with_logical_id(sink_id.clone())
-            .with_image(sink_image)
-            .with_logical_ports(crate::ir::LogicalPorts {
-                logical_output_mapping: Default::default(),
-                logical_input_mapping: std::collections::HashMap::from([
-                    super::interaction::dialect::logical_overlay::mock_ports::mock_destination_port(
-                        &sink_input,
-                        &[crate::ir::interaction::LogicalPortId {
-                            component: source_id.clone(),
-                            port: source_port_1.clone(),
-                        }],
-                    ),
-                ]),
-            })
-            .build();
+        let (processor_id, processor_actor) = processor_actor(processor_id.clone(), source_id.clone(), source_port_2(), None);
 
-        let (processor_id, processor_actor) = crate::ir::actor::mock_actor::MockActorBuilder::default()
-            .with_logical_id(processor_id.clone())
-            .with_image(processor_image)
-            .with_logical_ports(crate::ir::LogicalPorts {
-                logical_output_mapping: Default::default(),
-                logical_input_mapping: std::collections::HashMap::from([
-                    super::interaction::dialect::logical_overlay::mock_ports::mock_destination_port(
-                        &processor_input,
-                        &[crate::ir::interaction::LogicalPortId {
-                            component: source_id.clone(),
-                            port: source_port_2.clone(),
-                        }],
-                    ),
-                ]),
-            })
-            .build();
+        let (_source_id, source_actor) = source_actor(
+            source_id.clone(),
+            sink_id.clone(),
+            sink_input(),
+            Some((processor_id.clone(), processor_input())),
+        );
 
         let wf = super::workflow::mock_workflow::MockWorkflowBuilder::default()
-            .with_component(&source_id, &source_actor, &[])
-            .with_component(&sink_id, &sink_actor, &[])
-            .with_component(&processor_id, &processor_actor, &[])
+            .with_component(&source_id.clone(), &source_actor, &[])
+            .with_component(&sink_id.clone(), &sink_actor, &[])
+            .with_component(&processor_id.clone(), &processor_actor, &[])
             .build();
 
         let mut transformation = super::DeadComponentRemoval::new();
@@ -527,7 +412,7 @@ mod test {
                 updated_component
                     .logical_ports()
                     .logical_output_mapping
-                    .get(&source_port_1)
+                    .get(&source_port_1())
                     .unwrap()
                     .mapping
                     .as_ref(),
@@ -539,9 +424,299 @@ mod test {
             };
 
             assert_eq!(unicast_target.component, sink_id);
-            assert_eq!(unicast_target.port, sink_input);
+            assert_eq!(unicast_target.port, sink_input());
         } else {
             panic!("Unexpected Change");
         }
+    }
+
+    #[test]
+    fn remove_unused_chain() {
+        // source - processor - processor - processor - (unused output)
+
+        let source_id = "source".to_string();
+        let processor_id = "processor".to_string();
+        let processor_id_2 = "processor2".to_string();
+        let processor_id_3 = "processor3".to_string();
+
+        let (processor_id_3, processor_actor_instance_3) = processor_actor(processor_id_3.clone(), processor_id_2.clone(), processor_output(), None);
+
+        let (processor_id_2, processor_actor_instance_2) = processor_actor(
+            processor_id_2.clone(),
+            processor_id.clone(),
+            processor_output(),
+            Some((processor_id_3.clone(), processor_input())),
+        );
+
+        let (processor_id, processor_actor_instance) = processor_actor(
+            processor_id.clone(),
+            source_id.clone(),
+            source_port_1(),
+            Some((processor_id_2.clone(), processor_input())),
+        );
+
+        let (_source_id, source_actor) = source_actor(source_id.clone(), processor_id.clone(), processor_input(), None);
+
+        let wf = super::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&source_id.clone(), &source_actor, &[])
+            .with_component(&processor_id.clone(), &processor_actor_instance, &[])
+            .with_component(&processor_id_2.clone(), &processor_actor_instance_2, &[])
+            .with_component(&processor_id_3.clone(), &processor_actor_instance_3, &[])
+            .build();
+
+        let mut transformation = super::DeadComponentRemoval::new();
+
+        let changes = transformation.apply(&wf);
+
+        assert_eq!(changes.len(), 4);
+
+        let mut change_map = std::collections::HashMap::<String, crate::ir::transformations::LogicalComponentChangeAction>::new();
+
+        for change in changes {
+            let crate::ir::transformations::LogicalChange::Component(logical_component_change) = change;
+
+            change_map.insert(logical_component_change.component_id.clone(), logical_component_change.action);
+        }
+        assert_eq!(change_map.len(), 4);
+
+        assert!(std::matches!(
+            change_map.get(&source_id).unwrap(),
+            crate::ir::transformations::LogicalComponentChangeAction::Delete
+        ));
+
+        assert!(std::matches!(
+            change_map.get(&processor_id).unwrap(),
+            crate::ir::transformations::LogicalComponentChangeAction::Delete
+        ));
+
+        assert!(std::matches!(
+            change_map.get(&processor_id_2).unwrap(),
+            crate::ir::transformations::LogicalComponentChangeAction::Delete
+        ));
+
+        assert!(std::matches!(
+            change_map.get(&processor_id_3).unwrap(),
+            crate::ir::transformations::LogicalComponentChangeAction::Delete
+        ));
+    }
+
+    #[test]
+    fn dont_change_fully_used_graph() {
+        //        - sink
+        // source
+        //        - sink
+
+        let source_id = "source".to_string();
+        let sink_id = "sink1".to_string();
+        let sink_id_2 = "sink2".to_string();
+
+        let (sink_id, sink_actor_instance) = sink_actor(sink_id, source_id.clone(), source_port_1());
+
+        let (sink_id_2, sink_2_actor) = sink_actor(sink_id_2.clone(), source_id.clone(), source_port_2());
+
+        let (source_id, source_actor) = source_actor(
+            source_id.clone(),
+            sink_id.clone(),
+            sink_input(),
+            Some((sink_id_2.clone(), processor_input())),
+        );
+
+        let wf = super::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&source_id.clone(), &source_actor, &[])
+            .with_component(&sink_id.clone(), &sink_actor_instance, &[])
+            .with_component(&sink_id_2.clone(), &sink_2_actor, &[])
+            .build();
+
+        let mut transformation = super::DeadComponentRemoval::new();
+
+        let changes = transformation.apply(&wf);
+
+        assert_eq!(changes.len(), 0)
+    }
+
+    fn source_actor(
+        id: String,
+        dest_1: String,
+        dest_1_port: edgeless_api::function_instance::PortId,
+        dest_2: Option<(String, edgeless_api::function_instance::PortId)>,
+    ) -> (String, crate::ir::logical_model::LogicalComponent) {
+        let mut source_image = crate::ir::test::mock_actor_image();
+        source_image.spec.output_ports.insert(
+            source_port_1(),
+            edgeless_api::function_instance::Port {
+                id: source_port_1(),
+                method: edgeless_api::function_instance::PortMethod::Cast,
+                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
+                return_data_type: None,
+            },
+        );
+        source_image.spec.output_ports.insert(
+            source_port_2(),
+            edgeless_api::function_instance::Port {
+                id: source_port_2(),
+                method: edgeless_api::function_instance::PortMethod::Cast,
+                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
+                return_data_type: None,
+            },
+        );
+        source_image.spec.inner_structure.insert(
+            edgeless_api::function_instance::MappingNode::SideEffect,
+            vec![
+                edgeless_api::function_instance::MappingNode::Port(source_port_1()),
+                edgeless_api::function_instance::MappingNode::Port(source_port_2()),
+            ],
+        );
+
+        let mut logical_output_mapping =
+            std::collections::HashMap::from([super::interaction::dialect::logical_overlay::mock_ports::mock_source_port(
+                &source_port_1(),
+                crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(crate::ir::interaction::LogicalPortId {
+                    component: dest_1,
+                    port: dest_1_port,
+                }),
+            )]);
+
+        if let Some((dest_2, dest_2_port)) = dest_2 {
+            let (port_id, port_mapping) = super::interaction::dialect::logical_overlay::mock_ports::mock_source_port(
+                &source_port_2(),
+                crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(crate::ir::interaction::LogicalPortId {
+                    component: dest_2,
+                    port: dest_2_port,
+                }),
+            );
+
+            logical_output_mapping.insert(port_id, port_mapping);
+        }
+
+        crate::ir::actor::mock_actor::MockActorBuilder::default()
+            .with_logical_id(id)
+            .with_image(source_image)
+            .with_logical_ports(crate::ir::LogicalPorts {
+                logical_output_mapping,
+                logical_input_mapping: Default::default(),
+            })
+            .build()
+    }
+
+    fn sink_actor(
+        id: String,
+        source_id: String,
+        source_port: edgeless_api::function_instance::PortId,
+    ) -> (String, crate::ir::logical_model::LogicalComponent) {
+        let mut sink_image = crate::ir::test::mock_actor_image();
+        sink_image.spec.inner_structure.insert(
+            edgeless_api::function_instance::MappingNode::Port(sink_input()),
+            vec![edgeless_api::function_instance::MappingNode::SideEffect],
+        );
+        sink_image.spec.input_ports.insert(
+            sink_input(),
+            edgeless_api::function_instance::Port {
+                id: sink_input(),
+                method: edgeless_api::function_instance::PortMethod::Cast,
+                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
+                return_data_type: None,
+            },
+        );
+
+        crate::ir::actor::mock_actor::MockActorBuilder::default()
+            .with_logical_id(id)
+            .with_image(sink_image)
+            .with_logical_ports(crate::ir::LogicalPorts {
+                logical_output_mapping: Default::default(),
+                logical_input_mapping: std::collections::HashMap::from([
+                    super::interaction::dialect::logical_overlay::mock_ports::mock_destination_port(
+                        &sink_input(),
+                        &[crate::ir::interaction::LogicalPortId {
+                            component: source_id,
+                            port: source_port,
+                        }],
+                    ),
+                ]),
+            })
+            .build()
+    }
+
+    fn processor_actor(
+        id: String,
+        source_id: String,
+        source_port: edgeless_api::function_instance::PortId,
+        dest: Option<(String, edgeless_api::function_instance::PortId)>,
+    ) -> (String, crate::ir::logical_model::LogicalComponent) {
+        let mut processor_image = crate::ir::test::mock_actor_image();
+        processor_image.spec.inner_structure.insert(
+            edgeless_api::function_instance::MappingNode::Port(processor_input()),
+            vec![edgeless_api::function_instance::MappingNode::Port(processor_output())],
+        );
+        processor_image.spec.input_ports.insert(
+            processor_input(),
+            edgeless_api::function_instance::Port {
+                id: processor_input(),
+                method: edgeless_api::function_instance::PortMethod::Cast,
+                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
+                return_data_type: None,
+            },
+        );
+        processor_image.spec.output_ports.insert(
+            processor_output(),
+            edgeless_api::function_instance::Port {
+                id: processor_output(),
+                method: edgeless_api::function_instance::PortMethod::Cast,
+                data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
+                return_data_type: None,
+            },
+        );
+
+        let mut logical_output_mapping: std::collections::HashMap<
+            edgeless_api::function_instance::PortId,
+            crate::ir::interaction::SourcePortMapping,
+        > = Default::default();
+
+        if let Some((component, port)) = dest {
+            let (port_id, port_mapping) = super::interaction::dialect::logical_overlay::mock_ports::mock_source_port(
+                &processor_output(),
+                crate::ir::interaction::dialect::logical_overlay::DestinationMapping::Unicast(crate::ir::interaction::LogicalPortId {
+                    component,
+                    port,
+                }),
+            );
+
+            logical_output_mapping.insert(port_id, port_mapping);
+        }
+
+        crate::ir::actor::mock_actor::MockActorBuilder::default()
+            .with_logical_id(id)
+            .with_image(processor_image)
+            .with_logical_ports(crate::ir::LogicalPorts {
+                logical_output_mapping,
+                logical_input_mapping: std::collections::HashMap::from([
+                    super::interaction::dialect::logical_overlay::mock_ports::mock_destination_port(
+                        &processor_input(),
+                        &[crate::ir::interaction::LogicalPortId {
+                            component: source_id,
+                            port: source_port,
+                        }],
+                    ),
+                ]),
+            })
+            .build()
+    }
+
+    fn source_port_1() -> edgeless_api::function_instance::PortId {
+        edgeless_api::function_instance::PortId("source_1".to_string())
+    }
+
+    fn source_port_2() -> edgeless_api::function_instance::PortId {
+        edgeless_api::function_instance::PortId("source_2".to_string())
+    }
+
+    fn processor_input() -> edgeless_api::function_instance::PortId {
+        edgeless_api::function_instance::PortId("processor_input".to_string())
+    }
+    fn processor_output() -> edgeless_api::function_instance::PortId {
+        edgeless_api::function_instance::PortId("processor_output".to_string())
+    }
+
+    fn sink_input() -> edgeless_api::function_instance::PortId {
+        edgeless_api::function_instance::PortId("sink_input".to_string())
     }
 }

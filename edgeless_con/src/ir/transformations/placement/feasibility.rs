@@ -62,7 +62,7 @@ pub fn feasible_node_runtime_candidates<'b>(
     candidates
 }
 
-fn node_fulfills_constraints(node_filter: &crate::ir::component::NodeFilters, node: &dyn crate::ir::Node) -> bool {
+pub fn node_fulfills_constraints(node_filter: &crate::ir::component::NodeFilters, node: &dyn crate::ir::Node) -> bool {
     if let Some(allowed_nodes) = &node_filter.node_ids_allowed {
         if !allowed_nodes.contains(&node.node_id()) {
             return false;

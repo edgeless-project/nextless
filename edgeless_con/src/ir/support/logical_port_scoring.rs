@@ -104,7 +104,7 @@ pub fn port_weights(component: &crate::ir::LogicalComponent) -> Vec<(edgeless_ap
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ir::test::component_mock;
+    use crate::ir::test::multi_output_materialized_actor;
 
     #[test]
     fn equal_peer_weights() {
@@ -116,7 +116,7 @@ mod test {
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
         let (component_under_test, _instanced_under_test) =
-            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
+            multi_output_materialized_actor("test1".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
         let port_weights = port_weights(&component_under_test);
 
         let weights = peer_weights(&component_under_test, port_weights);
@@ -135,7 +135,7 @@ mod test {
         let remote_other_id = edgeless_api::function_instance::InstanceId::new(nodes[1]);
 
         let (component_under_test, _instanced_under_test) =
-            component_mock("test1".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
+            multi_output_materialized_actor("test1".to_string(), component_id, (colocated_other_id, 5.0), (remote_other_id, 5.0));
         let port_rates = port_weights(&component_under_test);
         assert_eq!(port_rates.len(), 2);
         assert_eq!(

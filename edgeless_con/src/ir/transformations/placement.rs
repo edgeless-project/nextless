@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 pub mod candidate_filter;
-mod feasibility;
+pub mod feasibility;
 mod scoring;
 pub mod strategy;
 
