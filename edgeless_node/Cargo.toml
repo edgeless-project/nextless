@@ -22,6 +22,7 @@ default = ["wasmtime", "otel"]
 wasmtime = []
 wasmi = []
 otel = ["dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
+hardware_led_matrix = ["dep:rpi-led-panel"]
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -37,6 +38,8 @@ toml = "0.7"
 edgeless_api = { path = "../edgeless_api", features = ["grpc_impl"] }
 edgeless_telemetry = { path = "../edgeless_telemetry" }
 edgeless_dataplane = { path = "../edgeless_dataplane" }
+edgeless_function_types = { path = "../edgeless_function_types" }
+edgeless_function_core = { path = "../edgeless_function_core" }
 edgeless_http = { path = "../edgeless_http", features = ["hyper"] }
 hyper = { version = "1.2", features = ["full"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
@@ -73,6 +76,9 @@ rustix = { version = "1", features = ["mm"] }
 
 elfloader = { git = "https://github.com/raphaelhetzel/rust-elfloader.git", branch = "so_fixes" }
 
+
+embedded-graphics = { version = "0.8" }
+rpi-led-panel = { version = "0.8", optional = true }
 
 [build-dependencies]
 tonic-build = "0.10"

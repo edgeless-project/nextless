@@ -142,6 +142,10 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                     true => Some("redis-1".to_string()),
                     false => None,
                 },
+                led_matrix: match first_node {
+                    true => Some("led-matrix-1".to_string()),
+                    false => None,
+                },
             }),
             user_node_capabilities: None,
             opentelemetry_export: None,

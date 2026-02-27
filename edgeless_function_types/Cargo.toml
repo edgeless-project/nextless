@@ -20,6 +20,8 @@ image = { version = "0.25", default-features = false, features = [
     "bmp",
 ], optional = true }
 
+embedded-graphics = {version = "0.8" }
+
 [features]
 default = ["std"]
 vision = ["std", "dep:image"]

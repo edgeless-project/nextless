@@ -9,3 +9,5 @@ extern crate alloc;
 pub mod eval;
 #[cfg(feature = "vision")]
 pub mod vision;
+
+pub mod led_matrix;

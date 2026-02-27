@@ -29,6 +29,32 @@
           latest.toolchain
           targets.wasm32-unknown-unknown.latest.rust-std
         ];
+        node_package = {
+          pname = "edgeless_node_d";
+          version = "0.1";
+          doCheck = false;
+          buildAndTestSubdir = "edgeless_node";
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            allowBuiltinFetchGit = true;
+          };
+          src = pkgs.lib.cleanSource ./.;
+          nativeBuildInputs = with pkgs; [
+            openssl.dev
+            vulkan-loader
+            perl
+            pkg-config
+            protobuf
+            makeWrapper
+          ];
+          buildInputs = with pkgs; [
+            vulkan-loader
+          ];
+          postInstall = ''
+            wrapProgram $out/bin/edgeless_node_d \
+              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [pkgs.vulkan-loader]}
+          '';
+        };
       in {
         packages = {
           nextless_cli = (pkgs.makeRustPlatform {
@@ -68,32 +94,13 @@
           nextless_node = (pkgs.makeRustPlatform {
             cargo = toolchain;
             rustc = toolchain;
-          }).buildRustPackage rec {
-            pname = "edgeless_node_d";
-            version = "0.1";
-            doCheck = false;
-            buildAndTestSubdir = "edgeless_node";
-            cargoLock = {
-              lockFile = ./Cargo.lock;
-              allowBuiltinFetchGit = true;
-            };
-            src = pkgs.lib.cleanSource ./.;
-            nativeBuildInputs = with pkgs; [
-              openssl.dev
-              vulkan-loader
-              perl
-              pkg-config
-              protobuf
-              makeWrapper
-            ];
-            buildInputs = with pkgs; [
-              vulkan-loader
-            ];
-            postInstall = ''
-              wrapProgram $out/bin/edgeless_node_d \
-                --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [pkgs.vulkan-loader]}
-            '';
-          };
+          }).buildRustPackage node_package;
+          nextless_node_led_matrix = (pkgs.makeRustPlatform {
+            cargo = toolchain;
+            rustc = toolchain;
+          }).buildRustPackage (node_package // {
+            buildFeatures = [ "hardware_led_matrix" ];
+          });
           nextless_controller = (pkgs.makeRustPlatform {
             cargo = toolchain;
             rustc = toolchain;

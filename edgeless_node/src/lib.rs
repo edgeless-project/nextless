@@ -102,6 +102,8 @@ pub struct EdgelessNodeResourceSettings {
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
     pub redis_provider: Option<String>,
+    /// Support for RGB LED Matrix
+    pub led_matrix: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -306,6 +308,31 @@ async fn fill_resources(
                         class_type: class_type.clone(),
                         client: Box::new(
                             resources::redis::RedisResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type,
+                    outputs: vec![],
+                });
+            }
+        }
+
+        if let Some(provider_id) = &settings.led_matrix {
+            if !provider_id.is_empty() {
+                tracing::info!("Creating resource '{provider_id}'");
+                let class_type = "led-matrix".to_string();
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::led_matrix::LedMatrixResourceProvider::new(
                                 data_plane.clone(),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                             )
