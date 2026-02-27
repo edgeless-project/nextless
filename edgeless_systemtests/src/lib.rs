@@ -64,6 +64,7 @@ mod tests {
                         http_egress_provider: None,
                         file_log_provider: Some("file-log-1".to_string()),
                         redis_provider: None,
+                        led_matrix: None,
                     }),
                     user_node_capabilities: None,
                     opentelemetry_export: None,
