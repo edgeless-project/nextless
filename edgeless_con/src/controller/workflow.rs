@@ -728,7 +728,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(physical_port_ids) => {
                         api_output_mapping.insert(
                             port,
-                            edgeless_api::common::Output::Any(physical_port_ids.iter().map(|p| (p.instance, p.port.clone())).collect()),
+                            edgeless_api::common::Output::All(physical_port_ids.iter().map(|p| (p.instance, p.port.clone())).collect()),
                         );
                     }
                 }
