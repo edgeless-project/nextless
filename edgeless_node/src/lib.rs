@@ -220,6 +220,7 @@ async fn fill_resources(
     node_id: uuid::Uuid,
     settings: &Option<EdgelessNodeResourceSettings>,
     provider_specifications: &mut Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
+    simulator_display_sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
 ) -> std::collections::HashMap<String, agent::ResourceDesc> {
     let mut ret = std::collections::HashMap::<String, agent::ResourceDesc>::new();
 
@@ -335,6 +336,7 @@ async fn fill_resources(
                             resources::led_matrix::LedMatrixResourceProvider::new(
                                 data_plane.clone(),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
+                                simulator_display_sender,
                             )
                             .await,
                         ),
@@ -351,7 +353,10 @@ async fn fill_resources(
     ret
 }
 
-pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
+pub async fn edgeless_node_main(
+    settings: EdgelessNodeSettings,
+    simulator_display_sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
+) {
     tracing::info!("Starting Edgeless Node");
     tracing::debug!("Settings: {settings:?}");
 
@@ -479,6 +484,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         settings.general.node_id,
         &settings.resources,
         &mut resource_provider_specifications,
+        simulator_display_sender,
     )
     .await;
 

@@ -15,22 +15,39 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
+
     if !args.template.is_empty() {
         edgeless_api::util::create_template(&args.template, edgeless_node::edgeless_node_default_conf().as_str())?;
-        return Ok(());
+        return anyhow::Ok(());
     }
     let conf: edgeless_node::EdgelessNodeSettings = toml::from_str(&std::fs::read_to_string(args.config_file)?)?;
 
+    let conf_clone = conf.clone();
+
+    let (sender, receiver) = std::sync::mpsc::channel::<edgeless_function_types::led_matrix::MatrixFrame>();
+
     setup_tracing(&conf.opentelemetry_export);
+    // The display requires the main thread, so we spawn the rest in a different thread.
+    let edgeless_main_thread = std::thread::spawn(move || {
+        let async_runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+        let async_tasks = vec![async_runtime.spawn(edgeless_node::edgeless_node_main(conf_clone, sender))];
 
-    let async_runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-    let async_tasks = vec![async_runtime.spawn(edgeless_node::edgeless_node_main(conf.clone()))];
+        async_runtime.block_on(async { futures::future::join_all(async_tasks).await });
+        anyhow::Ok(())
+    });
 
-    async_runtime.block_on(async { futures::future::join_all(async_tasks).await });
+    // The display required the main thread!
+    #[cfg(feature = "simulator_led_matrix")]
+    edgeless_node::resources::led_matrix::simulator_display::run_simulator_display(receiver, conf.general.node_id);
+
+    let _ = edgeless_main_thread
+        .join()
+        .map_err(|e| anyhow::anyhow!("Could not join actual main thread: {e:?}"))?;
+
     Ok(())
 }
 
-// Copied over from edgeless_node
+// Copied over from edgeless_controller
 fn setup_tracing(otel_export_config: &Option<edgeless_node::OpenTelemetryExportConfig>) {
     if let Some(otel_export_config) = otel_export_config {
         if otel_export_config.enabled {

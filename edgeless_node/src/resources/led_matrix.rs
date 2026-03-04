@@ -7,6 +7,8 @@
 mod mock_display;
 #[cfg(feature = "hardware_led_matrix")]
 mod real_display;
+#[cfg(feature = "simulator_led_matrix")]
+pub mod simulator_display;
 
 use edgeless_function_core::Deserialize;
 
@@ -21,6 +23,7 @@ pub struct LedMatrixResourceProvider {
 
 struct LedMatrixResourceProviderInner {
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, LedMatrixResource>,
 }
 
@@ -35,11 +38,17 @@ impl Drop for LedMatrixResource {
 }
 
 impl LedMatrixResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle) -> anyhow::Result<Self> {
+    async fn new(
+        dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        #[allow(unused)] sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
+    ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
 
-        #[cfg(not(feature = "hardware_led_matrix"))]
+        #[cfg(not(any(feature = "hardware_led_matrix", feature = "simulator_led_matrix")))]
         let mut display = mock_display::MockDisplay {};
+
+        #[cfg(feature = "simulator_led_matrix")]
+        let mut display = simulator_display::MockDisplay::new(sender);
 
         #[cfg(feature = "hardware_led_matrix")]
         let mut display = real_display::RealDisplay::new();
@@ -72,11 +81,13 @@ impl LedMatrixResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
+        sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(LedMatrixResourceProviderInner {
                 dataplane_provider,
                 instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, LedMatrixResource>::new(),
+                sender,
             })),
         }
     }
@@ -92,7 +103,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         let dataplane_handle = lck.dataplane_provider.get_handle_for(instance_specification.resource_id, None).await;
 
-        match LedMatrixResource::new(dataplane_handle).await {
+        match LedMatrixResource::new(dataplane_handle, lck.sender.clone()).await {
             Ok(resource) => {
                 lck.instances.insert(instance_specification.resource_id, resource);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(

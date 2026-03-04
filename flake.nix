@@ -156,6 +156,7 @@
             espflash
             binutils
             lld
+            SDL2
             (pkgs.python3.withPackages (pypkg: [
               pypkg.jupyter
               pypkg.pandas
