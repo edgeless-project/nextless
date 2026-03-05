@@ -55,7 +55,7 @@ impl super::FilterStrategy for StaticColocation {
         let mut candidate_options = Vec::new();
 
         for candidate in &candidates {
-            if best_peers.contains(&candidate.node_id) {
+            if best_peers.contains(&candidate.node_id()) {
                 candidate_options.push(candidate.clone())
             }
         }
@@ -100,7 +100,7 @@ mod test {
 
         let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered.get(0).unwrap().node_id, colocated_peer_id.node_id);
+        assert_eq!(filtered.get(0).unwrap().node_id(), colocated_peer_id.node_id);
     }
 
     #[test]
@@ -126,7 +126,7 @@ mod test {
         let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 2);
 
-        let filtered_candidate_node_ids: std::collections::HashSet<uuid::Uuid> = filtered.into_iter().map(|i| i.node_id).collect();
+        let filtered_candidate_node_ids: std::collections::HashSet<uuid::Uuid> = filtered.into_iter().map(|i| i.node_id()).collect();
         let expected_candidate_node_ids = std::collections::HashSet::<uuid::Uuid>::from([node_ids[0].clone(), node_ids[1].clone()]);
 
         assert_eq!(filtered_candidate_node_ids, expected_candidate_node_ids);
@@ -155,7 +155,7 @@ mod test {
 
         let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered.get(0).unwrap().node_id, node_ids[0]);
+        assert_eq!(filtered.get(0).unwrap().node_id(), node_ids[0]);
     }
 
     #[test]
@@ -183,8 +183,8 @@ mod test {
         let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates.clone(), &workflow);
         assert_eq!(filtered.len(), 3);
 
-        let filtered_candidate_node_ids: std::collections::HashSet<uuid::Uuid> = filtered.into_iter().map(|i| i.node_id).collect();
-        let expected_candidate_node_ids: std::collections::HashSet<uuid::Uuid> = candidates.iter().cloned().map(|i| i.node_id).collect();
+        let filtered_candidate_node_ids: std::collections::HashSet<uuid::Uuid> = filtered.into_iter().map(|i| i.node_id()).collect();
+        let expected_candidate_node_ids: std::collections::HashSet<uuid::Uuid> = candidates.iter().cloned().map(|i| i.node_id()).collect();
 
         assert_eq!(filtered_candidate_node_ids, expected_candidate_node_ids);
     }

@@ -74,7 +74,7 @@ impl super::FilterStrategy for DynamicColocation {
         let mut candidate_options = Vec::new();
 
         for candidate in &candidates {
-            if best_peers.contains(&candidate.node_id) {
+            if best_peers.contains(&candidate.node_id()) {
                 candidate_options.push(candidate.clone())
             }
         }
@@ -129,6 +129,6 @@ mod test {
 
         let filtered = colocation_filter.filter_candidates("fut".to_string(), &*fut_ref, candidates, &workflow);
         assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered.get(0).unwrap().node_id, colocated_peer_id.node_id);
+        assert_eq!(filtered.get(0).unwrap().node_id(), colocated_peer_id.node_id);
     }
 }

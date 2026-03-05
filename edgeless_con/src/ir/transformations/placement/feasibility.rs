@@ -9,7 +9,7 @@ pub fn feasible_node_runtime_candidates<'b>(
     node: &'b dyn crate::ir::Node,
     allow_suboptimal: bool,
     disable_actor_optimization: bool,
-) -> Vec<super::Candidate<'b>> {
+) -> Vec<super::ActorCandidate<'b>> {
     let mut candidates = Vec::new();
 
     if !node_fulfills_constraints(node_filter, node) {
@@ -51,7 +51,7 @@ pub fn feasible_node_runtime_candidates<'b>(
             .ok();
 
         if let Some(dest_image_id) = target_image_id {
-            candidates.push(super::Candidate {
+            candidates.push(super::ActorCandidate {
                 node_id: node.node_id(),
                 runtime: rt.clone(),
                 dest_image: crate::ir::actor::ImageState::Planned(dest_image_id),
@@ -60,6 +60,26 @@ pub fn feasible_node_runtime_candidates<'b>(
     }
 
     candidates
+}
+
+pub fn node_can_host_resource<'b>(
+    node_filter: &crate::ir::component::NodeFilters,
+    logical_resource: &crate::ir::resource::LogicalResource,
+    node: &'b dyn crate::ir::Node,
+) -> Vec<super::ResourceCandidate> {
+    if !node_fulfills_constraints(node_filter, node) {
+        return Vec::new();
+    }
+
+    if !node
+        .available_resource_providers()
+        .iter()
+        .any(|(_, r)| r.class_type() == logical_resource.class)
+    {
+        return Vec::new();
+    }
+
+    return vec![super::ResourceCandidate { node_id: node.node_id() }];
 }
 
 pub fn node_fulfills_constraints(node_filter: &crate::ir::component::NodeFilters, node: &dyn crate::ir::Node) -> bool {

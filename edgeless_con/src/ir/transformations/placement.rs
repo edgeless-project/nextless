@@ -8,8 +8,6 @@ pub mod feasibility;
 mod scoring;
 pub mod strategy;
 
-use std::str::FromStr;
-
 use crate::ir::{support::image_cache, transformations::placement::candidate_filter::FilterStrategy};
 
 use super::super::*;
@@ -43,10 +41,30 @@ struct PlacementConstraints {
 }
 
 #[derive(Clone)]
-pub struct Candidate<'a> {
+pub enum Candidate<'a> {
+    Actor(ActorCandidate<'a>),
+    Resource(ResourceCandidate),
+}
+
+#[derive(Clone)]
+pub struct ActorCandidate<'a> {
     pub(crate) node_id: edgeless_api::function_instance::NodeId,
     pub(crate) dest_image: actor::ImageState,
     pub(crate) runtime: crate::ir::Runtime<'a>,
+}
+
+#[derive(Clone)]
+pub struct ResourceCandidate {
+    pub(crate) node_id: edgeless_api::function_instance::NodeId,
+}
+
+impl<'a> Candidate<'a> {
+    fn node_id(&'a self) -> edgeless_api::function_instance::NodeId {
+        match self {
+            Candidate::Actor(actor_candidate) => actor_candidate.node_id.clone(),
+            Candidate::Resource(resource_candidate) => resource_candidate.node_id.clone(),
+        }
+    }
 }
 
 impl<'a, P: strategy::PlacementStrategy> super::StatefulPhysicalTransformation<PlacementState<'a, P>> for DefaultPlacement<P> {
@@ -61,107 +79,7 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulPhysicalTransformation<P
         let mut required_changes = Vec::new();
 
         for (f_id, function, instances) in workflow.components_with_instances() {
-            match function {
-                LogicalComponent::Actor(_logical_actor) => {
-                    required_changes.extend(self.process_component(workflow, f_id, function, instances, nodes, global_state))
-                }
-                LogicalComponent::Resource(logical_resource) => {
-                    let r_class_clone = logical_resource.class.to_string();
-                    let r_configuration_clone = logical_resource.configurations.clone();
-
-                    for resource_instance in instances {
-                        match &*resource_instance.component {
-                            PhysicalComponentState::Requested(_extra_constraints) => {
-                                let dst = select_node_for_resource(&r_class_clone, nodes);
-                                if let Some(dst) = dst {
-                                    let instance = PhysicalComponentState::Materialized(Box::new(resource::PhysicalResource {
-                                        id: edgeless_api::function_instance::InstanceId {
-                                            node_id: dst,
-                                            function_id: resource_instance.component_id,
-                                        },
-                                        desired_mapping: PhysicalPorts::default(),
-                                        materialized: None,
-                                        creation_time: std::time::Instant::now(),
-                                        class: r_class_clone.clone(),
-                                        component_name: f_id.to_string(),
-                                        configuration: r_configuration_clone.clone(),
-                                    }));
-                                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
-                                        component_id: resource_instance.component_id,
-                                        action: super::PhysicalComponentChangeAction::Update(instance),
-                                    }));
-                                } else {
-                                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
-                                        component_id: resource_instance.component_id,
-                                        action: super::PhysicalComponentChangeAction::Delete,
-                                    }));
-                                }
-                            }
-                            _ => {
-                                //NOOP
-                            }
-                        }
-                    }
-                }
-                LogicalComponent::SubApplication(logical_sub_flow) => {
-                    for s in instances {
-                        match &*s.component {
-                            PhysicalComponentState::Requested(_extra_constraints) => {
-                                let dst = select_cluster_for_subflow(&logical_sub_flow, peer_clusters);
-                                if let Some(dst) = dst {
-                                    let subflow_instance = PhysicalComponentState::Materialized(Box::new(subflow::PhysicalSubFlow {
-                                        id: edgeless_api::function_instance::InstanceId {
-                                            node_id: dst,
-                                            function_id: s.component_id,
-                                        },
-                                        desired_mapping: PhysicalPorts::default(),
-                                        materialized: None,
-                                        creation_time: std::time::Instant::now(),
-                                        internal_ports: InternalPorts::default(),
-                                    }));
-
-                                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
-                                        component_id: s.component_id,
-                                        action: super::PhysicalComponentChangeAction::Update(subflow_instance),
-                                    }));
-                                }
-                            }
-                            _ => {
-                                //NOOP
-                            }
-                        }
-                    }
-                }
-                LogicalComponent::Proxy(logical_proxy) => {
-                    for p in instances {
-                        match p.component {
-                            PhysicalComponentState::Requested(_extra_constraints) => {
-                                let dst = select_node_for_proxy(logical_proxy, nodes);
-                                if let Some(dst) = dst {
-                                    let proxy_instance = PhysicalComponentState::Materialized(Box::new(proxy::PhyiscalProxy {
-                                        id: edgeless_api::function_instance::InstanceId {
-                                            node_id: dst,
-                                            function_id: p.component_id,
-                                        },
-                                        desired_mapping: PhysicalPorts::default(),
-                                        materialized: None,
-                                        creation_time: std::time::Instant::now(),
-                                        external_ports: ExternalPorts::default(),
-                                    }));
-
-                                    required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
-                                        component_id: p.component_id,
-                                        action: super::PhysicalComponentChangeAction::Update(proxy_instance),
-                                    }));
-                                }
-                            }
-                            _ => {
-                                //NOOP
-                            }
-                        }
-                    }
-                }
-            }
+            required_changes.extend(self.process_component(workflow, f_id, function, instances, nodes, peer_clusters, global_state))
         }
 
         required_changes
@@ -173,22 +91,22 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         &mut self,
         workflow: &crate::ir::workflow::ActiveWorkflow,
         logical_component_id: &str,
-        actor: &crate::ir::logical_model::LogicalComponent,
-        actor_instances: crate::ir::workflow::InstanceIterator,
+        logical_component: &crate::ir::logical_model::LogicalComponent,
+        component_instances: crate::ir::workflow::InstanceIterator,
         nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
         global_state: &PlacementState<P>,
     ) -> Vec<super::PhysicalChange> {
-        tracing::warn!("{:?}", actor_instances.clone().map(|p| p.component_id).collect::<Vec<_>>());
-        let num_instances = actor_instances.clone().count();
-        let num_active_instances = actor_instances.clone().filter_active().count();
+        tracing::debug!(
+            "Component Instances {logical_component_id}: {:?}",
+            component_instances.clone().map(|p| p.component_id).collect::<Vec<_>>()
+        );
+        let num_instances = component_instances.clone().count();
+        let num_active_instances = component_instances.clone().filter_active().count();
 
-        let cloned_init_on = if let crate::ir::logical_model::LogicalComponent::Actor(logical_actor) = actor {
-            logical_actor.annotations.get("node_id_init_on").cloned()
-        } else {
-            None
-        };
+        let cloned_init_on = logical_component.node_filters().node_id_init_on.clone();
 
-        if let crate::ir::logical_model::LogicalComponent::Actor(logical_actor) = actor {
+        if let crate::ir::logical_model::LogicalComponent::Actor(logical_actor) = logical_component {
             global_state.image_chache.insert_blocking(logical_actor.image.main_image.clone());
             for extra in logical_actor.image.extra_images.clone() {
                 tracing::debug!("Storing Extra Image in Cache: {:?}", extra.behavior_image_id);
@@ -198,20 +116,19 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
 
         let mut required_changes = Vec::new();
 
-        for i in actor_instances {
-            // let mut i = i.borrow_mut();
+        for i in component_instances {
             match &*i.component {
                 PhysicalComponentState::Requested(extra_constraints) => {
                     let mut node_filters = if let Some(extra_constraints) = extra_constraints {
                         extra_constraints.clone()
                     } else {
-                        actor.node_filters()
+                        logical_component.node_filters()
                     };
 
                     // This was added for evaluation purposes
                     if let Some(dest_node) = &cloned_init_on {
                         if num_instances == 1 {
-                            let dest_uuid = uuid::Uuid::from_str(dest_node).unwrap();
+                            let dest_uuid = dest_node.clone();
                             node_filters.node_ids_allowed = Some(vec![dest_uuid])
                         }
                     }
@@ -225,8 +142,9 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         workflow,
                         i.component_id,
                         logical_component_id.to_string(),
-                        &actor,
+                        &logical_component,
                         nodes,
+                        peer_clusters,
                         global_state,
                         &placement_constraints,
                         workflow.feature_flags.disable_actor_optimization,
@@ -250,7 +168,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                     }
                 }
                 PhysicalComponentState::MigrationRequested(c) => {
-                    let node_filters = actor.node_filters();
+                    let node_filters = logical_component.node_filters();
 
                     // This would allow to guarantee getting a different instance but that might be less efficient than the old instance.
                     // To properly do this, we might be required to also return the efficiency and compare it here.
@@ -263,8 +181,9 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         workflow,
                         new_component_id,
                         logical_component_id.to_string(),
-                        &actor,
+                        &logical_component,
                         nodes,
+                        peer_clusters,
                         global_state,
                         &placement_constraints,
                         workflow.feature_flags.disable_actor_optimization,
@@ -299,12 +218,12 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         required_changes.extend(i.abort_migration());
                     }
                 }
-                PhysicalComponentState::Lost(_) => match &actor.scaling_mode() {
+                PhysicalComponentState::Lost(_) => match &logical_component.scaling_mode() {
                     crate::ir::component::ScalingMode::AllNodes => {
                         required_changes.extend(i.mark_stopped());
                     }
                     _ => {
-                        let node_filters = actor.node_filters();
+                        let node_filters = logical_component.node_filters();
                         let placement_constraints = PlacementConstraints {
                             node_filters,
                             urgent: num_active_instances <= 1,
@@ -315,8 +234,9 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                             workflow,
                             new_component_id,
                             logical_component_id.to_string(),
-                            &actor,
+                            &logical_component,
                             nodes,
+                            peer_clusters,
                             global_state,
                             &placement_constraints,
                             workflow.feature_flags.disable_actor_optimization,
@@ -332,13 +252,13 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                     }
                 },
                 PhysicalComponentState::Dead(old_instance) => {
-                    let node_filters = match &actor.scaling_mode() {
+                    let node_filters = match &logical_component.scaling_mode() {
                         crate::ir::component::ScalingMode::AllNodes => {
-                            let mut filters = actor.node_filters();
+                            let mut filters = logical_component.node_filters();
                             filters.node_ids_allowed = Some(vec![old_instance.id().node_id.clone()]);
                             filters
                         }
-                        _ => actor.node_filters(),
+                        _ => logical_component.node_filters(),
                     };
 
                     let placement_constraints = PlacementConstraints {
@@ -351,8 +271,9 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         workflow,
                         new_component_id,
                         logical_component_id.to_string(),
-                        &actor,
+                        &logical_component,
                         nodes,
+                        peer_clusters,
                         global_state,
                         &placement_constraints,
                         workflow.feature_flags.disable_actor_optimization,
@@ -382,6 +303,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         logical_name: String,
         component: &crate::ir::logical_model::LogicalComponent,
         nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
         global_state: &PlacementState<P>,
         placement_constraints: &PlacementConstraints,
         disable_actor_optimization: bool,
@@ -394,9 +316,16 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                 global_state.image_chache,
                 disable_actor_optimization,
             ),
-            LogicalComponent::Resource(logical_resource) => todo!(),
-            LogicalComponent::SubApplication(logical_sub_flow) => todo!(),
-            LogicalComponent::Proxy(logical_proxy) => todo!(),
+            LogicalComponent::Resource(logical_resource) => find_candidates_for_resource(placement_constraints, logical_resource, nodes),
+            LogicalComponent::SubApplication(_logical_sub_flow) => {
+                tracing::warn!("Tried to place SubApplication");
+                tracing::warn!("Peer Clusters: {:?}", peer_clusters.keys());
+                vec![]
+            }
+            LogicalComponent::Proxy(_logical_proxy) => {
+                tracing::warn!("Tried to place Proxy");
+                vec![]
+            }
         };
 
         let mut filtered = self
@@ -414,27 +343,60 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
         if let Some(dst) = dst {
             let new_id = edgeless_api::function_instance::InstanceId {
                 function_id: component_id,
-                node_id: dst.node_id,
+                node_id: dst.node_id(),
             };
 
-            let new_instance = match component {
-                LogicalComponent::Actor(logical_actor) => actor::PhysicalActor {
-                    id: new_id,
-                    desired_mapping: PhysicalPorts::default(),
-                    image: dst.dest_image,
-                    behavior_spec: logical_actor.image.spec.clone(),
-                    materialized: None,
-                    creation_time: std::time::Instant::now(),
-                    component_name: logical_name,
-                    annotations: logical_actor.annotations.clone(),
-                },
-                LogicalComponent::Resource(logical_resource) => todo!(),
-                LogicalComponent::SubApplication(logical_sub_flow) => todo!(),
-                LogicalComponent::Proxy(logical_proxy) => todo!(),
+            let new_instance: Box<dyn PhysicalComponent> = match component {
+                LogicalComponent::Actor(logical_actor) => {
+                    let Candidate::Actor(actor_candidate) = dst else { return None };
+                    let actor = actor::PhysicalActor {
+                        id: new_id,
+                        desired_mapping: PhysicalPorts::default(),
+                        image: actor_candidate.dest_image,
+                        behavior_spec: logical_actor.image.spec.clone(),
+                        materialized: None,
+                        creation_time: std::time::Instant::now(),
+                        component_name: logical_name,
+                        annotations: logical_actor.annotations.clone(),
+                    };
+                    Box::new(actor)
+                }
+                LogicalComponent::Resource(logical_resource) => {
+                    let resource = resource::PhysicalResource {
+                        id: new_id,
+                        desired_mapping: PhysicalPorts::default(),
+                        materialized: None,
+                        creation_time: std::time::Instant::now(),
+                        class: logical_resource.class.clone(),
+                        component_name: logical_name.to_string(),
+                        configuration: logical_resource.configurations.clone(),
+                    };
+                    Box::new(resource)
+                }
+                LogicalComponent::SubApplication(_logical_sub_flow) => {
+                    let subflow = subflow::PhysicalSubFlow {
+                        id: new_id,
+                        desired_mapping: PhysicalPorts::default(),
+                        materialized: None,
+                        creation_time: std::time::Instant::now(),
+                        internal_ports: InternalPorts::default(),
+                    };
+                    Box::new(subflow)
+                }
+                LogicalComponent::Proxy(_logical_proxy) => {
+                    let proxy = proxy::PhyiscalProxy {
+                        id: new_id,
+                        desired_mapping: PhysicalPorts::default(),
+                        materialized: None,
+                        creation_time: std::time::Instant::now(),
+                        external_ports: ExternalPorts::default(),
+                    };
+                    Box::new(proxy)
+                }
             };
 
             let (_, empty_component_state) = PhysicalComponentState::request_new_instance();
-            empty_component_state.plan_creation(Box::new(new_instance)).map(|x| x)
+            empty_component_state.plan_creation(new_instance).map(|x| x)
         } else {
             None
         }
@@ -469,7 +431,7 @@ fn find_candidates_for_actor<'b>(
 
         if !candiates.is_empty() {
             tracing::debug!("Found 'Urgent' Image");
-            return candiates;
+            return candiates.into_iter().map(|c| Candidate::Actor(c)).collect();
         }
     }
 
@@ -488,7 +450,7 @@ fn find_candidates_for_actor<'b>(
     }
 
     if !candiates.is_empty() {
-        return candiates;
+        return candiates.into_iter().map(|c| Candidate::Actor(c)).collect();
     }
 
     // Last attempt: Just use any image
@@ -509,15 +471,31 @@ fn find_candidates_for_actor<'b>(
         tracing::debug!("Found 'Any' Image");
     }
 
-    candiates
+    candiates.into_iter().map(|c| Candidate::Actor(c)).collect()
+}
+
+fn find_candidates_for_resource<'b>(
+    placement_constraints: &PlacementConstraints,
+    logical_resource: &crate::ir::resource::LogicalResource,
+    nodes: &'b crate::ir::Nodes,
+) -> Vec<Candidate<'b>> {
+    let mut candidates = Vec::new();
+
+    for (_node_id, node) in nodes {
+        for candidate in feasibility::node_can_host_resource(&placement_constraints.node_filters, logical_resource, *node) {
+            candidates.push(Candidate::Resource(candidate));
+        }
+    }
+
+    candidates
 }
 
 fn select_actor_node_candidate<'b>(
-    candiates: Vec<Candidate<'b>>,
+    candiates: Vec<ActorCandidate<'b>>,
     only_available: bool,
     allow_imperfect: bool,
     image_cache: &crate::ir::support::image_cache::ImageCache,
-) -> Option<Candidate<'b>> {
+) -> Option<ActorCandidate<'b>> {
     let mut viable_candidates: Vec<_> = candiates
         .into_iter()
         .filter_map(|c| {
@@ -583,37 +561,6 @@ fn select_actor_node_candidate<'b>(
         .collect();
     viable_candidates.sort_by(|a, b| a.runtime.efficiency_score().total_cmp(&b.runtime.efficiency_score()));
     viable_candidates.pop()
-}
-
-fn select_node_for_resource(resource_class: &str, nodes: &crate::ir::Nodes) -> Option<edgeless_api::function_instance::NodeId> {
-    if let Some((id, _)) = nodes
-        .iter()
-        .find(|(_, n)| n.available_resource_providers().iter().any(|(_, r)| r.class_type() == resource_class))
-    {
-        Some(*id)
-    } else {
-        None
-    }
-}
-
-fn select_node_for_proxy(_proxy: &proxy::LogicalProxy, nodes: &crate::ir::Nodes) -> Option<edgeless_api::function_instance::NodeId> {
-    for (node_id, node) in nodes {
-        if node.is_proxy() {
-            return Some(*node_id);
-        }
-    }
-    None
-}
-
-fn select_cluster_for_subflow(
-    _subflow: &subflow::LogicalSubFlow,
-    _clusters: &crate::ir::Clusters,
-) -> Option<edgeless_api::function_instance::NodeId> {
-    // for (cluster_id, cluster) in clusters {
-    //     // TODO Proper Selection
-    //     return Some(*cluster_id);
-    // }
-    None
 }
 
 #[cfg(test)]

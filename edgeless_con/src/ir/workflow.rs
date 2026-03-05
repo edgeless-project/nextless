@@ -16,7 +16,7 @@ pub struct ActiveWorkflow {
     pub(crate) feature_flags: FeatureFlags,
 
     components: std::collections::HashMap<String, (LogicalComponent, std::collections::BTreeSet<uuid::Uuid>)>,
-    component_instances: std::collections::BTreeMap<uuid::Uuid, super::PhysicalComponentState>,
+    component_instances: std::collections::BTreeMap<uuid::Uuid, (super::PhysicalComponentState, String)>,
 }
 
 pub struct FeatureFlags {
@@ -73,13 +73,13 @@ impl<'a> Iterator for InstanceIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(id) = self.id_it.next() {
-            if let Some(instance) = self.wf.component_instances.get(id) {
+            if let Some((instance, _)) = self.wf.component_instances.get(id) {
                 return Some(crate::ir::physical_model::PhysicalInstance {
                     component_id: id.clone(),
                     component: instance,
                 });
             } else {
-                tracing::warn!("Outdated Instance Link");
+                tracing::warn!("Outdated Instance Link {id}");
             }
         }
 
@@ -237,41 +237,49 @@ impl ActiveWorkflow {
         match change.action {
             transformations::PhysicalComponentChangeAction::Delete => {
                 tracing::debug!("Delete Instance");
-                let instance = self.component_instances.remove(&change.component_id);
-                if let Some(instance) = instance {
-                    if let Some(logical_component_id) = instance.logical_component_id() {
-                        let found_instance = self
-                            .components
-                            .get_mut(&logical_component_id)
-                            .map(|item| item.1.remove(&change.component_id))
-                            .unwrap_or(false);
+                let removed = self.component_instances.remove(&change.component_id);
+                if let Some((_instance, logical_component_id)) = removed {
+                    let found_instance = self
+                        .components
+                        .get_mut(&logical_component_id)
+                        .map(|item| item.1.remove(&change.component_id))
+                        .unwrap_or(false);
 
-                        if !found_instance {
-                            tracing::warn!("Inconsistent Workflow State");
-                        }
+                    if !found_instance {
+                        tracing::warn!("Inconsistent workflow state: Missing instance link for logical component {logical_component_id}");
                     }
                 } else {
-                    tracing::warn!("Tried removing unknown component instance");
+                    tracing::warn!("Tried to remove unknown component instance.");
                 }
             }
             transformations::PhysicalComponentChangeAction::Update(physical_component_state) => {
                 tracing::debug!("Update Instance");
-                if let Some(component) = physical_component_state.logical_component_id() {
-                    if let Some((_parent, parent_links)) = self.components.get_mut(&component) {
-                        parent_links.insert(change.component_id);
-                    }
+
+                let old = self.component_instances.get_mut(&change.component_id);
+
+                let Some((old_component, old_logical_id)) = old else {
+                    tracing::warn!("Physical Component Update on non-existing instance. Request Ignored.");
+                    return;
+                };
+
+                if let Some((_parent, parent_links)) = self.components.get_mut(old_logical_id.as_str()) {
+                    parent_links.insert(change.component_id);
+                } else {
+                    tracing::warn!("State error: No Logical Component corresponding to the instance.");
                 }
-                let old = self.component_instances.insert(change.component_id, physical_component_state);
-                if old.is_none() {
-                    tracing::warn!("Physical Component Update inserted new physical instance.");
-                }
+
+                *old_component = physical_component_state;
             }
             transformations::PhysicalComponentChangeAction::Insert(logical_component_id, physical_component_state) => {
                 tracing::debug!("Insert Instance");
                 if let Some((_parent, parent_links)) = self.components.get_mut(&logical_component_id) {
                     parent_links.insert(change.component_id);
+                } else {
+                    tracing::warn!("State error: Logical Component does not exist.");
                 }
-                let old = self.component_instances.insert(change.component_id, physical_component_state);
+                let old = self
+                    .component_instances
+                    .insert(change.component_id, (physical_component_state, logical_component_id.clone()));
                 if old.is_some() {
                     tracing::warn!("Physical Component Insert replaced existing physical instance.");
                 }
@@ -368,7 +376,11 @@ pub(crate) mod mock_workflow {
             let component_instances = self
                 .components
                 .iter()
-                .flat_map(|(_, (_, instances))| instances.iter().map(|(id, instance)| (id.clone(), instance.clone())))
+                .flat_map(|(logical_id, (_, instances))| {
+                    instances
+                        .iter()
+                        .map(|(id, instance)| (id.clone(), (instance.clone(), logical_id.clone())))
+                })
                 .collect();
 
             let workfow = crate::ir::workflow::ActiveWorkflow {

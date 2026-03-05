@@ -22,14 +22,14 @@ impl super::PlacementStrategy for RoundRobin {
         state: &RoundRobinState,
     ) -> Option<crate::ir::transformations::placement::Candidate<'b>> {
         for c in &candidates {
-            if !state.node_order.lock().unwrap().iter().any(|i| *i == c.node_id) {
-                state.node_order.lock().unwrap().push_back(c.node_id);
+            if !state.node_order.lock().unwrap().iter().any(|i| *i == c.node_id()) {
+                state.node_order.lock().unwrap().push_back(c.node_id());
             }
         }
 
         while let Some(current) = state.node_order.lock().unwrap().pop_front() {
             state.node_order.lock().unwrap().push_back(current);
-            if let Some(c) = candidates.iter().find(|c| c.node_id == current) {
+            if let Some(c) = candidates.iter().find(|c| c.node_id() == current) {
                 return Some(c.clone());
             }
         }

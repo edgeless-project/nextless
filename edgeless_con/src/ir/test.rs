@@ -212,14 +212,17 @@ pub(crate) fn mock_nodes_and_candidates<'a>(
 
     let candidates: Vec<_> = nodes
         .iter()
-        .map(|c| crate::ir::transformations::placement::Candidate {
-            node_id: c.clone(),
-            runtime: rt.clone(),
-            dest_image: crate::ir::actor::ImageState::Planned(crate::ir::behavior::BehaviorImageId {
-                behavior_id: behavior_image_id.behavior_id.clone(),
-                enabled_ports: behavior_image_id.enabled_ports.clone(),
-                dialect_type: rt.supported_dialect(),
-            }),
+        .map(|c| {
+            let actor_c = crate::ir::transformations::placement::ActorCandidate {
+                node_id: c.clone(),
+                runtime: rt.clone(),
+                dest_image: crate::ir::actor::ImageState::Planned(crate::ir::behavior::BehaviorImageId {
+                    behavior_id: behavior_image_id.behavior_id.clone(),
+                    enabled_ports: behavior_image_id.enabled_ports.clone(),
+                    dialect_type: rt.supported_dialect(),
+                }),
+            };
+            crate::ir::transformations::placement::Candidate::Actor(actor_c)
         })
         .collect();
 

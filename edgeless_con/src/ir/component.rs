@@ -20,6 +20,7 @@ pub struct NodeFilters {
     pub node_label_filter_denied: Option<Vec<std::collections::HashSet<String>>>,
     pub cluster_ids_allowed: Option<Vec<edgeless_api::function_instance::NodeId>>,
     pub cluster_ids_denied: Option<Vec<edgeless_api::function_instance::NodeId>>,
+    pub node_id_init_on: Option<edgeless_api::function_instance::NodeId>,
 }
 
 impl ScalingMode {
@@ -54,6 +55,11 @@ impl NodeFilters {
         let mut node_ids_allowed = None;
         if let Some(val) = annotations.get("node_ids_allowed") {
             node_ids_allowed = Some(val.split(",").filter_map(|x| uuid::Uuid::parse_str(x).ok()).collect());
+        }
+
+        let mut node_id_init_on = None;
+        if let Some(val) = annotations.get("node_id_init_on") {
+            node_id_init_on = uuid::Uuid::parse_str(val).ok();
         }
 
         let mut node_ids_denied = None;
@@ -124,6 +130,7 @@ impl NodeFilters {
             node_label_filter_denied,
             cluster_ids_allowed,
             cluster_ids_denied,
+            node_id_init_on,
         }
     }
 }
@@ -212,6 +219,7 @@ mod parser_test {
             ("runtime_dialects_denied", "RUST"),
             ("node_label_filter_allowed", "a&b&c|d&e|f"),
             ("node_label_filter_denied", "g&h&i|j&k|l"),
+            ("node_id_init_on", "00000000-0000-0000-0000-000000000009"),
         ]);
 
         let annotations = annotations
@@ -227,6 +235,11 @@ mod parser_test {
                 uuid::Uuid::from_str("00000000-0000-0000-0000-000000000001").unwrap(),
                 uuid::Uuid::from_str("00000000-0000-0000-0000-000000000002").unwrap()
             ]
+        );
+
+        assert_eq!(
+            parsed.node_id_init_on.unwrap(),
+            uuid::Uuid::from_str("00000000-0000-0000-0000-000000000009").unwrap(),
         );
 
         assert_eq!(
