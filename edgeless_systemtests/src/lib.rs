@@ -42,35 +42,39 @@ mod tests {
 
         // The first node in each domain is also assigned a file-log resource.
         for node_i in 0..num_nodes_per_domain {
-            let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(match node_i {
-                0 => edgeless_node::EdgelessNodeSettings {
-                    general: edgeless_node::EdgelessNodeGeneralSettings {
-                        node_id: uuid::Uuid::new_v4(),
-                        agent_url: format!("http://{}:{}", address, next_port()),
-                        agent_url_announced: "".to_string(),
-                        invocation_url: format!("http://{}:{}", address, next_port()),
-                        invocation_url_announced: "".to_string(),
-                        invocation_url_coap: None,
-                        invocation_url_announced_coap: None,
-                        metrics_url: format!("http://{}:{}", address, next_port()),
-                        controller_url: controller_url.to_string(),
+            let (sender, _receiver) = std::sync::mpsc::channel();
+            let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(
+                match node_i {
+                    0 => edgeless_node::EdgelessNodeSettings {
+                        general: edgeless_node::EdgelessNodeGeneralSettings {
+                            node_id: uuid::Uuid::new_v4(),
+                            agent_url: format!("http://{}:{}", address, next_port()),
+                            agent_url_announced: "".to_string(),
+                            invocation_url: format!("http://{}:{}", address, next_port()),
+                            invocation_url_announced: "".to_string(),
+                            invocation_url_coap: None,
+                            invocation_url_announced_coap: None,
+                            metrics_url: format!("http://{}:{}", address, next_port()),
+                            controller_url: controller_url.to_string(),
+                        },
+                        wasmtime_runtime: Some(edgeless_node::EdgelessNodeWasmtimeRuntimeSettings { enabled: true, wgpu: None }),
+                        wasmi_runtime: None,
+                        native_runtime: None,
+                        resources: Some(edgeless_node::EdgelessNodeResourceSettings {
+                            http_ingress_url: None,
+                            http_ingress_provider: None,
+                            http_egress_provider: None,
+                            file_log_provider: Some("file-log-1".to_string()),
+                            redis_provider: None,
+                            led_matrix: None,
+                        }),
+                        user_node_capabilities: None,
+                        opentelemetry_export: None,
                     },
-                    wasmtime_runtime: Some(edgeless_node::EdgelessNodeWasmtimeRuntimeSettings { enabled: true, wgpu: None }),
-                    wasmi_runtime: None,
-                    native_runtime: None,
-                    resources: Some(edgeless_node::EdgelessNodeResourceSettings {
-                        http_ingress_url: None,
-                        http_ingress_provider: None,
-                        http_egress_provider: None,
-                        file_log_provider: Some("file-log-1".to_string()),
-                        redis_provider: None,
-                        led_matrix: None,
-                    }),
-                    user_node_capabilities: None,
-                    opentelemetry_export: None,
+                    _ => edgeless_node::EdgelessNodeSettings::new_without_resources(&controller_url, address, next_port(), next_port(), next_port()),
                 },
-                _ => edgeless_node::EdgelessNodeSettings::new_without_resources(&controller_url, address, next_port(), next_port(), next_port()),
-            }));
+                sender,
+            ));
             tokio::spawn(task);
             handles.push(handle);
         }

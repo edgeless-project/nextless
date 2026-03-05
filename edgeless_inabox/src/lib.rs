@@ -23,7 +23,8 @@ pub fn edgeless_inabox_main(
     async_tasks.push(async_runtime.spawn(edgeless_con::edgeless_con_main(con_conf.clone())));
 
     for node_conf in node_confs {
-        async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf.clone())));
+        let (sender, _receiver) = std::sync::mpsc::channel();
+        async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf.clone(), sender)));
     }
 
     Ok(())
