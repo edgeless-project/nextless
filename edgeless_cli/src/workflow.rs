@@ -450,7 +450,7 @@ fn api_resource_for_resource(
                 ))
             })
             .collect::<Result<std::collections::HashMap<_, _>, ComponentError>>()?,
-        configurations: res_spec.configurations,
+        configurations: res_spec.configurations.into_iter().collect(),
         annotations: res_spec.annotations.into_iter().collect(),
     })
 }

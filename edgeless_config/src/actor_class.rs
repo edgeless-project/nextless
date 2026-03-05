@@ -28,8 +28,8 @@ pub struct EdgelessActorClass {
 starlark::starlark_simple_value!(EdgelessActorClass);
 
 impl std::fmt::Display for EdgelessActorClass {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("ActorClass(id={})", self.id))
     }
 }
 

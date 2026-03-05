@@ -5,9 +5,9 @@
 pub struct EdgelessResourceGen<PortType> {
     pub id: String,
     pub klass: crate::resource_class::EdgelessResourceClass,
-    pub outputs: std::collections::HashMap<String, PortType>,
-    pub inputs: std::collections::HashMap<String, PortType>,
-    pub configurations: std::collections::HashMap<String, String>,
+    pub outputs: starlark::collections::SmallMap<String, PortType>,
+    pub inputs: starlark::collections::SmallMap<String, PortType>,
+    pub configurations: starlark::collections::SmallMap<String, String>,
     pub annotations: starlark::collections::SmallMap<String, String>,
 }
 
@@ -15,8 +15,8 @@ pub type EdgelessResource = EdgelessResourceGen<crate::port::Port>;
 pub type FrozenEdgelessResource = EdgelessResourceGen<crate::port::FrozenPort>;
 
 impl<PortType> std::fmt::Display for EdgelessResourceGen<PortType> {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("Resource(class={}, id={})", self.klass, self.id))
     }
 }
 
@@ -66,8 +66,13 @@ impl starlark::values::Freeze for EdgelessResource {
 }
 
 unsafe impl<'v> starlark::values::Trace<'v> for EdgelessResource {
-    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {
-        todo!()
+    fn trace(&mut self, tracer: &starlark::values::Tracer<'v>) {
+        self.annotations.trace(tracer);
+        self.configurations.trace(tracer);
+        self.id.trace(tracer);
+        self.inputs.trace(tracer);
+        self.klass.trace(tracer);
+        self.outputs.trace(tracer);
     }
 }
 

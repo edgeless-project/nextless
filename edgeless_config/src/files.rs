@@ -8,8 +8,8 @@ pub struct File {
 starlark::starlark_simple_value!(File);
 
 impl std::fmt::Display for File {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("File(path={})", self.path))
     }
 }
 

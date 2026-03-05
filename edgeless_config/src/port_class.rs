@@ -36,8 +36,8 @@ pub struct PortSpec {
 }
 
 impl std::fmt::Display for PortSpec {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("PortSpec({:?})", self))
     }
 }
 

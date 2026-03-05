@@ -20,8 +20,8 @@ pub enum MappingNode {
 starlark::starlark_simple_value!(Mapping);
 
 impl std::fmt::Display for Mapping {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("InnerStructureMapping(source={:?},dests={:?})", self.source, self.dests))
     }
 }
 

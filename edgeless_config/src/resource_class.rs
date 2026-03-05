@@ -1,7 +1,17 @@
 #![allow(clippy::needless_lifetimes)]
 #![allow(clippy::type_complexity)]
 
-#[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    allocative::Allocative,
+    starlark::any::ProvidesStaticType,
+    starlark::values::Trace,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+)]
 pub struct EdgelessResourceClass {
     pub id: String,
     pub inputs: std::collections::HashMap<String, crate::port_class::PortSpec>,
@@ -12,8 +22,8 @@ pub struct EdgelessResourceClass {
 starlark::starlark_simple_value!(EdgelessResourceClass);
 
 impl std::fmt::Display for EdgelessResourceClass {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("ResourceClass(id={})", self.id))
     }
 }
 

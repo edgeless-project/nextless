@@ -14,8 +14,8 @@ pub struct EdgelessWorkflow {
 starlark::starlark_simple_value!(EdgelessWorkflow);
 
 impl std::fmt::Display for EdgelessWorkflow {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("Application(id={})", self.id))
     }
 }
 

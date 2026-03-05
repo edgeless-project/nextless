@@ -15,8 +15,8 @@ pub type EdgelessActor = EdgelessActorGen<crate::port::Port>;
 pub type FrozenEdgelessActor = EdgelessActorGen<crate::port::FrozenPort>;
 
 impl<PortType> std::fmt::Display for EdgelessActorGen<PortType> {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("Actor(class={}, id={})", self.klass, self.id))
     }
 }
 

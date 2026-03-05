@@ -25,8 +25,8 @@ starlark::starlark_simple_value!(Mapping);
 impl<'v> starlark::values::StarlarkValue<'v> for Mapping {}
 
 impl std::fmt::Display for Mapping {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("PortMapping({:?})", self))
     }
 }
 
@@ -64,7 +64,6 @@ impl<'v> starlark::values::StarlarkValue<'v> for Port {
         _heap: &'v starlark::values::Heap,
     ) -> Result<starlark::values::Value<'v>, starlark::Error> {
         if let Some(port) = starlark::values::ValueLike::downcast_ref::<Port>(other) {
-            log::info!("{}", port.port_id);
             *self.mapping.borrow_mut() = Mapping::Direct(DirectTarget {
                 target_component: port.component_id.clone(),
                 port: port.port_id.clone(),
@@ -117,8 +116,8 @@ impl<'v> starlark::values::AllocValue<'v> for Port {
 }
 
 impl<V> std::fmt::Display for PortGen<V> {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("Port(component={}, port_id={})", self.component_id, self.port_id))
     }
 }
 
