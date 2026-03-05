@@ -34,10 +34,6 @@ impl super::StatefulPhysicalTransformation<PhysicalInteractionSpecializerState> 
     ) -> Vec<super::PhysicalChange> {
         let mut required_changes = Vec::new();
 
-        if workflow.original_request.annotations.contains_key("DISABLE_MULTICAST") {
-            return vec![];
-        }
-
         let mut reg = global_state.dialect_registry.blocking_lock();
 
         let Ok(interactions) = collect_physical_interactions(workflow, &mut reg) else {
@@ -48,7 +44,7 @@ impl super::StatefulPhysicalTransformation<PhysicalInteractionSpecializerState> 
         let mapped_interactions = interactions
             .into_iter()
             .flat_map(|i| {
-                try_map_interaction(&i, nodes, &mut reg).unwrap_or_else(|e| {
+                try_map_interaction(&i, nodes, &mut reg, workflow.feature_flags.disable_ip_multicast_dialect).unwrap_or_else(|e| {
                     tracing::debug!("Failed to map interaction: {e}; Falling back to original mapping");
                     vec![i]
                 })
@@ -95,6 +91,7 @@ fn try_map_interaction(
     src: &interaction::InteractionMapping,
     nodes: &crate::ir::Nodes,
     reg: &mut interaction::dialect::DialectRegistry,
+    disable_ip_multicast_dialect: bool,
 ) -> Result<Vec<interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
     let node_ids = src
         .mapping
@@ -109,6 +106,7 @@ fn try_map_interaction(
             let node_dialects: std::collections::BTreeMap<_, _> = node
                 .available_interaction_dialects()
                 .into_iter()
+                .filter(|d| d.base_type != interaction::dialect::ip_multicast::ID || !disable_ip_multicast_dialect)
                 .map(|d| (d.base_type, d.constraints))
                 .collect();
 

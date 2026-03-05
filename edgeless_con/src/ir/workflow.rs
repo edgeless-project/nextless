@@ -22,6 +22,7 @@ pub struct ActiveWorkflow {
 pub struct FeatureFlags {
     pub disable_application_optimization: bool,
     pub disable_actor_optimization: bool,
+    pub disable_ip_multicast_dialect: bool,
 }
 
 #[derive(Clone)]
@@ -319,6 +320,7 @@ impl Default for FeatureFlags {
         Self {
             disable_application_optimization: false,
             disable_actor_optimization: false,
+            disable_ip_multicast_dialect: false,
         }
     }
 }
@@ -332,6 +334,7 @@ impl FeatureFlags {
                 match flag {
                     "disable_application_optimization" => flags.disable_application_optimization = true,
                     "disable_actor_optimization" => flags.disable_actor_optimization = true,
+                    "disable_ip_multicast_dialect" => flags.disable_ip_multicast_dialect = true,
                     _ => {}
                 }
             }

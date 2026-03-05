@@ -81,7 +81,9 @@ game_instances[1].iteration_clock_o >> [game_instances[instance["id"]].iteration
 wf = edgeless_workflow(
     "game_of_life",
     game_instances.values() + displays.values(),
-    annotations = {}
+    annotations = {
+        "feature_flags": "disable_ip_multicast_dialect",
+    }
 )
 
 el_main = wf
