@@ -311,7 +311,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
 
-        let span = tracing::info_span!(
+        let span = tracing::trace_span!(
             "actor_invocation",
             target_port = target_port.0,
             node_id = self.instance_id.node_id.to_string(),

@@ -57,8 +57,19 @@ fn setup_tracing(otel_export_config: &Option<edgeless_node::OpenTelemetryExportC
         }
     }
 
+    setup_tracing_without_opentelemetry();
+}
+
+fn setup_tracing_without_opentelemetry() {
+    let otel_layer_env_filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive("edgeless=info".parse().unwrap())
+        .from_env()
+        .expect("Bad RUST_LOG value");
+
+    // We still need an otel layer to be able to set parents in the code.
+    let otel_layer = tracing_opentelemetry::layer().with_filter(otel_layer_env_filter);
     println!("Setup with basic fmt tracing");
-    tracing_subscriber::registry().with(get_fmt_layer()).init();
+    tracing_subscriber::registry().with(get_fmt_layer()).with(otel_layer).init();
 }
 
 #[cfg(feature = "otel")]

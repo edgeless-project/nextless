@@ -58,7 +58,7 @@ tracing-subscriber = {version = "0.3", features = ["env-filter"]}
 opentelemetry = {version  = "0.31" }
 opentelemetry_sdk = { version = "0.31", optional = true }
 opentelemetry-otlp = { version = "0.31", optional = true }
-tracing-opentelemetry = {version = "0.32" }
+tracing-opentelemetry = { version = "0.32" }
 
 wgpu = { version = "27", features = ["serde"] }
 

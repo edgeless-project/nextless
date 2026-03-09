@@ -114,7 +114,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                     }
                 }
 
-                let mut not_found = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from("Not Found")));
+                let mut not_found = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from("Not Found: Proxy")));
                 *not_found.status_mut() = hyper::StatusCode::NOT_FOUND;
                 Ok(not_found)
             }
