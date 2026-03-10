@@ -1,0 +1,5 @@
+/target
+/Cargo.lock
+/function.json
+# This containes AI-generated material and is excluded from the repository.
+/data/controller.html
