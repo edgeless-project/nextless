@@ -275,7 +275,11 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     }
 
     async fn stop(&mut self) -> WorkflowResult {
-        let changes = self.wf.stop();
+        let changes = {
+            let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
+                self.nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
+            tokio::task::block_in_place(|| self.wf.stop(&ir_nodes, &std::collections::HashMap::new(), &self.global_pipeline_state))
+        };
         if let Err(errs) = self.materialize(changes).await {
             tracing::info!("Failures materializing workflow stop: {}.", errs.join(";"));
         };
@@ -340,12 +344,14 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     input_mapping,
                     output_mapping,
                     configuration,
+                    provider_id,
                 } => {
                     self.start_workflow_resource_on_node(
                         &wf_id,
                         resource_name,
                         resource_id,
                         class_type,
+                        provider_id,
                         output_mapping,
                         input_mapping,
                         configuration,
@@ -510,6 +516,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         r_name: String,
         resource_id: edgeless_api::function_instance::InstanceId,
         class_type: String,
+        provider_id: String,
         output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalOutput>,
         input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::super::ir::PhysicalInput>,
         configurations: std::collections::HashMap<String, String>,
@@ -526,6 +533,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 configuration: configurations.clone(),
                 output_mapping: api_output_mapping,
                 input_mapping: api_input_mapping,
+                provider_id: provider_id.clone(),
             })
             .await;
 

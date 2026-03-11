@@ -5,6 +5,7 @@
 pub struct ResourceProviderSpecification {
     pub provider_id: String,
     pub class_type: String,
+    pub instance_limit: Option<u32>,
     pub outputs: Vec<String>,
 }
 

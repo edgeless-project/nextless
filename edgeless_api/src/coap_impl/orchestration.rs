@@ -83,6 +83,7 @@ impl CoapOrchestrationServer {
                 .iter()
                 .map(|core_spec| crate::node_registration::ResourceProviderSpecification {
                     provider_id: String::from(core_spec.provider_id),
+                    instance_limit: core_spec.instance_limit,
                     class_type: String::from(core_spec.class_type),
                     outputs: core_spec.outputs.iter().map(|core_output| String::from(*core_output)).collect(),
                 })

@@ -233,6 +233,7 @@ async fn fill_resources(
                     provider_id.clone(),
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
+                        instance_limit: None,
                         client: resources::http_ingress::ingress_task(
                             data_plane.clone(),
                             edgeless_api::function_instance::InstanceId::new(node_id),
@@ -245,6 +246,7 @@ async fn fill_resources(
                     provider_id: provider_id.clone(),
                     class_type,
                     outputs: vec!["new_request".to_string()],
+                    instance_limit: None,
                 });
             }
         }
@@ -257,6 +259,7 @@ async fn fill_resources(
                     provider_id.clone(),
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
+                        instance_limit: None,
                         client: Box::new(
                             resources::http_egress::EgressResourceProvider::new(
                                 data_plane.clone(),
@@ -270,6 +273,7 @@ async fn fill_resources(
                     provider_id: provider_id.clone(),
                     class_type,
                     outputs: vec![],
+                    instance_limit: None,
                 });
             }
         }
@@ -282,6 +286,7 @@ async fn fill_resources(
                     provider_id.clone(),
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
+                        instance_limit: None,
                         client: Box::new(
                             resources::file_log::FileLogResourceProvider::new(
                                 data_plane.clone(),
@@ -295,6 +300,7 @@ async fn fill_resources(
                     provider_id: provider_id.clone(),
                     class_type,
                     outputs: vec![],
+                    instance_limit: None,
                 });
             }
         }
@@ -307,6 +313,7 @@ async fn fill_resources(
                     provider_id.clone(),
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
+                        instance_limit: None,
                         client: Box::new(
                             resources::redis::RedisResourceProvider::new(
                                 data_plane.clone(),
@@ -320,6 +327,7 @@ async fn fill_resources(
                     provider_id: provider_id.clone(),
                     class_type,
                     outputs: vec![],
+                    instance_limit: None,
                 });
             }
         }
@@ -332,6 +340,7 @@ async fn fill_resources(
                     provider_id.clone(),
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
+                        instance_limit: Some(1),
                         client: Box::new(
                             resources::led_matrix::LedMatrixResourceProvider::new(
                                 data_plane.clone(),
@@ -346,6 +355,7 @@ async fn fill_resources(
                     provider_id: provider_id.clone(),
                     class_type,
                     outputs: vec![],
+                    instance_limit: Some(1),
                 });
             }
         }

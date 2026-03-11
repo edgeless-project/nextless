@@ -8,6 +8,7 @@ pub struct ResourceInstanceSpecification {
     #[serde(skip)]
     pub resource_id: crate::function_instance::InstanceId,
     pub class_type: String,
+    pub provider_id: String,
     #[serde(skip)]
     pub output_mapping: std::collections::HashMap<super::function_instance::PortId, crate::common::Output>,
     #[serde(skip)]

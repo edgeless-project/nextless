@@ -47,4 +47,14 @@ impl<'a> super::TransformationPipeline<LogicalPipelineState<'a>> for DefaultLogi
         _global_state: &LogicalPipelineState,
     ) {
     }
+
+    fn apply_stop(
+        &mut self,
+        _workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        _nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+        _global_state: &LogicalPipelineState,
+    ) {
+        // There currently is no stateful logical component.
+    }
 }

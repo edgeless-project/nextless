@@ -65,6 +65,14 @@ impl super::PhysicalComponent for PhyiscalProxy {
     fn logical_parent(&self) -> String {
         todo!("Not Implemented Yet");
     }
+
+    fn as_resource(&self) -> Option<&super::resource::PhysicalResource> {
+        None
+    }
+
+    fn as_resource_mut(&mut self) -> Option<&mut super::resource::PhysicalResource> {
+        None
+    }
 }
 
 #[derive(Clone)]

@@ -32,6 +32,13 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
 pub struct PlacementState<'a, P: strategy::PlacementStrategy> {
     pub strategy_state: &'a P::GlobalState,
     pub image_chache: &'a crate::ir::support::image_cache::ImageCache,
+    pub instance_counts: &'a InstanceCounts,
+}
+
+#[derive(Default, Clone)]
+pub struct InstanceCounts {
+    resource_instance_counts:
+        std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<(uuid::Uuid, String), std::collections::BTreeSet<uuid::Uuid>>>>,
 }
 
 struct PlacementConstraints {
@@ -56,6 +63,7 @@ pub struct ActorCandidate<'a> {
 #[derive(Clone)]
 pub struct ResourceCandidate {
     pub(crate) node_id: edgeless_api::function_instance::NodeId,
+    pub(crate) provider_id: String,
 }
 
 impl<'a> Candidate<'a> {
@@ -80,6 +88,36 @@ impl<'a, P: strategy::PlacementStrategy> super::StatefulPhysicalTransformation<P
 
         for (f_id, function, instances) in workflow.components_with_instances() {
             required_changes.extend(self.process_component(workflow, f_id, function, instances, nodes, peer_clusters, global_state))
+        }
+
+        required_changes
+    }
+
+    fn apply_stop(
+        &mut self,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
+        _nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+        global_state: &PlacementState<P>,
+    ) -> Vec<super::PhysicalChange> {
+        let mut required_changes = Vec::new();
+
+        for (_, _, instances) in workflow.components_with_instances() {
+            for instance in instances {
+                if let Some(active_instance) = instance.component.try_unpack_active() {
+                    required_changes.extend(instance.plan_stop());
+                    if let Some(resource_instance) = active_instance.as_resource() {
+                        global_state
+                            .instance_counts
+                            .resource_instance_counts
+                            .blocking_lock()
+                            .entry((resource_instance.id.node_id.clone(), resource_instance.provider.clone()))
+                            .and_modify(|e| {
+                                e.remove(&resource_instance.id.function_id);
+                            });
+                    }
+                }
+            }
         }
 
         required_changes
@@ -150,11 +188,19 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         workflow.feature_flags.disable_actor_optimization,
                     );
                     if let Some(new_instance) = new_instance {
+                        if let Some(resource_instance) = new_instance.try_unpack_active().and_then(|i| i.as_resource()) {
+                            global_state
+                                .instance_counts
+                                .resource_instance_counts
+                                .blocking_lock()
+                                .entry((resource_instance.id.node_id.clone(), resource_instance.provider.clone()))
+                                .or_default()
+                                .insert(resource_instance.id.function_id);
+                        }
                         required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
                             component_id: i.component_id,
                             action: super::PhysicalComponentChangeAction::Update(new_instance),
                         }));
-                        tracing::info!("Spawn worked");
                     } else {
                         tracing::debug!(
                             "Requested Instance: Found no viable node for {} in {}",
@@ -207,6 +253,17 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                                 c.id().node_id,
                                 new_id.node_id
                             );
+                            // This is wrong/suboptimal here, but doing this properly would require sharing the counts between stages.
+                            if let Some(resource_instance) = i.component.try_unpack_active().and_then(|i| i.as_resource()) {
+                                global_state
+                                    .instance_counts
+                                    .resource_instance_counts
+                                    .blocking_lock()
+                                    .entry((resource_instance.id.node_id.clone(), resource_instance.provider.clone()))
+                                    .and_modify(|e| {
+                                        e.remove(&resource_instance.id.function_id);
+                                    });
+                            }
                             required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
                                 component_id: new_component_id,
                                 action: super::PhysicalComponentChangeAction::Update(new_instance),
@@ -218,40 +275,63 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         required_changes.extend(i.abort_migration());
                     }
                 }
-                PhysicalComponentState::Lost(_) => match &logical_component.scaling_mode() {
-                    crate::ir::component::ScalingMode::AllNodes => {
-                        required_changes.extend(i.mark_stopped());
+                PhysicalComponentState::Lost(_) => {
+                    if let Some(resource_instance) = i.component.try_unpack_active().and_then(|i| i.as_resource()) {
+                        global_state
+                            .instance_counts
+                            .resource_instance_counts
+                            .blocking_lock()
+                            .entry((resource_instance.id.node_id.clone(), resource_instance.provider.clone()))
+                            .and_modify(|e| {
+                                e.remove(&resource_instance.id.function_id);
+                            });
                     }
-                    _ => {
-                        let node_filters = logical_component.node_filters();
-                        let placement_constraints = PlacementConstraints {
-                            node_filters,
-                            urgent: num_active_instances <= 1,
-                        };
+                    match &logical_component.scaling_mode() {
+                        crate::ir::component::ScalingMode::AllNodes => {
+                            required_changes.extend(i.mark_stopped());
+                        }
+                        _ => {
+                            let node_filters = logical_component.node_filters();
+                            let placement_constraints = PlacementConstraints {
+                                node_filters,
+                                urgent: num_active_instances <= 1,
+                            };
 
-                        let new_component_id = uuid::Uuid::new_v4();
-                        let new_instance = self.spawn_new_component_instance(
-                            workflow,
-                            new_component_id,
-                            logical_component_id.to_string(),
-                            &logical_component,
-                            nodes,
-                            peer_clusters,
-                            global_state,
-                            &placement_constraints,
-                            workflow.feature_flags.disable_actor_optimization,
-                        );
-                        if let Some(new_instance) = new_instance {
-                            let new_id = new_instance.id().unwrap();
-                            required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
-                                component_id: new_component_id,
-                                action: super::PhysicalComponentChangeAction::Update(new_instance),
-                            }));
-                            required_changes.extend(i.mark_lost_replaced(new_id));
+                            let new_component_id = uuid::Uuid::new_v4();
+                            let new_instance = self.spawn_new_component_instance(
+                                workflow,
+                                new_component_id,
+                                logical_component_id.to_string(),
+                                &logical_component,
+                                nodes,
+                                peer_clusters,
+                                global_state,
+                                &placement_constraints,
+                                workflow.feature_flags.disable_actor_optimization,
+                            );
+                            if let Some(new_instance) = new_instance {
+                                let new_id = new_instance.id().unwrap();
+                                required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
+                                    component_id: new_component_id,
+                                    action: super::PhysicalComponentChangeAction::Update(new_instance),
+                                }));
+                                required_changes.extend(i.mark_lost_replaced(new_id));
+                            }
                         }
                     }
-                },
+                }
                 PhysicalComponentState::Dead(old_instance) => {
+                    if let Some(resource_instance) = i.component.try_unpack_active().and_then(|i| i.as_resource()) {
+                        global_state
+                            .instance_counts
+                            .resource_instance_counts
+                            .blocking_lock()
+                            .entry((resource_instance.id.node_id.clone(), resource_instance.provider.clone()))
+                            .and_modify(|e| {
+                                e.remove(&resource_instance.id.function_id);
+                            });
+                    }
+
                     let node_filters = match &logical_component.scaling_mode() {
                         crate::ir::component::ScalingMode::AllNodes => {
                             let mut filters = logical_component.node_filters();
@@ -316,7 +396,9 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                 global_state.image_chache,
                 disable_actor_optimization,
             ),
-            LogicalComponent::Resource(logical_resource) => find_candidates_for_resource(placement_constraints, logical_resource, nodes),
+            LogicalComponent::Resource(logical_resource) => {
+                find_candidates_for_resource(placement_constraints, logical_resource, nodes, global_state.instance_counts)
+            }
             LogicalComponent::SubApplication(_logical_sub_flow) => {
                 tracing::warn!("Tried to place SubApplication");
                 tracing::warn!("Peer Clusters: {:?}", peer_clusters.keys());
@@ -362,6 +444,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                     Box::new(actor)
                 }
                 LogicalComponent::Resource(logical_resource) => {
+                    let Candidate::Resource(resource_candidate) = dst else { return None };
                     let resource = resource::PhysicalResource {
                         id: new_id,
                         desired_mapping: PhysicalPorts::default(),
@@ -370,6 +453,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         class: logical_resource.class.clone(),
                         component_name: logical_name.to_string(),
                         configuration: logical_resource.configurations.clone(),
+                        provider: resource_candidate.provider_id.clone(),
                     };
                     Box::new(resource)
                 }
@@ -478,11 +562,12 @@ fn find_candidates_for_resource<'b>(
     placement_constraints: &PlacementConstraints,
     logical_resource: &crate::ir::resource::LogicalResource,
     nodes: &'b crate::ir::Nodes,
+    instance_counts: &'b InstanceCounts,
 ) -> Vec<Candidate<'b>> {
     let mut candidates = Vec::new();
 
     for (_node_id, node) in nodes {
-        for candidate in feasibility::node_can_host_resource(&placement_constraints.node_filters, logical_resource, *node) {
+        for candidate in feasibility::node_can_host_resource(&placement_constraints.node_filters, logical_resource, *node, instance_counts) {
             candidates.push(Candidate::Resource(candidate));
         }
     }
@@ -567,6 +652,24 @@ fn select_actor_node_candidate<'b>(
 mod test {
     use crate::ir::transformations::{placement::strategy::PlacementStrategy, StatefulPhysicalTransformation};
 
+    struct MockResourceProvider {
+        instance_limit: Option<usize>,
+    }
+
+    impl crate::ir::ResourceProvider for MockResourceProvider {
+        fn class_type(&self) -> String {
+            "test-class".to_string()
+        }
+
+        fn outputs(&self) -> Vec<String> {
+            vec![]
+        }
+
+        fn instance_limit(&self) -> Option<usize> {
+            self.instance_limit.clone()
+        }
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn place_actor_on_single_node() {
         let (actor_id, logical_actor) = crate::ir::actor::mock_actor::MockActorBuilder::default().build();
@@ -593,17 +696,226 @@ mod test {
 
         let nodes = std::collections::HashMap::from([(example_node_id.clone(), &mock_node as &dyn crate::ir::Node)]);
 
+        let changes = run_transformation(&workflow, &nodes, None);
+
+        assert_eq!(changes.len(), 1);
+
+        let super::transformations::PhysicalChange::Component(component_change) = &changes[0] else {
+            panic!("Unexpected Physical Change");
+        };
+
+        assert!(component_change.component_id == actor_instance_id);
+
+        let super::transformations::PhysicalComponentChangeAction::Update(update) = &component_change.action else {
+            panic!("Unexpected Change Action");
+        };
+
+        let crate::ir::physical_model::PhysicalComponentState::Planned(_) = update else {
+            panic!("Unexpected State Change");
+        };
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn limited_resource_placement_and_stop() {
+        let (resource_id, logical_resource) = crate::ir::resource::mock_resource::MockResourceBuilder::default()
+            .with_class("test-class")
+            .build();
+        let (_, resource_instance_id, resource_instance) =
+            crate::ir::resource::mock_resource::MockResourceInstanceBuilder::new_for_logical(&resource_id, &logical_resource)
+                .with_state(crate::ir::actor::mock_actor::DesiredPhysicalComponentState::Requested)
+                .build();
+
+        let mut workflow = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&resource_id, &logical_resource, &[(resource_instance_id, resource_instance)])
+            .build();
+
+        let example_node_id = uuid::Uuid::new_v4();
+
+        let mock_resource_provider = MockResourceProvider { instance_limit: Some(1) };
+
+        let mock_node = crate::ir::system_model::mock_node::MockNodeBuilder::default()
+            .id(example_node_id.clone())
+            .resource_providers(crate::ir::ResourceProviders::from([(
+                "test-provider-1".to_string(),
+                &mock_resource_provider as &dyn crate::ir::ResourceProvider,
+            )]))
+            .build()
+            .unwrap();
+
+        let nodes = std::collections::HashMap::from([(example_node_id.clone(), &mock_node as &dyn crate::ir::Node)]);
+
+        let instance_counts = crate::ir::transformations::placement::InstanceCounts::default();
+
+        // Placement
+        {
+            let changes = run_transformation(&workflow, &nodes, Some(instance_counts.clone()));
+
+            assert_eq!(changes.len(), 1);
+
+            let super::transformations::PhysicalChange::Component(component_change) = &changes[0] else {
+                panic!("Unexpected Physical Change");
+            };
+
+            assert!(component_change.component_id == resource_instance_id);
+
+            let super::transformations::PhysicalComponentChangeAction::Update(update) = &component_change.action else {
+                panic!("Unexpected Change Action");
+            };
+
+            let crate::ir::physical_model::PhysicalComponentState::Planned(_) = update else {
+                panic!("Unexpected State Change");
+            };
+
+            assert_eq!(
+                instance_counts
+                    .resource_instance_counts
+                    .lock()
+                    .await
+                    .get(&(example_node_id.clone(), "test-provider-1".to_string()))
+                    .unwrap()
+                    .len(),
+                1
+            );
+            workflow.apply_physical_changes(changes);
+        }
+
+        // Mark All Instances Started
+        {
+            let mut all_changes = vec![];
+            for (_id, _component, instances) in workflow.components_with_instances() {
+                for instance in instances {
+                    let super::physical_model::PhysicalComponentState::Planned(planned_instance) = instance.component else {
+                        panic!("Unexpected State");
+                    };
+
+                    let (changes, _) = planned_instance.materialize(&None);
+                    all_changes.extend(changes);
+                }
+            }
+            workflow.apply_physical_changes(all_changes);
+        }
+
+        // Stop
+        {
+            let changes = run_stop(&workflow, &nodes, Some(instance_counts.clone()));
+
+            assert_eq!(changes.len(), 1);
+
+            let super::transformations::PhysicalChange::Component(component_change) = &changes[0] else {
+                panic!("Unexpected Physical Change");
+            };
+
+            assert!(component_change.component_id == resource_instance_id);
+
+            let super::transformations::PhysicalComponentChangeAction::Update(update) = &component_change.action else {
+                panic!("Unexpected Change Action");
+            };
+
+            let crate::ir::physical_model::PhysicalComponentState::StopPlanned { .. } = update else {
+                panic!("Unexpected State Change");
+            };
+
+            assert!(component_change.component_id == resource_instance_id);
+
+            assert_eq!(
+                instance_counts
+                    .resource_instance_counts
+                    .lock()
+                    .await
+                    .get(&(example_node_id.clone(), "test-provider-1".to_string()))
+                    .unwrap()
+                    .len(),
+                0
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn dont_place_if_resource_limit_exceeded() {
+        let (resource_id, logical_resource) = crate::ir::resource::mock_resource::MockResourceBuilder::default()
+            .with_class("test-class")
+            .build();
+        let (_, resource_instance_id, resource_instance) =
+            crate::ir::resource::mock_resource::MockResourceInstanceBuilder::new_for_logical(&resource_id, &logical_resource)
+                .with_state(crate::ir::actor::mock_actor::DesiredPhysicalComponentState::Requested)
+                .build();
+
+        let workflow = crate::ir::workflow::mock_workflow::MockWorkflowBuilder::default()
+            .with_component(&resource_id, &logical_resource, &[(resource_instance_id, resource_instance)])
+            .build();
+
+        let example_node_id = uuid::Uuid::new_v4();
+
+        let mock_resource_provider = MockResourceProvider { instance_limit: Some(1) };
+
+        let mock_node = crate::ir::system_model::mock_node::MockNodeBuilder::default()
+            .id(example_node_id.clone())
+            .resource_providers(crate::ir::ResourceProviders::from([(
+                "test-provider-1".to_string(),
+                &mock_resource_provider as &dyn crate::ir::ResourceProvider,
+            )]))
+            .build()
+            .unwrap();
+
+        let nodes = std::collections::HashMap::from([(example_node_id.clone(), &mock_node as &dyn crate::ir::Node)]);
+
+        let instance_counts = crate::ir::transformations::placement::InstanceCounts::default();
+
+        instance_counts.resource_instance_counts.lock().await.insert(
+            (example_node_id.clone(), "test-provider-1".to_string()),
+            std::collections::BTreeSet::from([uuid::Uuid::new_v4()]),
+        );
+
+        let changes = run_transformation(&workflow, &nodes, Some(instance_counts));
+
+        assert_eq!(changes.len(), 1);
+
+        let super::transformations::PhysicalChange::Component(component_change) = &changes[0] else {
+            panic!("Unexpected PhysicalChange");
+        };
+
+        assert!(component_change.component_id == resource_instance_id);
+
+        let super::transformations::PhysicalComponentChangeAction::Delete = &component_change.action else {
+            panic!("Unexpected Change Action");
+        };
+    }
+
+    fn run_transformation(
+        workflow: &crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        instance_counts: Option<crate::ir::transformations::placement::InstanceCounts>,
+    ) -> Vec<super::transformations::PhysicalChange> {
         let mut transformation = super::DefaultPlacement::<super::strategy::random::Random>::new(super::strategy::random::Random::new());
 
         let image_cache = crate::ir::support::image_cache::ImageCache::new();
+        let instance_counts = instance_counts.unwrap_or(crate::ir::transformations::placement::InstanceCounts::default());
 
         let placement_state = super::PlacementState {
             strategy_state: &(),
             image_chache: &image_cache,
+            instance_counts: &instance_counts,
         };
 
-        let changes = tokio::task::block_in_place(|| transformation.apply(&workflow, &nodes, &Default::default(), &placement_state));
+        tokio::task::block_in_place(|| transformation.apply(workflow, &nodes, &Default::default(), &placement_state))
+    }
 
-        assert_eq!(changes.len(), 1);
+    fn run_stop(
+        workflow: &crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        instance_counts: Option<crate::ir::transformations::placement::InstanceCounts>,
+    ) -> Vec<super::transformations::PhysicalChange> {
+        let mut transformation = super::DefaultPlacement::<super::strategy::random::Random>::new(super::strategy::random::Random::new());
+
+        let image_cache = crate::ir::support::image_cache::ImageCache::new();
+        let instance_counts = instance_counts.unwrap_or(crate::ir::transformations::placement::InstanceCounts::default());
+
+        let placement_state = super::PlacementState {
+            strategy_state: &(),
+            image_chache: &image_cache,
+            instance_counts: &instance_counts,
+        };
+
+        tokio::task::block_in_place(|| transformation.apply_stop(workflow, &nodes, &Default::default(), &placement_state))
     }
 }

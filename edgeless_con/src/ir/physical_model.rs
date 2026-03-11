@@ -56,6 +56,8 @@ pub trait PhysicalComponent: Send + PhysicalComponentClone {
     fn materialized_state(&self) -> Option<&dyn MaterializedComponent>;
     fn as_actor(&self) -> Option<&super::actor::PhysicalActor>;
     fn as_actor_mut(&mut self) -> Option<&mut super::actor::PhysicalActor>;
+    fn as_resource(&self) -> Option<&super::resource::PhysicalResource>;
+    fn as_resource_mut(&mut self) -> Option<&mut super::resource::PhysicalResource>;
     fn logical_parent(&self) -> String;
 }
 

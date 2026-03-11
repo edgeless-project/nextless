@@ -96,6 +96,7 @@ pub enum RequiredChange {
         resource_id: edgeless_api::function_instance::InstanceId,
         resource_name: String,
         class_type: String,
+        provider_id: String,
         input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
         output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
         configuration: std::collections::HashMap<String, String>,

@@ -81,6 +81,7 @@ pub trait ResourceProvider {
     // TODO(raphael) Update to use Ports.
     #[allow(unused)]
     fn outputs(&self) -> Vec<String>;
+    fn instance_limit(&self) -> Option<usize>;
 }
 
 pub type ResourceProviders<'a> = std::collections::HashMap<String, &'a dyn ResourceProvider>;

@@ -445,6 +445,8 @@ message ResourceProviderSpecification {
     string class_type        = 2;
     // List of callbacks that can be invoked.
     repeated string outputs  = 3;
+    // Limits the number of instances for this resource
+    optional uint32 instance_limit = 4;
 }
 
 // Resource instance specification.
@@ -457,6 +459,7 @@ message ResourceInstanceSpecification {
     map<string, InstanceOutput> output_mapping = 3;
     map<string, InstanceInput> input_mapping = 4;
     InstanceId resource_id = 5;
+    string provider_id = 6;
 }
 
 message LinkProviderSpecification {

@@ -43,15 +43,42 @@ impl<'a> crate::ir::pipeline::TransformationPipeline<PhysicalPipelineState<'a>> 
         global_state: &PhysicalPipelineState,
     ) {
         let changes = self.physical_connection_mapper.apply(workflow, nodes, peer_clusters);
-        tracing::info!("Connection Mapper: {changes:?}");
+        if changes.len() > 0 {
+            tracing::debug!("Connection Mapper: {changes:?}");
+        }
         workflow.apply_physical_changes(changes);
         let changes = self
             .pipe_generator
             .apply(workflow, nodes, peer_clusters, global_state.pipe_generator_state);
-        tracing::info!("Interaction Specializer: {changes:?}");
+        if changes.len() > 0 {
+            tracing::debug!("Interaction Specializer: {changes:?}");
+        }
         workflow.apply_physical_changes(changes);
         let changes = self.compiler.apply(workflow, nodes, peer_clusters, global_state.compiler_state);
-        tracing::info!("Compiler: {changes:?}");
+        if changes.len() > 0 {
+            tracing::debug!("Compiler: {changes:?}");
+        }
+        workflow.apply_physical_changes(changes);
+    }
+
+    fn apply_stop(
+        &mut self,
+        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &PhysicalPipelineState,
+    ) {
+        let changes = self
+            .pipe_generator
+            .apply_stop(workflow, nodes, peer_clusters, global_state.pipe_generator_state);
+        if changes.len() > 0 {
+            tracing::debug!("Interaction Specializer Stop: {changes:?}");
+        }
+        workflow.apply_physical_changes(changes);
+        let changes = self.compiler.apply_stop(workflow, nodes, peer_clusters, global_state.compiler_state);
+        if changes.len() > 0 {
+            tracing::debug!("Compiler Stop: {changes:?}");
+        }
         workflow.apply_physical_changes(changes);
     }
 }

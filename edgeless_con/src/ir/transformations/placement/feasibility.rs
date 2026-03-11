@@ -66,20 +66,37 @@ pub fn node_can_host_resource<'b>(
     node_filter: &crate::ir::component::NodeFilters,
     logical_resource: &crate::ir::resource::LogicalResource,
     node: &'b dyn crate::ir::Node,
+    intance_counts: &'b super::InstanceCounts,
 ) -> Vec<super::ResourceCandidate> {
     if !node_fulfills_constraints(node_filter, node) {
         return Vec::new();
     }
 
-    if !node
-        .available_resource_providers()
+    node.available_resource_providers()
         .iter()
-        .any(|(_, r)| r.class_type() == logical_resource.class)
-    {
-        return Vec::new();
-    }
+        .filter(|(provider_id, resource_provider)| {
+            if resource_provider.class_type() != logical_resource.class {
+                return false;
+            }
 
-    return vec![super::ResourceCandidate { node_id: node.node_id() }];
+            if let Some(instance_limit) = resource_provider.instance_limit() {
+                if intance_counts
+                    .resource_instance_counts
+                    .blocking_lock()
+                    .get(&(node.node_id(), provider_id.to_string()))
+                    .is_some_and(|instances| instances.len() >= instance_limit)
+                {
+                    return false;
+                }
+            }
+
+            true
+        })
+        .map(|(provider_id, _resource_provider)| super::ResourceCandidate {
+            node_id: node.node_id(),
+            provider_id: provider_id.clone(),
+        })
+        .collect()
 }
 
 pub fn node_fulfills_constraints(node_filter: &crate::ir::component::NodeFilters, node: &dyn crate::ir::Node) -> bool {

@@ -135,6 +135,14 @@ impl super::PhysicalComponent for PhysicalActor {
     fn logical_parent(&self) -> String {
         self.component_name.clone()
     }
+
+    fn as_resource(&self) -> Option<&super::resource::PhysicalResource> {
+        None
+    }
+
+    fn as_resource_mut(&mut self) -> Option<&mut super::resource::PhysicalResource> {
+        None
+    }
 }
 
 #[derive(Clone)]

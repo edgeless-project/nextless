@@ -85,6 +85,28 @@ impl super::StatefulPhysicalTransformation<PhysicalInteractionSpecializerState> 
 
         return required_changes;
     }
+
+    fn apply_stop(
+        &mut self,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
+        _nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+        _global_state: &PhysicalInteractionSpecializerState,
+    ) -> Vec<transformations::PhysicalChange> {
+        let mut required_changes = Vec::new();
+
+        for (link_id, _link) in &workflow.links {
+            // This would probably actually require tracking the links' state similar to how we track the component instances.
+            tracing::warn!("Links are currently not removed from the nodes!");
+            // TODO: This should be an update
+            required_changes.push(transformations::PhysicalChange::Link(transformations::PhysicalLinkChange {
+                link_id: link_id.clone(),
+                action: transformations::PhysicalLinkChangeAction::Delete,
+            }));
+        }
+
+        required_changes
+    }
 }
 
 fn try_map_interaction(

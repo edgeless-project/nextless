@@ -35,6 +35,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 crate::ir::interaction::dialect::DialectRegistry::new_default(),
             )),
             image_cache: crate::ir::support::image_cache::ImageCache::default(),
+            instance_counts: Default::default(),
         };
 
         Self {

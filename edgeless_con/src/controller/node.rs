@@ -58,6 +58,7 @@ impl WorkerNode {
                     (
                         r.provider_id,
                         super::resource_provider::ResourceProvider {
+                            instance_limit: r.instance_limit.map(|limit| limit as usize),
                             class_type: r.class_type,
                             outputs: r.outputs,
                         },

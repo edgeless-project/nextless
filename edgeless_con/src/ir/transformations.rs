@@ -35,6 +35,15 @@ pub trait StatefulPhysicalTransformation<G>: Send + Sync {
         peer_clusters: &crate::ir::Clusters,
         global_state: &G,
     ) -> Vec<PhysicalChange>;
+
+    /// Clean up any state that would outlive the workflow (e.g., the one stored in global_state).
+    fn apply_stop(
+        &mut self,
+        workflow: &crate::ir::workflow::ActiveWorkflow,
+        _nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+        global_state: &G,
+    ) -> Vec<PhysicalChange>;
 }
 
 pub trait StatelessLogicalTransformation: Send + Sync {

@@ -53,6 +53,7 @@ impl NodeRegistrationHelper for super::CoapClient {
                         provider_id: &resource.provider_id,
                         class_type: &resource.class_type,
                         outputs,
+                        instance_limit: resource.instance_limit,
                     })
                     .map_err(|_| anyhow::anyhow!("Too many outputs"))?;
             }

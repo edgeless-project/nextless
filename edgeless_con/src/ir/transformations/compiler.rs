@@ -67,6 +67,18 @@ impl super::StatefulPhysicalTransformation<crate::ir::support::image_cache::Imag
         }
         required_changes
     }
+
+    fn apply_stop(
+        &mut self,
+        _workflow: &crate::ir::workflow::ActiveWorkflow,
+        _nodes: &crate::ir::Nodes,
+        _peer_clusters: &crate::ir::Clusters,
+        _global_state: &crate::ir::support::image_cache::ImageCache,
+    ) -> Vec<transformations::PhysicalChange> {
+        // We might want to clear images from the cache here (would require ref-counting.)
+        // Probably some other strategy to keep the cache size limited is better here.
+        vec![]
+    }
 }
 
 fn build_new_image(

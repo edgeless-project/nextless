@@ -43,16 +43,38 @@ impl<'a, P: PlacementStrategy> super::TransformationPipeline<crate::ir::transfor
         global_state: &crate::ir::transformations::placement::PlacementState<P>,
     ) {
         let changes = self.scaler.apply(workflow, nodes, peer_clusters);
-        tracing::info!("Scaler: {changes:?}");
+        if changes.len() > 0 {
+            tracing::debug!("Scaler: {changes:?}");
+        }
         workflow.apply_physical_changes(changes);
         let changes = self.colocation_optimizer.apply(workflow, nodes, peer_clusters);
-        tracing::info!("Colocation Optimizer: {changes:?}");
+        if changes.len() > 0 {
+            tracing::debug!("Colocation Optimizer: {changes:?}");
+        }
         workflow.apply_physical_changes(changes);
         let changes = self.migration_finalizer.apply(workflow, nodes, peer_clusters);
-        tracing::info!("Migration Finalizer: {changes:?}");
+        if changes.len() > 0 {
+            tracing::debug!("Migration Finalizer: {changes:?}");
+        }
         workflow.apply_physical_changes(changes);
         let changes = self.placement.apply(workflow, nodes, peer_clusters, global_state);
-        tracing::info!("Placement: {changes:?}");
+        if changes.len() > 0 {
+            tracing::debug!("Placement: {changes:?}");
+        }
+        workflow.apply_physical_changes(changes);
+    }
+
+    fn apply_stop(
+        &mut self,
+        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &crate::ir::transformations::placement::PlacementState<P>,
+    ) {
+        let changes = self.placement.apply_stop(workflow, nodes, peer_clusters, global_state);
+        if changes.len() > 0 {
+            tracing::debug!("Placement Stop: {changes:?}");
+        }
         workflow.apply_physical_changes(changes);
     }
 }

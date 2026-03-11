@@ -90,18 +90,13 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         Vec::new()
     }
 
-    pub fn stop(&mut self) -> Vec<super::RequiredChange> {
-        let mut planned_changes = Vec::new();
-        for (_, _logical_component, component_instances) in self.wf.components_with_instances() {
-            for instance in component_instances {
-                if instance.component.try_unpack_active().is_some() {
-                    planned_changes.extend(instance.plan_stop());
-                }
-            }
-        }
-
-        self.wf.apply_physical_changes(planned_changes);
-
+    pub fn stop(
+        &mut self,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
+    ) -> Vec<super::RequiredChange> {
+        self.pipeline.apply_stop(&mut self.wf, nodes, peer_clusters, global_state);
         self.materialize()
     }
 

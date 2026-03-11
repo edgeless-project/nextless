@@ -63,6 +63,7 @@ pub struct AgentTask {
 
 pub struct ResourceDesc {
     pub class_type: String,
+    pub instance_limit: Option<u32>,
     pub client: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
 }
 
@@ -263,6 +264,7 @@ impl AgentTask {
                     class_type: resource.class_type.clone(),
                     // TODO(raphaelhetzel) Fix (and add inputs) or remove
                     outputs: vec![],
+                    instance_limit: resource.instance_limit,
                 })
                 .collect(),
             self.capabilities.clone(),
@@ -403,11 +405,13 @@ impl AgentTask {
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>, anyhow::Error> {
-        if let Some((provider_id, resource_desc)) = self
-            .resource_providers
-            .iter_mut()
-            .find(|(_provider_id, resource_desc)| resource_desc.class_type == instance_specification.class_type)
-        {
+        if let Some(resource_desc) = self.resource_providers.get_mut(&instance_specification.provider_id) {
+            let provider_id = instance_specification.provider_id.clone();
+
+            if resource_desc.class_type != instance_specification.class_type {
+                tracing::warn!("Resource Spawn request has invalid class type. Ignoring.");
+            }
+
             let res = match resource_desc.client.start(instance_specification).await {
                 Ok(val) => val,
                 Err(err) => {
@@ -422,7 +426,7 @@ impl AgentTask {
                     id.node_id,
                     id.function_id
                 );
-                self.resource_instance_provider_map.insert(id, provider_id.clone());
+                self.resource_instance_provider_map.insert(id, provider_id);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(id));
             } else {
                 return Ok(res);

@@ -224,6 +224,7 @@ fn parse_resource_provider_specification(
         provider_id: api_spec.provider_id.clone(),
         class_type: api_spec.class_type.clone(),
         outputs: api_spec.outputs.clone(),
+        instance_limit: api_spec.instance_limit.clone(),
     })
 }
 
@@ -234,6 +235,7 @@ fn serialize_resource_provider_specification(
         provider_id: crate_spec.provider_id.clone(),
         class_type: crate_spec.class_type.clone(),
         outputs: crate_spec.outputs.clone(),
+        instance_limit: crate_spec.instance_limit.clone(),
     }
 }
 
@@ -297,6 +299,7 @@ mod test {
                     provider_id: "provider-1".to_string(),
                     class_type: "class-type-1".to_string(),
                     outputs: vec!["out1".to_string(), "out2".to_string()],
+                    instance_limit: Some(1),
                 }],
                 NodeCapabilities {
                     num_cpus: 4,

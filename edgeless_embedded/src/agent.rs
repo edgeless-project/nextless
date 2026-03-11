@@ -212,6 +212,8 @@ impl EmbeddedAgent {
                     provider_id: i.provider_id(),
                     class_type: i.resource_class(),
                     outputs,
+                    // TODO: Add this to the resource abstraction.
+                    instance_limit: None,
                 })
                 .is_err()
             {
@@ -302,8 +304,13 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         let mut lck = self.inner.lock().await;
         for r in lck.resources.iter_mut() {
             log::info!("Resource Start {}", r.resource_class());
-            if r.resource_class() == instance_specification.class_type {
+            if r.provider_id() == instance_specification.provider_id {
                 log::info!("Try Start Resource");
+
+                if r.resource_class() != instance_specification.class_type {
+                    log::warn!("Spawn request: Bad resource class!");
+                }
+
                 match r.start(instance_specification).await {
                     Ok(_) => {
                         log::info!("Resource Started");

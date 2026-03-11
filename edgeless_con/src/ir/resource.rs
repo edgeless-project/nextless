@@ -16,6 +16,7 @@ pub struct LogicalResource {
 pub struct PhysicalResource {
     pub(crate) id: edgeless_api::function_instance::InstanceId,
     pub(crate) class: String,
+    pub(crate) provider: String,
     pub(crate) component_name: String,
     pub(crate) configuration: std::collections::HashMap<String, String>,
     pub(crate) desired_mapping: super::PhysicalPorts,
@@ -76,6 +77,7 @@ impl super::PhysicalComponent for PhysicalResource {
                 resource_id: self.id,
                 resource_name: self.component_name.clone(),
                 class_type: self.class.clone(),
+                provider_id: self.provider.clone(),
                 input_mapping: self.desired_mapping.physical_input_mapping.clone(),
                 output_mapping: self.desired_mapping.physical_output_mapping.clone(),
                 configuration: self.configuration.clone(),
@@ -119,6 +121,14 @@ impl super::PhysicalComponent for PhysicalResource {
     fn logical_parent(&self) -> String {
         self.component_name.clone()
     }
+
+    fn as_resource(&self) -> Option<&super::resource::PhysicalResource> {
+        Some(self)
+    }
+
+    fn as_resource_mut(&mut self) -> Option<&mut super::resource::PhysicalResource> {
+        Some(self)
+    }
 }
 
 #[derive(Clone)]
@@ -151,6 +161,155 @@ impl From<edgeless_api::workflow_instance::WorkflowResource> for LogicalResource
             },
             scaling_mode,
             node_filters,
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod mock_resource {
+    use crate::ir::actor::mock_actor::DesiredPhysicalComponentState;
+
+    #[derive(Default)]
+    pub struct MockResourceBuilder {
+        logical_id: Option<String>,
+        class: Option<String>,
+        configuration: std::collections::HashMap<String, String>,
+        scaling_mode: Option<crate::ir::component::ScalingMode>,
+        node_filters: Option<crate::ir::component::NodeFilters>,
+        logical_ports: Option<crate::ir::LogicalPorts>,
+    }
+
+    pub struct MockResourceInstanceBuilder {
+        // Those are always set if we base this on a logical instance.
+        configuration: std::collections::HashMap<String, String>,
+        class: String,
+        component_name: String,
+        // Those need to defined for the instance
+        node_id: Option<uuid::Uuid>,
+        component_id: Option<uuid::Uuid>,
+        provider: Option<String>,
+        creation_time: Option<std::time::Instant>,
+        desired_mapping: Option<crate::ir::PhysicalPorts>,
+        materialized_state: Option<crate::ir::resource::MaterializedResource>,
+        runtime_statistics: Option<Box<dyn crate::ir::ComponentRuntimeStatistics>>,
+        // This is a helper field
+        desired_state: crate::ir::actor::mock_actor::DesiredPhysicalComponentState,
+    }
+
+    // Derived from MockActorBuilder
+    impl MockResourceBuilder {
+        pub fn build(self) -> (String, crate::ir::logical_model::LogicalComponent) {
+            let id = self.logical_id.unwrap_or("test_resource".to_string());
+
+            let resource = crate::ir::resource::LogicalResource {
+                class: self.class.unwrap_or("test_resource_class".to_string()),
+                configurations: self.configuration,
+                scaling_mode: self.scaling_mode.unwrap_or_else(|| crate::ir::component::ScalingMode::Singleton),
+                node_filters: self.node_filters.unwrap_or_default(),
+                logical_ports: self.logical_ports.unwrap_or_default(),
+            };
+
+            (id, crate::ir::logical_model::LogicalComponent::Resource(resource))
+        }
+
+        pub fn with_class(mut self, class: &str) -> Self {
+            self.class = Some(class.to_string());
+            self
+        }
+    }
+
+    // Derived from MockActorInstanceBuilder
+    impl MockResourceInstanceBuilder {
+        pub fn new_for_logical(logical_id: &str, logical_component: &crate::ir::LogicalComponent) -> Self {
+            let crate::ir::LogicalComponent::Resource(logical_resource) = logical_component else {
+                panic!("Bad Component Type");
+            };
+
+            Self {
+                node_id: None,
+                component_id: None,
+                component_name: logical_id.to_string(),
+                creation_time: None,
+                desired_mapping: None,
+                desired_state: DesiredPhysicalComponentState::Materialized,
+                materialized_state: None,
+                runtime_statistics: None,
+                configuration: logical_resource.configurations.clone(),
+                class: logical_resource.class.clone(),
+                provider: None,
+            }
+        }
+
+        pub fn build(self) -> (String, uuid::Uuid, crate::ir::physical_model::PhysicalComponentState) {
+            let id = edgeless_api::function_instance::InstanceId {
+                node_id: self.node_id.unwrap_or_else(|| uuid::Uuid::new_v4()),
+                function_id: self.component_id.unwrap_or_else(|| uuid::Uuid::new_v4()),
+            };
+
+            let desired_mapping = self.desired_mapping.clone().unwrap_or_default();
+
+            let materialized_state = self.materialized_state.unwrap_or_else(|| crate::ir::resource::MaterializedResource {
+                mapping: crate::ir::MaterializedPorts {
+                    materialized_outputs: desired_mapping
+                        .physical_output_mapping
+                        .iter()
+                        .map(|(k, v)| {
+                            (
+                                k.clone(),
+                                crate::ir::MaterializedOutput {
+                                    mapping: v.clone(),
+                                    port_statistics: None,
+                                },
+                            )
+                        })
+                        .collect(),
+                    materialized_inputs: desired_mapping
+                        .physical_input_mapping
+                        .iter()
+                        .map(|(k, v)| {
+                            (
+                                k.clone(),
+                                crate::ir::MaterializedInput {
+                                    mapping: v.clone(),
+                                    port_statistics: None,
+                                },
+                            )
+                        })
+                        .collect(),
+                },
+                runtime_statistics: self.runtime_statistics,
+            });
+
+            let instance = crate::ir::resource::PhysicalResource {
+                id: id.clone(),
+                component_name: self.component_name.clone(),
+                creation_time: self
+                    .creation_time
+                    .unwrap_or_else(|| std::time::Instant::now() - std::time::Duration::from_secs(60)),
+                desired_mapping: desired_mapping,
+                materialized: match self.desired_state {
+                    DesiredPhysicalComponentState::Materialized => Some(materialized_state),
+                    DesiredPhysicalComponentState::Planned => None,
+                    DesiredPhysicalComponentState::Requested => None,
+                },
+                class: self.class.clone(),
+                provider: self.provider.unwrap_or("default_resource_provider".to_string()),
+                configuration: self.configuration.clone(),
+            };
+
+            let physical_component = match self.desired_state {
+                DesiredPhysicalComponentState::Materialized => crate::ir::physical_model::PhysicalComponentState::Materialized(Box::new(instance)),
+                DesiredPhysicalComponentState::Planned => crate::ir::PhysicalComponentState::Planned(Box::new(instance)),
+                DesiredPhysicalComponentState::Requested => crate::ir::PhysicalComponentState::Requested(None),
+            };
+
+            (self.component_name, id.function_id, physical_component)
+        }
+
+        #[allow(unused)]
+        pub fn with_state(mut self, state: DesiredPhysicalComponentState) -> Self {
+            self.desired_state = state;
+            self
         }
     }
 }

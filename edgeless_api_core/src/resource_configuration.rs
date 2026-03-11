@@ -6,6 +6,7 @@
 pub struct EncodedResourceInstanceSpecification<'a> {
     pub instance_id: crate::instance_id::InstanceId,
     pub class_type: &'a str,
+    pub provider_id: &'a str,
     pub output_mapping: heapless::Vec<(&'a str, crate::common::Output), 4>,
     pub configuration: heapless::Vec<(&'a str, &'a str), 16>,
 }
@@ -20,6 +21,7 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
     fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e.encode(self.instance_id)?;
         e = e.str(self.class_type)?;
+        e.str(self.provider_id)?;
         {
             e = e.array(self.output_mapping.len() as u64)?;
             for data in &self.output_mapping {
@@ -42,6 +44,8 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
         let instance_id = d.decode::<crate::instance_id::InstanceId>()?;
 
         let class_type = d.str()?;
+
+        let provider_id = d.str()?;
         let mut outputs = heapless::Vec::<(&'b str, crate::common::Output), 4>::new();
         let mut configuration = heapless::Vec::<(&'b str, &'b str), 16>::new();
 
@@ -62,6 +66,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
             class_type,
             output_mapping: outputs,
             configuration,
+            provider_id,
         })
     }
 }
@@ -70,6 +75,7 @@ impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let mut len: usize = self.instance_id.cbor_len(ctx);
         len += self.class_type.cbor_len(ctx);
+        len += self.provider_id.cbor_len(ctx);
 
         len += self.output_mapping[..self.output_mapping.len()].cbor_len(ctx);
 
@@ -149,6 +155,7 @@ mod test {
         let id = super::EncodedResourceInstanceSpecification {
             instance_id: crate::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
             class_type: "class-1",
+            provider_id: "provider-1",
             output_mapping: outputs,
             configuration,
         };

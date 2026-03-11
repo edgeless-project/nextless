@@ -26,6 +26,7 @@ pub struct ResourceProviderSpecification<'a> {
     pub provider_id: &'a str,
     pub class_type: &'a str,
     pub outputs: heapless::Vec<&'a str, 4>,
+    pub instance_limit: Option<u32>,
 }
 
 impl<C> minicbor::Encode<C> for NodeId {
@@ -128,7 +129,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedRuntimeType {
         let mut features = heapless::Vec::<heapless::String<32>, 4>::new();
         for item in d.array_iter::<&'b str>()?.flatten() {
             if features
-                .push(heapless::String::from_str(item).map_err(|e| minicbor::decode::Error::message("String Failure: {e:?}"))?)
+                .push(heapless::String::from_str(item).map_err(|_e| minicbor::decode::Error::message("String Failure"))?)
                 .is_err()
             {
                 log::error!("Too many Runtime Features");
@@ -166,6 +167,7 @@ impl<C> minicbor::Encode<C> for ResourceProviderSpecification<'_> {
         let mut e = e;
         e = e.encode(self.provider_id)?;
         e = e.encode(self.class_type)?;
+        e.encode(self.instance_limit)?;
 
         {
             e = e.array(self.outputs.len().try_into().unwrap())?;
@@ -182,6 +184,7 @@ impl<'b, C> minicbor::Decode<'b, C> for ResourceProviderSpecification<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let provider_id: &str = d.decode()?;
         let class_type: &str = d.decode()?;
+        let instance_limit: Option<u32> = d.decode()?;
 
         let mut outputs = heapless::Vec::new();
         for item in d.array_iter::<&str>()?.flatten() {
@@ -192,13 +195,14 @@ impl<'b, C> minicbor::Decode<'b, C> for ResourceProviderSpecification<'b> {
             provider_id,
             class_type,
             outputs,
+            instance_limit,
         })
     }
 }
 
 impl<C> minicbor::CborLen<C> for ResourceProviderSpecification<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let len = self.provider_id.cbor_len(ctx) + self.class_type.cbor_len(ctx);
+        let len = self.provider_id.cbor_len(ctx) + self.class_type.cbor_len(ctx) + self.instance_limit.cbor_len(ctx);
 
         let mut data: [&str; 4] = [""; 4];
         let mut data_count = 0;

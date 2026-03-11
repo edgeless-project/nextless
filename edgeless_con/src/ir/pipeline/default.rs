@@ -13,6 +13,7 @@ pub struct DefaultTransformationPipelineState<PS: Sync + Send> {
     pub placement_strategy_state: PS,
     pub interaction_dialect_registry: std::sync::Arc<tokio::sync::Mutex<crate::ir::interaction::dialect::DialectRegistry>>,
     pub image_cache: crate::ir::support::image_cache::ImageCache,
+    pub instance_counts: crate::ir::transformations::placement::InstanceCounts,
 }
 
 impl<P: PlacementStrategy> DefaultTransformationPipeline<P> {
@@ -54,6 +55,7 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
                 &crate::ir::transformations::placement::PlacementState::<P> {
                     strategy_state: &global_state.placement_strategy_state,
                     image_chache: &global_state.image_cache,
+                    instance_counts: &global_state.instance_counts,
                 },
             );
             self.physical_pipeline.apply_all(
@@ -85,6 +87,7 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
                 &crate::ir::transformations::placement::PlacementState::<P> {
                     strategy_state: &global_state.placement_strategy_state,
                     image_chache: &global_state.image_cache,
+                    instance_counts: &global_state.instance_counts,
                 },
             );
             self.physical_pipeline.apply_all(
@@ -99,5 +102,46 @@ impl<P: PlacementStrategy> super::TransformationPipeline<DefaultTransformationPi
                 },
             );
         });
+    }
+
+    fn apply_stop(
+        &mut self,
+        workflow: &mut crate::ir::workflow::ActiveWorkflow,
+        nodes: &crate::ir::Nodes,
+        peer_clusters: &crate::ir::Clusters,
+        global_state: &DefaultTransformationPipelineState<P::GlobalState>,
+    ) {
+        self.logical_pipeline.apply_stop(
+            workflow,
+            nodes,
+            peer_clusters,
+            &super::default_logical::LogicalPipelineState {
+                logical_interaction_normalizer_state:
+                    &crate::ir::transformations::logical_interaction_normalizer::LogicalInteractionNormalizerState {
+                        dialect_registry: global_state.interaction_dialect_registry.clone(),
+                    },
+            },
+        );
+        self.orchestration.apply_stop(
+            workflow,
+            nodes,
+            peer_clusters,
+            &crate::ir::transformations::placement::PlacementState::<P> {
+                strategy_state: &global_state.placement_strategy_state,
+                image_chache: &global_state.image_cache,
+                instance_counts: &global_state.instance_counts,
+            },
+        );
+        self.physical_pipeline.apply_stop(
+            workflow,
+            nodes,
+            peer_clusters,
+            &super::default_physical::PhysicalPipelineState {
+                pipe_generator_state: &crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializerState::new(
+                    global_state.interaction_dialect_registry.clone(),
+                ),
+                compiler_state: &global_state.image_cache,
+            },
+        );
     }
 }
