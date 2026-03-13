@@ -580,15 +580,15 @@ mod test {
             })
             .collect();
 
-        std::assert_matches!(
+        assert!(std::matches!(
             change_map.get(&processor_instance_id).unwrap(),
             crate::ir::transformations::PhysicalComponentChangeAction::Delete
-        );
+        ));
 
-        std::assert_matches!(
+        assert!(std::matches!(
             change_map.get(&processor_instance_id).unwrap(),
             crate::ir::transformations::PhysicalComponentChangeAction::Delete
-        );
+        ));
     }
 
     #[test]
