@@ -258,7 +258,7 @@ impl EventProcessor for EventLogger {
             }
             TelemetryEvent::FunctionExit(function_exit_status) => {
                 if self.output_configuration.exit {
-                    println!("\x1b[{color}m{f_id}\x1b[0m: Actor Instantiated; ExitStatus: {function_exit_status:?}");
+                    println!("\x1b[{color}m{f_id}\x1b[0m: Actor Exit; ExitStatus: {function_exit_status:?}");
                 }
             }
         }
