@@ -139,6 +139,67 @@ static COLORS: [&str; 12] = ["31", "32", "33", "34", "35", "36", "91", "92", "93
 struct EventLogger {
     next_color: usize,
     colors: std::collections::HashMap<String, &'static str>,
+    output_configuration: OutputConfiguration,
+}
+
+#[derive(Debug)]
+struct OutputConfiguration {
+    instantiate: bool,
+    init: bool,
+    log_entry: bool,
+    invocation_completed: bool,
+    stop: bool,
+    exit: bool,
+    message_reception: bool,
+}
+
+impl Default for OutputConfiguration {
+    fn default() -> Self {
+        Self {
+            instantiate: true,
+            init: true,
+            log_entry: true,
+            invocation_completed: false,
+            stop: true,
+            exit: true,
+            message_reception: false,
+        }
+    }
+}
+
+impl OutputConfiguration {
+    fn new_from_env() -> Self {
+        let mut instance = Self::default();
+
+        if let Ok(config_str) = std::env::var("EDGELESS_TELEMETRY_LOG") {
+            for item in config_str.split(",") {
+                if let Some((key, value)) = item.split_once("=") {
+                    let value: bool = value.parse().unwrap_or(false);
+                    match key {
+                        "instantiate" => instance.instantiate = value,
+                        "init" => instance.init = value,
+                        "log_entry" => instance.log_entry = value,
+                        "invocation_completed" => instance.invocation_completed = value,
+                        "stop" => instance.stop = value,
+                        "exit" => instance.exit = value,
+                        "message_reception" => instance.message_reception = value,
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        instance
+    }
+}
+
+impl EventLogger {
+    fn new() -> Self {
+        Self {
+            output_configuration: OutputConfiguration::new_from_env(),
+            ..Default::default()
+        }
+    }
 }
 
 impl EventProcessor for EventLogger {
@@ -157,15 +218,48 @@ impl EventProcessor for EventLogger {
 
         match event {
             TelemetryEvent::FunctionLogEntry(level, component, message) => {
-                println!(
-                    "\x1b[{}m{}\x1b[0m:{}",
-                    color,
-                    f_id,
-                    format_args!("[{}][{}] {}", level, component, message)
-                );
+                if self.output_configuration.log_entry {
+                    println!(
+                        "\x1b[{}m{}\x1b[0m:{}",
+                        color,
+                        f_id,
+                        format_args!("[{}][{}] {}", level, component, message)
+                    );
+                }
             }
-            _ => {
-                println!("\x1b[{color}m{f_id}\x1b[0m: {event:?}");
+            TelemetryEvent::MessageReceived(message_len) => {
+                if self.output_configuration.message_reception {
+                    println!("\x1b[{color}m{f_id}\x1b[0m: Message Received; Size: {message_len}");
+                }
+            }
+            TelemetryEvent::FunctionInvocationCompleted {
+                duration,
+                error,
+                under_duration_soft_limit,
+            } => {
+                if self.output_configuration.invocation_completed {
+                    println!("\x1b[{color}m{f_id}\x1b[0m: Invocation Completed; Duration: {duration:?}; Error: {error}; Under Soft Limit: {under_duration_soft_limit}");
+                }
+            }
+            TelemetryEvent::FunctionInstantiate(duration) => {
+                if self.output_configuration.instantiate {
+                    println!("\x1b[{color}m{f_id}\x1b[0m: Actor Instantiated; Duration: {duration:?}");
+                }
+            }
+            TelemetryEvent::FunctionInit(duration) => {
+                if self.output_configuration.init {
+                    println!("\x1b[{color}m{f_id}\x1b[0m: Actor Initialized; Duration: {duration:?}");
+                }
+            }
+            TelemetryEvent::FunctionStop(duration) => {
+                if self.output_configuration.stop {
+                    println!("\x1b[{color}m{f_id}\x1b[0m: Actor Stopped; Duration: {duration:?}");
+                }
+            }
+            TelemetryEvent::FunctionExit(function_exit_status) => {
+                if self.output_configuration.exit {
+                    println!("\x1b[{color}m{f_id}\x1b[0m: Actor Instantiated; ExitStatus: {function_exit_status:?}");
+                }
             }
         }
 
@@ -212,7 +306,7 @@ impl TelemetryProcessor {
                 let inner = TelemetryProcessorInner {
                     processing_chain: vec![
                         Box::new(super::file_logger::FileLogger::new()),
-                        Box::new(EventLogger::default()),
+                        Box::new(EventLogger::new()),
                         Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
                     ],
                     receiver,
