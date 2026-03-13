@@ -3,6 +3,7 @@ load("../../resources/led_matrix.star", "LedMatrix")
 load("../../functions/pong_controller/pong_controller.star", "PongController")
 load("../../functions/pong_renderer/pong_renderer.star", "PongRenderer")
 load("two_x_two.star", "instances")
+load("addr_conf_local.star", "host")
 
 def id_str(id):
     unpadded = "%x" % (id)
@@ -47,7 +48,7 @@ ingress = edgeless_resource(
     id = "controller_ingress",
     klass = HTTPIngress,
     configurations = {
-        "host": "A.B.C.D:7035",
+        "host": host,
         "methods": "POST,GET"
     }
 )
