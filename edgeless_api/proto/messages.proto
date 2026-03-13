@@ -44,6 +44,7 @@ message Port {
     PortMethod method = 2;
     string data_type = 3;
     optional string return_data_type = 4;
+    bool optional = 5;
 }
 
 message SideEffectMapping {}

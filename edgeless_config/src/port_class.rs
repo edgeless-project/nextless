@@ -33,6 +33,7 @@ pub struct PortSpec {
     pub data_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub return_data_type: Option<String>,
+    pub optional: bool,
 }
 
 impl std::fmt::Display for PortSpec {
@@ -54,23 +55,35 @@ impl<'v> starlark::values::UnpackValue<'v> for PortSpec {
 
 #[starlark::starlark_module]
 pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
-    fn cast_output<'v>(id: String, data: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value<'v>> {
+    fn cast_output<'v>(
+        id: String,
+        data: String,
+        optional: Option<bool>,
+        heap: &'v starlark::values::Heap,
+    ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(PortSpec {
             id,
             method: Method::Cast,
             direction: Direction::Output,
             data_type: data,
             return_data_type: None,
+            optional: optional.unwrap_or(true),
         }))
     }
 
-    fn cast_input<'v>(id: String, data: String, heap: &'v starlark::values::Heap) -> anyhow::Result<starlark::values::Value<'v>> {
+    fn cast_input<'v>(
+        id: String,
+        data: String,
+        optional: Option<bool>,
+        heap: &'v starlark::values::Heap,
+    ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(PortSpec {
             id,
             method: Method::Cast,
             direction: Direction::Input,
             data_type: data,
             return_data_type: None,
+            optional: optional.unwrap_or(true),
         }))
     }
 
@@ -78,6 +91,7 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
         id: String,
         data: String,
         return_data: Option<String>,
+        optional: Option<bool>,
         heap: &'v starlark::values::Heap,
     ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(PortSpec {
@@ -86,6 +100,7 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
             direction: Direction::Output,
             data_type: data,
             return_data_type: return_data,
+            optional: optional.unwrap_or(true),
         }))
     }
 
@@ -93,6 +108,7 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
         id: String,
         data: String,
         return_data: Option<String>,
+        optional: Option<bool>,
         heap: &'v starlark::values::Heap,
     ) -> anyhow::Result<starlark::values::Value<'v>> {
         Ok(heap.alloc(PortSpec {
@@ -101,6 +117,7 @@ pub fn edgeless_port_spec(builder: &mut starlark::environment::GlobalsBuilder) {
             direction: Direction::Input,
             data_type: data,
             return_data_type: return_data,
+            optional: optional.unwrap_or(true),
         }))
     }
 }

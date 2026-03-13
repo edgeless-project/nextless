@@ -1,6 +1,6 @@
 load("../../functions/game_of_life/game_of_life.star", "GameOfLife")
 load("../../resources/led_matrix.star", "LedMatrix")
-load("three_x_three.star", "instances")
+load("full_matrix.star", "instances")
 
 def id_str(id):
     unpadded = "%x" % (id)
@@ -15,6 +15,8 @@ def id_str(id):
 def init_payload(instance):
     base = "draw_border=true,corner_blocks=false,position_y={},position_x={}".format(instance["position_y"],instance["position_x"])
     if instance["id"] == 1:
+        return "period_ms=500," + base
+    if instance["id"] == 11:
         return "period_ms=500," + base
     if instance["id"] == 3:
         return "period_ms=0,periodic_glider=true," + base
@@ -47,7 +49,7 @@ displays = {
 [ game_instances[instance["id"]].drawable >> displays[instance["id"]].update for instance in instances ]
 
 # Trigger
-game_instances[1].iteration_clock_o >> [game_instances[instance["id"]].iteration_clock_i for instance in instances ]
+game_instances[11].iteration_clock_o >> [game_instances[instance["id"]].iteration_clock_i for instance in instances ]
 # [ game_instances[instance["id"]].iteration_clock_o >> game_instances[instance["id"]].iteration_clock_i for instance in instances ]
 
 # Sides

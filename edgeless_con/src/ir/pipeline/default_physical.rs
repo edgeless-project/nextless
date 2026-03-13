@@ -5,6 +5,8 @@ use crate::ir::transformations::{StatefulPhysicalTransformation, StatelessPhysic
 
 pub struct DefaultPhysicalPipeline {
     physical_connection_mapper: crate::ir::transformations::physical_mapper::PhysicalConnectionMapper,
+    physical_interaction_normalizer: crate::ir::transformations::physical_interaction_normalizer::PhysicalInteractionNormalizer,
+    dead_instance_removal: crate::ir::transformations::dead_instance_removal::DeadInstanceRemoval,
     pipe_generator: crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializer,
     compiler: crate::ir::transformations::compiler::Compiler,
 }
@@ -18,6 +20,8 @@ impl DefaultPhysicalPipeline {
     pub fn new() -> Self {
         DefaultPhysicalPipeline {
             physical_connection_mapper: crate::ir::transformations::physical_mapper::PhysicalConnectionMapper::new(),
+            physical_interaction_normalizer: crate::ir::transformations::physical_interaction_normalizer::PhysicalInteractionNormalizer::new(),
+            dead_instance_removal: crate::ir::transformations::dead_instance_removal::DeadInstanceRemoval::new(),
             pipe_generator: crate::ir::transformations::physical_interaction_specializer::PhysicalInteractionSpecializer::new(),
             compiler: crate::ir::transformations::compiler::Compiler::new(),
         }
@@ -45,6 +49,16 @@ impl<'a> crate::ir::pipeline::TransformationPipeline<PhysicalPipelineState<'a>> 
         let changes = self.physical_connection_mapper.apply(workflow, nodes, peer_clusters);
         if changes.len() > 0 {
             tracing::debug!("Connection Mapper: {changes:?}");
+        }
+        workflow.apply_physical_changes(changes);
+        let changes = self.physical_interaction_normalizer.apply(workflow, nodes, peer_clusters);
+        if changes.len() > 0 {
+            tracing::debug!("Physical Interaction Normalizer: {changes:?}");
+        }
+        workflow.apply_physical_changes(changes);
+        let changes = self.dead_instance_removal.apply(workflow, nodes, peer_clusters);
+        if changes.len() > 0 {
+            tracing::debug!("Dead Instance Removal: {changes:?}");
         }
         workflow.apply_physical_changes(changes);
         let changes = self

@@ -190,7 +190,7 @@ fn try_map_interaction(
     ));
 }
 
-fn collect_physical_interactions(
+pub fn collect_physical_interactions(
     workflow: &crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,
 ) -> Result<Vec<crate::ir::interaction::InteractionMapping>, crate::ir::interaction::InteractionError> {
@@ -240,7 +240,7 @@ fn collect_physical_interactions(
         .collect())
 }
 
-fn distribute_physical_interactions(
+pub fn distribute_physical_interactions(
     mapped_interactions: Vec<crate::ir::interaction::InteractionMapping>,
     workflow: &crate::ir::workflow::ActiveWorkflow,
     dialect_registry: &mut crate::ir::interaction::dialect::DialectRegistry,

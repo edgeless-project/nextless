@@ -44,6 +44,7 @@ pub struct Port {
     pub method: PortMethod,
     pub data_type: PortDataType,
     pub return_data_type: Option<PortDataType>,
+    pub optional: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize)]

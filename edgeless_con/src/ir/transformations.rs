@@ -6,8 +6,10 @@
 pub mod colocation_optimizer;
 pub mod compiler;
 pub mod dead_component_removal;
+pub mod dead_instance_removal;
 pub mod logical_interaction_normalizer;
 pub mod migration_finalizer;
+pub mod physical_interaction_normalizer;
 pub mod physical_interaction_specializer;
 pub mod physical_mapper;
 pub mod placement;

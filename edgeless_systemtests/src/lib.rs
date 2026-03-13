@@ -96,6 +96,7 @@ mod tests {
             method: edgeless_api::function_instance::PortMethod::Cast,
             data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
             return_data_type: None,
+            optional: true,
         };
 
         let out_2 = edgeless_api::function_instance::Port {
@@ -103,6 +104,7 @@ mod tests {
             method: edgeless_api::function_instance::PortMethod::Cast,
             data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
             return_data_type: None,
+            optional: true,
         };
 
         let out_err = edgeless_api::function_instance::Port {
@@ -110,6 +112,7 @@ mod tests {
             method: edgeless_api::function_instance::PortMethod::Cast,
             data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
             return_data_type: None,
+            optional: true,
         };
 
         let out_log = edgeless_api::function_instance::Port {
@@ -117,6 +120,7 @@ mod tests {
             method: edgeless_api::function_instance::PortMethod::Cast,
             data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
             return_data_type: None,
+            optional: true,
         };
 
         let in_1 = edgeless_api::function_instance::Port {
@@ -124,6 +128,7 @@ mod tests {
             method: edgeless_api::function_instance::PortMethod::Cast,
             data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
             return_data_type: None,
+            optional: true,
         };
 
         let behavior_id = edgeless_api::behavior::BehaviorId {

@@ -374,6 +374,7 @@ impl From<crate::function_instance::Port> for super::api::Port {
             },
             data_type: val.data_type.0,
             return_data_type: val.return_data_type.map(|dt| dt.0),
+            optional: val.optional,
         }
     }
 }
@@ -393,6 +394,7 @@ impl TryFrom<super::api::Port> for crate::function_instance::Port {
             },
             data_type: crate::function_instance::PortDataType(value.data_type),
             return_data_type: value.return_data_type.map(crate::function_instance::PortDataType),
+            optional: value.optional,
         })
     }
 }
@@ -414,6 +416,7 @@ mod tests {
             method: crate::function_instance::PortMethod::Cast,
             data_type: crate::function_instance::PortDataType("d1".to_string()),
             return_data_type: None,
+            optional: true,
         };
 
         let mut out_port_spec_err = out_prt_spec_1.clone();

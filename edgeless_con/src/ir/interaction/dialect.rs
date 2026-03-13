@@ -81,6 +81,16 @@ impl DialectRegistry {
         }
     }
 
+    // We use this to create input ports for the mapped output ports.
+    pub fn only_physical_overlay() -> Self {
+        Self {
+            registry: std::collections::HashMap::from([(
+                physical_overlay::ID.0.to_string(),
+                Box::new(physical_overlay::PhysicalOverlayDialect {}) as Box<dyn InteractionDialect>,
+            )]),
+        }
+    }
+
     pub fn logical_ports_to_interaction(
         &self,
         dialect_id: &DialectDescriptor,

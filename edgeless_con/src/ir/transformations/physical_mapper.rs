@@ -71,16 +71,13 @@ impl super::StatelessPhysicalTransformation for PhysicalConnectionMapper {
                         );
                     }
                 }
-
-                // We do not map the input ports here as they will be automatically generated from the source ports in the next step (physical_interaction_specializer).
-                // If the next step required them to be normalized, we need to add a pass of port_to_interaction and interaction_to_port here.
             }
 
             for (component_id, (component, changed)) in cloned_component_instances {
                 if !changed {
                     continue;
                 }
-                tracing::info!("Mapping Changed");
+                tracing::debug!("Mapping Changed");
 
                 let component_update = crate::ir::transformations::PhysicalChange::Component(crate::ir::transformations::PhysicalComponentChange {
                     component_id,
@@ -122,6 +119,10 @@ fn map_unicast(
 
             let Some(target_instance_id) = target_instance else {
                 tracing::warn!("Could not find phyiscal target instance.");
+                let old_mapping = c_instance.physical_ports_mut().physical_output_mapping.remove(&source_port_id);
+                if old_mapping.is_some() {
+                    *changed = true;
+                }
                 continue;
             };
 
@@ -160,12 +161,12 @@ fn map_anycast<'a>(
     component_instance_map: &std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>,
     cluster_id: &uuid::Uuid,
 ) {
-    let mut instances = Vec::new();
+    let mut target_instances = Vec::new();
 
     for logical_port_id in logical_target_port_ids {
         let target_id = &logical_port_id.component;
         let port_id = &logical_port_id.port;
-        instances.append(
+        target_instances.append(
             &mut component_instance_map
                 .get(target_id)
                 .unwrap()
@@ -180,10 +181,20 @@ fn map_anycast<'a>(
 
     for (_component_instance_id, (component, changed)) in physical_instances {
         if let Some(c_instance) = component.try_unpack_active_mut() {
+            if target_instances.is_empty() {
+                let old_mapping = c_instance.physical_ports_mut().physical_output_mapping.remove(&source_port_id);
+                if old_mapping.is_some() {
+                    *changed = true;
+                }
+                continue;
+            }
+
             let new_mapping = crate::ir::interaction::SourcePortMapping {
                 dialect_type: dialect_type(cluster_id),
                 mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
-                    destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(instances.iter().cloned().collect()),
+                    destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Anycast(
+                        target_instances.iter().cloned().collect(),
+                    ),
                 }),
             };
 
@@ -209,11 +220,11 @@ fn map_multicast<'a>(
     component_instance_map: &std::collections::HashMap<String, Vec<edgeless_api::function_instance::InstanceId>>,
     cluster_id: &uuid::Uuid,
 ) {
-    let mut instances = Vec::new();
+    let mut target_instances = Vec::new();
     for logical_port_id in logical_target_port_ids {
         let target_id = &logical_port_id.component;
         let port_id = &logical_port_id.port;
-        instances.append(
+        target_instances.append(
             &mut component_instance_map
                 .get(target_id)
                 .unwrap()
@@ -227,11 +238,19 @@ fn map_multicast<'a>(
     }
     for (_component_instance_id, (component, changed)) in physical_instances {
         if let Some(c_instance) = component.try_unpack_active_mut() {
+            if target_instances.len() == 0 {
+                let old_mapping = c_instance.physical_ports_mut().physical_output_mapping.remove(&source_port_id);
+                if old_mapping.is_some() {
+                    *changed = true;
+                }
+                continue;
+            }
+
             let new_mapping = crate::ir::interaction::SourcePortMapping {
                 dialect_type: dialect_type(cluster_id),
                 mapping: Box::new(crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort {
                     destination: crate::ir::interaction::dialect::physical_overlay::DestinationMapping::Multicast(
-                        instances.iter().cloned().collect(),
+                        target_instances.iter().cloned().collect(),
                     ),
                 }),
             };

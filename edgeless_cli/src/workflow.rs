@@ -257,6 +257,7 @@ fn api_behavior_for_actor_class(
                     },
                     data_type: edgeless_api::function_instance::PortDataType(port_spec.data_type.clone()),
                     return_data_type: port_spec.return_data_type.clone().map(edgeless_api::function_instance::PortDataType),
+                    optional: port_spec.optional,
                 },
             )
         })
@@ -276,6 +277,7 @@ fn api_behavior_for_actor_class(
                     },
                     data_type: edgeless_api::function_instance::PortDataType(port_spec.data_type.clone()),
                     return_data_type: port_spec.return_data_type.clone().map(edgeless_api::function_instance::PortDataType),
+                    optional: port_spec.optional,
                 },
             )
         })

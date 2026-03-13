@@ -493,6 +493,7 @@ mod tests {
             method: crate::function_instance::PortMethod::Cast,
             data_type: crate::function_instance::PortDataType("d1".to_string()),
             return_data_type: None,
+            optional: true,
         };
 
         let mut out_port_spec_2 = out_prt_spec_1.clone();
@@ -611,6 +612,7 @@ mod tests {
             method: crate::function_instance::PortMethod::Cast,
             data_type: crate::function_instance::PortDataType("d1".to_string()),
             return_data_type: None,
+            optional: true,
         };
 
         let mut out_port_spec_2 = out_prt_spec_1.clone();

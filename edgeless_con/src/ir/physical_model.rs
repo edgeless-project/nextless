@@ -674,6 +674,20 @@ impl<'a> PhysicalInstance<'a> {
         }
     }
 
+    pub(crate) fn remove_planned_or_stop_running(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
+        if std::matches!(self.component, crate::ir::physical_model::PhysicalComponentState::Planned(_))
+            || std::matches!(self.component, crate::ir::physical_model::PhysicalComponentState::Requested(_))
+        {
+            return vec![crate::ir::transformations::PhysicalChange::Component(
+                crate::ir::transformations::PhysicalComponentChange {
+                    component_id: self.component_id.clone(),
+                    action: crate::ir::transformations::PhysicalComponentChangeAction::Delete,
+                },
+            )];
+        }
+        self.plan_stop()
+    }
+
     pub(crate) fn plan_stop(&self) -> Vec<crate::ir::transformations::PhysicalChange> {
         match self.component.plan_stop() {
             Some(new_component) => vec![crate::ir::transformations::PhysicalChange::Component(

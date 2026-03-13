@@ -10,7 +10,6 @@ PongController = edgeless_actor_class(
     inner_structure = [
         source("render"),
         sink("user_input"),
-        sink("user_input")
     ],
     code = file("pong_controller.wasm"),
     code_type = "WASM_BASE"

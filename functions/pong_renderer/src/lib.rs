@@ -18,6 +18,8 @@ struct PongRenderer;
 
 edgeless_function::generate!(PongRenderer);
 
+const GAME_COLOR: embedded_graphics::pixelcolor::Rgb888 = embedded_graphics::pixelcolor::Rgb888::CSS_BLUE_VIOLET;
+
 static CONFIGURATION: std::sync::OnceLock<configuration::Configuration> = std::sync::OnceLock::new();
 
 impl PongRendererAPI<'_> for PongRenderer {
@@ -29,9 +31,9 @@ impl PongRendererAPI<'_> for PongRenderer {
         frame.0.clear(embedded_graphics::pixelcolor::Rgb888::BLACK);
 
         let style = embedded_graphics::primitives::PrimitiveStyleBuilder::new()
-            .stroke_color(embedded_graphics::pixelcolor::Rgb888::WHITE)
+            .stroke_color(GAME_COLOR)
             .stroke_width(1)
-            .fill_color(embedded_graphics::pixelcolor::Rgb888::WHITE)
+            .fill_color(GAME_COLOR)
             .build();
 
         // Left Paddle
@@ -76,10 +78,7 @@ impl PongRendererAPI<'_> for PongRenderer {
 
         // Score
         if CONFIGURATION.get().unwrap().position_y == 0 {
-            let text_style = embedded_graphics::mono_font::MonoTextStyle::new(
-                &embedded_graphics::mono_font::ascii::FONT_6X10,
-                embedded_graphics::pixelcolor::Rgb888::WHITE,
-            );
+            let text_style = embedded_graphics::mono_font::MonoTextStyle::new(&embedded_graphics::mono_font::ascii::FONT_6X10, GAME_COLOR);
 
             let middle = render_request.size_x as i32 / 2 - 1;
 

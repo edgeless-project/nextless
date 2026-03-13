@@ -354,7 +354,7 @@ impl DeadComponentRemoval {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use crate::ir::{interaction::dialect::AsConcreteSourcePort, transformations::StatelessLogicalTransformation};
 
     #[test]
@@ -534,7 +534,7 @@ mod test {
         assert_eq!(changes.len(), 0)
     }
 
-    fn source_actor(
+    pub fn source_actor(
         id: String,
         dest_1: String,
         dest_1_port: edgeless_api::function_instance::PortId,
@@ -548,6 +548,7 @@ mod test {
                 method: edgeless_api::function_instance::PortMethod::Cast,
                 data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
                 return_data_type: None,
+                optional: true,
             },
         );
         source_image.spec.output_ports.insert(
@@ -557,6 +558,7 @@ mod test {
                 method: edgeless_api::function_instance::PortMethod::Cast,
                 data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
                 return_data_type: None,
+                optional: true,
             },
         );
         source_image.spec.inner_structure.insert(
@@ -598,7 +600,7 @@ mod test {
             .build()
     }
 
-    fn sink_actor(
+    pub fn sink_actor(
         id: String,
         source_id: String,
         source_port: edgeless_api::function_instance::PortId,
@@ -615,6 +617,7 @@ mod test {
                 method: edgeless_api::function_instance::PortMethod::Cast,
                 data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
                 return_data_type: None,
+                optional: false,
             },
         );
 
@@ -636,7 +639,7 @@ mod test {
             .build()
     }
 
-    fn processor_actor(
+    pub fn processor_actor(
         id: String,
         source_id: String,
         source_port: edgeless_api::function_instance::PortId,
@@ -654,6 +657,7 @@ mod test {
                 method: edgeless_api::function_instance::PortMethod::Cast,
                 data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
                 return_data_type: None,
+                optional: false,
             },
         );
         processor_image.spec.output_ports.insert(
@@ -663,6 +667,7 @@ mod test {
                 method: edgeless_api::function_instance::PortMethod::Cast,
                 data_type: edgeless_api::function_instance::PortDataType("test".to_string()),
                 return_data_type: None,
+                optional: false,
             },
         );
 
@@ -701,7 +706,7 @@ mod test {
             .build()
     }
 
-    fn source_port_1() -> edgeless_api::function_instance::PortId {
+    pub fn source_port_1() -> edgeless_api::function_instance::PortId {
         edgeless_api::function_instance::PortId("source_1".to_string())
     }
 
@@ -709,14 +714,14 @@ mod test {
         edgeless_api::function_instance::PortId("source_2".to_string())
     }
 
-    fn processor_input() -> edgeless_api::function_instance::PortId {
+    pub fn processor_input() -> edgeless_api::function_instance::PortId {
         edgeless_api::function_instance::PortId("processor_input".to_string())
     }
-    fn processor_output() -> edgeless_api::function_instance::PortId {
+    pub fn processor_output() -> edgeless_api::function_instance::PortId {
         edgeless_api::function_instance::PortId("processor_output".to_string())
     }
 
-    fn sink_input() -> edgeless_api::function_instance::PortId {
+    pub fn sink_input() -> edgeless_api::function_instance::PortId {
         edgeless_api::function_instance::PortId("sink_input".to_string())
     }
 }
