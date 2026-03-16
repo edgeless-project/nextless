@@ -3,7 +3,7 @@ DemoDashboard = edgeless_actor_class(
     version = "0.1",
     outputs = [],
     inputs = [
-        call_input("http_fetch", "edgeless.http.request", "edgeless.http.response"),
+        call_input("http_fetch", "eft.http.request", "eft.http.response"),
         cast_input("data_in", "eft.eval.mock_sensor_value")
     ],
 

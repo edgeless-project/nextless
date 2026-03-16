@@ -50,7 +50,7 @@ impl EgressResource {
                     continue;
                 }
 
-                let req = match edgeless_http::request_from_string(core::str::from_utf8(&message_data).unwrap()) {
+                let req = match edgeless_function_types::http::request_from_string(core::str::from_utf8(&message_data).unwrap()) {
                     Ok(val) => val,
                     Err(_) => {
                         dataplane_handle
@@ -63,7 +63,7 @@ impl EgressResource {
                 tokio::spawn(async move {
                     match Self::perform_request(req).await {
                         Ok(resp) => {
-                            let serialized_resp = edgeless_http::response_to_string(&resp);
+                            let serialized_resp = edgeless_function_types::http::response_to_string(&resp);
                             cloned_dataplane
                                 .reply(
                                     source_id,
@@ -85,11 +85,13 @@ impl EgressResource {
         Self { join_handle: handle }
     }
 
-    async fn perform_request(req: edgeless_http::EdgelessHTTPRequest) -> anyhow::Result<edgeless_http::EdgelessHTTPResponse> {
-        let method = reqwest::Method::from_bytes(edgeless_http::edgeless_method_to_string(req.method).as_bytes())?;
+    async fn perform_request(
+        req: edgeless_function_types::http::EdgelessHTTPRequest,
+    ) -> anyhow::Result<edgeless_function_types::http::EdgelessHTTPResponse> {
+        let method = reqwest::Method::from_bytes(edgeless_function_types::http::edgeless_method_to_string(req.method).as_bytes())?;
 
         let protocol_string = match req.protocol {
-            edgeless_http::EdgelessHTTPProtocol::HTTPS => "HTTPS",
+            edgeless_function_types::http::EdgelessHTTPProtocol::HTTPS => "HTTPS",
             _ => "HTTP",
         };
 
@@ -121,7 +123,7 @@ impl EgressResource {
             })
             .collect();
 
-        Ok(edgeless_http::EdgelessHTTPResponse {
+        Ok(edgeless_function_types::http::EdgelessHTTPResponse {
             status: ret.status().as_u16(),
             headers,
             body: match ret.bytes().await {

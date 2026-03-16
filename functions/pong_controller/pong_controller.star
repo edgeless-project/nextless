@@ -5,7 +5,7 @@ PongController = edgeless_actor_class(
         cast_output("render", "pong.render_request")
     ],
     inputs = [
-        call_input("user_input", "edgeless.http.request", "edgeless.http.response"),
+        call_input("user_input", "eft.http.request", "eft.http.response"),
     ],
     inner_structure = [
         source("render"),

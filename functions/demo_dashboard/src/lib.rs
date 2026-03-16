@@ -34,8 +34,8 @@ static STATE: std::sync::OnceLock<std::sync::Mutex<DashboardState>> = std::sync:
 
 impl DemoDashboardAPI<'_> for DemoDashboard {
     type EFT_EVAL_MOCK_SENSOR_VALUE = edgeless_function_types::eval::MockSensorValue;
-    type EDGELESS_HTTP_REQUEST = edgeless_http::EdgelessHTTPRequest;
-    type EDGELESS_HTTP_RESPONSE = edgeless_http::EdgelessHTTPResponse;
+    type EFT_HTTP_REQUEST = edgeless_function_types::http::EdgelessHTTPRequest;
+    type EFT_HTTP_RESPONSE = edgeless_function_types::http::EdgelessHTTPResponse;
 
     fn handle_cast_data_in(_src: InstanceId, test_msg: Self::EFT_EVAL_MOCK_SENSOR_VALUE) {
         let sensor_node_id = uuid::Uuid::from_bytes(test_msg.sensor_id.node_id);
@@ -61,7 +61,7 @@ impl DemoDashboardAPI<'_> for DemoDashboard {
         });
     }
 
-    fn handle_call_http_fetch(_src: InstanceId, req: Self::EDGELESS_HTTP_REQUEST) -> Self::EDGELESS_HTTP_RESPONSE {
+    fn handle_call_http_fetch(_src: InstanceId, req: Self::EFT_HTTP_REQUEST) -> Self::EFT_HTTP_RESPONSE {
         log::info!("Demo Dashboard received fetch request");
 
         let own_id = slf();
@@ -75,7 +75,7 @@ impl DemoDashboardAPI<'_> for DemoDashboard {
 
             let response_json = serde_json::to_vec(&numbers_only).unwrap();
 
-            edgeless_http::EdgelessHTTPResponse {
+            edgeless_function_types::http::EdgelessHTTPResponse {
                 status: 200,
                 body: Some(response_json),
                 headers: std::collections::HashMap::<String, String>::new(),
@@ -93,13 +93,13 @@ impl DemoDashboardAPI<'_> for DemoDashboard {
 
             let response_json = serde_json::to_vec(&response).unwrap();
 
-            edgeless_http::EdgelessHTTPResponse {
+            edgeless_function_types::http::EdgelessHTTPResponse {
                 status: 200,
                 body: Some(response_json),
                 headers: std::collections::HashMap::<String, String>::new(),
             }
         } else {
-            edgeless_http::EdgelessHTTPResponse {
+            edgeless_function_types::http::EdgelessHTTPResponse {
                 status: 404,
                 body: Some(Vec::<u8>::from("Not Found")),
                 headers: std::collections::HashMap::<String, String>::new(),

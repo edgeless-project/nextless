@@ -27,7 +27,7 @@ crate-type = ["cdylib"]
 [dependencies]
 log = "0.4"
 
-edgeless_http = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_http" }
+edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types", features = ["http"] }
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 
 

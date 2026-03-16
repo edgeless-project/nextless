@@ -1579,22 +1579,12 @@ dependencies = [
 name = "edgeless_function_types"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "edgeless_function_core",
  "embedded-graphics",
+ "hyper 1.8.1",
  "image",
  "log",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "edgeless_http"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "edgeless_function_core",
- "hyper 1.8.1",
  "serde",
  "serde_json",
 ]
@@ -1653,7 +1643,6 @@ dependencies = [
  "edgeless_dataplane",
  "edgeless_function_core",
  "edgeless_function_types",
- "edgeless_http",
  "edgeless_telemetry",
  "elfloader",
  "embedded-graphics",

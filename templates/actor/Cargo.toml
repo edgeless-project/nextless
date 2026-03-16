@@ -25,11 +25,12 @@ crate-type = ["cdylib"]
 [dependencies]
 log = "0.4"
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
-edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types" }
 {% if generate_http_handler %}
-edgeless_http = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_http" }
+edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types", features = ["http"] }
 serde = {version="1", features=["derive"] }
 serde_json = "1"
+{% else %}
+edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types" }
 {% endif %}
 [features]
 {% assign inputs = cast_inputs | split: "," %}

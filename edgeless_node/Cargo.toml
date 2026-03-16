@@ -39,9 +39,8 @@ toml = "0.7"
 edgeless_api = { path = "../edgeless_api", features = ["grpc_impl"] }
 edgeless_telemetry = { path = "../edgeless_telemetry" }
 edgeless_dataplane = { path = "../edgeless_dataplane" }
-edgeless_function_types = { path = "../edgeless_function_types" }
+edgeless_function_types = { path = "../edgeless_function_types", features = ["hyper", "http"] }
 edgeless_function_core = { path = "../edgeless_function_core" }
-edgeless_http = { path = "../edgeless_http", features = ["hyper"] }
 hyper = { version = "1.2", features = ["full"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
 reqwest = { version = "0.11" }

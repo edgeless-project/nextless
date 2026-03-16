@@ -31,18 +31,18 @@ struct ControllerInput {
 static STATE: std::sync::OnceLock<std::sync::Mutex<game_state::GameState>> = std::sync::OnceLock::new();
 
 impl PongControllerAPI<'_> for PongController {
-    type EDGELESS_HTTP_REQUEST = edgeless_http::EdgelessHTTPRequest;
-    type EDGELESS_HTTP_RESPONSE = edgeless_http::EdgelessHTTPResponse;
+    type EFT_HTTP_REQUEST = edgeless_function_types::http::EdgelessHTTPRequest;
+    type EFT_HTTP_RESPONSE = edgeless_function_types::http::EdgelessHTTPResponse;
     type PONG_RENDER_REQUEST = messages::PongRenderRequest;
 
-    fn handle_call_user_input(_src: InstanceId, req: Self::EDGELESS_HTTP_REQUEST) -> Self::EDGELESS_HTTP_RESPONSE {
+    fn handle_call_user_input(_src: InstanceId, req: Self::EFT_HTTP_REQUEST) -> Self::EFT_HTTP_RESPONSE {
         let mut game_state = STATE.get().unwrap().lock().unwrap();
 
         if req.path == "/index.html" || req.path == "" || req.path == "/" {
             // This file is not included on github as it contains AI-generated content.
             let html = include_bytes!("../data/controller.html");
 
-            edgeless_http::EdgelessHTTPResponse {
+            edgeless_function_types::http::EdgelessHTTPResponse {
                 status: 200,
                 body: Some(html.to_vec()),
                 headers: std::collections::HashMap::<String, String>::from([("Content-Type".to_string(), "text/html".to_string())]),
@@ -72,13 +72,13 @@ impl PongControllerAPI<'_> for PongController {
                 }
             }
 
-            edgeless_http::EdgelessHTTPResponse {
+            edgeless_function_types::http::EdgelessHTTPResponse {
                 status: 200,
                 body: Some(Vec::<u8>::from("")),
                 headers: std::collections::HashMap::<String, String>::new(),
             }
         } else {
-            edgeless_http::EdgelessHTTPResponse {
+            edgeless_function_types::http::EdgelessHTTPResponse {
                 status: 404,
                 body: Some(Vec::<u8>::from("Not Found")),
                 headers: std::collections::HashMap::<String, String>::new(),

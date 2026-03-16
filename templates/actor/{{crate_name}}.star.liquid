@@ -13,7 +13,7 @@
         cast_input("{{input}}", "String"),
         {%- endfor %}
         {% if generate_http_handler -%}
-        call_input("http_request", "edgeless.http.request", "edgeless.http.response"),
+        call_input("http_request", "eft.http.request", "eft.http.response"),
         {% endif -%}
     ],
     inner_structure = [

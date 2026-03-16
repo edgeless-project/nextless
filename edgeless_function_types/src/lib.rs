@@ -11,3 +11,6 @@ pub mod eval;
 pub mod vision;
 
 pub mod led_matrix;
+
+#[cfg(feature = "http")]
+pub mod http;

@@ -9,7 +9,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 struct ResourceDesc {
     host: String,
-    allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
+    allow: std::collections::HashSet<edgeless_function_types::http::EdgelessHTTPMethod>,
     dataplane: edgeless_dataplane::handle::DataplaneHandle,
 }
 
@@ -53,7 +53,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                     Some(val) => val.to_str()?,
                     None => &cloned_addr,
                 };
-                let method = edgeless_http::hyper_method_to_edgeless(&parts.method)?;
+                let method = edgeless_function_types::http::hyper_method_to_edgeless(&parts.method)?;
                 let data = body.collect().await?.to_bytes();
 
                 let rq = {
@@ -69,9 +69,9 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                 };
 
                 if let Some((host, mut dataplane)) = rq {
-                    let msg = edgeless_http::EdgelessHTTPRequest {
+                    let msg = edgeless_function_types::http::EdgelessHTTPRequest {
                         host: host.to_string(),
-                        protocol: edgeless_http::EdgelessHTTPProtocol::Unknown,
+                        protocol: edgeless_function_types::http::EdgelessHTTPProtocol::Unknown,
                         method: method.clone(),
                         path: parts.uri.to_string(),
                         body: Some(Vec::from(data)),
@@ -94,7 +94,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         .await;
 
                     if let edgeless_dataplane::core::CallRet::Reply(data) = res {
-                        let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_slice(&data)?;
+                        let processor_response: edgeless_function_types::http::EdgelessHTTPResponse = serde_json::from_slice(&data)?;
                         let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
                             processor_response.body.unwrap_or_default(),
                         )));
@@ -191,7 +191,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
             let allow: std::collections::HashSet<_> = methods
                 .split(",")
-                .filter_map(|str_method| match edgeless_http::string_method_to_edgeless(str_method) {
+                .filter_map(|str_method| match edgeless_function_types::http::string_method_to_edgeless(str_method) {
                     Ok(val) => Some(val),
                     Err(_) => {
                         tracing::debug!("Bad HTTP Method");

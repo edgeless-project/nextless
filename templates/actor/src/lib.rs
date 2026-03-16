@@ -6,14 +6,14 @@ edgeless_function::generate!({{crate_name | upper_camel_case}});
 
 impl {{crate_name | upper_camel_case}}API<'_> for {{crate_name | upper_camel_case}} {
     {% if generate_http_handler -%}
-    type EDGELESS_HTTP_REQUEST = edgeless_http::EdgelessHTTPRequest;
-    type EDGELESS_HTTP_RESPONSE = edgeless_http::EdgelessHTTPResponse;
+    type EFT_HTTP_REQUEST = edgeless_function_types::http::EdgelessHTTPRequest;
+    type EFT_HTTP_RESPONSE = edgeless_function_types::http::EdgelessHTTPResponse;
     {% endif -%}
     type STRING = String;
 
     {% if generate_http_handler -%}
-    fn handle_call_http_request(_src: InstanceId, req: Self::EDGELESS_HTTP_REQUEST) -> Self::EDGELESS_HTTP_RESPONSE {
-        edgeless_http::EdgelessHTTPResponse {
+    fn handle_call_http_request(_src: InstanceId, req: Self::EFT_HTTP_REQUEST) -> Self::EFT_HTTP_RESPONSE {
+        edgeless_function_types::http::EdgelessHTTPResponse {
             status: 404,
             body: Some(Vec::<u8>::from("Not Found")),
             headers: std::collections::HashMap::<String, String>::new(),

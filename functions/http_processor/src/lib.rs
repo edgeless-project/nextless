@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 use edgeless_function::*;
-use edgeless_http::*;
+use edgeless_function_types::http::*;
 
 extern "C" {
     fn eval_sleep(delay_ms: u64);
@@ -19,8 +19,8 @@ struct ProcessorFun;
 edgeless_function::generate!(ProcessorFun);
 
 impl HttpProcessorAPI<'_> for ProcessorFun {
-    type EDGELESS_HTTP_REQUEST = edgeless_http::EdgelessHTTPRequest;
-    type EDGELESS_HTTP_RESPONSE = edgeless_http::EdgelessHTTPResponse;
+    type EFT_HTTP_REQUEST = edgeless_function_types::http::EdgelessHTTPRequest;
+    type EFT_HTTP_RESPONSE = edgeless_function_types::http::EdgelessHTTPResponse;
     type STRING = String;
 
     fn handle_call_new_req(_src: InstanceId, req: EdgelessHTTPRequest) -> EdgelessHTTPResponse {
