@@ -23,7 +23,7 @@ pub trait FunctionInstanceRunner<Instance> {
         data_plane: crate::dataplane::handle::DataplaneHandle,
         runtime_api: futures::channel::mpsc::UnboundedSender<runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
-        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
     ) -> Self;
     async fn stop(&mut self);
     async fn patch(&mut self, update_request: edgeless_api::common::PatchRequest);

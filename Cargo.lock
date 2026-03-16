@@ -1619,7 +1619,6 @@ dependencies = [
  "edgeless_function_core",
  "edgeless_function_types",
  "edgeless_link_multicast",
- "edgeless_telemetry",
  "elfloader",
  "embedded-graphics",
  "embedded-graphics-simulator",
@@ -1631,6 +1630,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "prometheus-client",
  "rand 0.8.5",
  "redis",
  "reqwest 0.11.27",
@@ -1649,6 +1649,7 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "uuid",
+ "warp",
  "wasmi",
  "wasmtime 31.0.0",
  "wgpu",
@@ -1674,25 +1675,6 @@ dependencies = [
  "uuid",
  "wasmtime 10.0.2",
  "wasmtime-wasi",
-]
-
-[[package]]
-name = "edgeless_telemetry"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "clap",
- "edgeless_api",
- "futures",
- "prometheus-client",
- "serde",
- "serde_json",
- "tokio",
- "toml 0.7.8",
- "tracing",
- "uuid",
- "warp",
 ]
 
 [[package]]

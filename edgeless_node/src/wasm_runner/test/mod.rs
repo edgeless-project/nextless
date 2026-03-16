@@ -5,8 +5,8 @@
 use crate::base_runtime::RuntimeAPI;
 use crate::dataplane::core::CallRet;
 use crate::dataplane::handle::DataplaneHandle;
+use crate::telemetry::telemetry_events::TelemetryEvent;
 use edgeless_api::function_instance::InstanceId;
-use edgeless_telemetry::telemetry_events::TelemetryEvent;
 
 #[derive(Clone)]
 struct MockTelemetryHandle {
@@ -14,7 +14,7 @@ struct MockTelemetryHandle {
 }
 
 struct TestTelemetryEvent {
-    event: edgeless_telemetry::telemetry_events::TelemetryEvent,
+    event: crate::telemetry::telemetry_events::TelemetryEvent,
     #[allow(dead_code)]
     tags: std::collections::BTreeMap<String, String>,
 }
@@ -49,11 +49,11 @@ impl TestTelemetryEvent {
     }
 }
 
-impl edgeless_telemetry::telemetry_events::TelemetryHandleAPI for MockTelemetryHandle {
-    fn observe(&mut self, event: edgeless_telemetry::telemetry_events::TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
+impl crate::telemetry::telemetry_events::TelemetryHandleAPI for MockTelemetryHandle {
+    fn observe(&mut self, event: crate::telemetry::telemetry_events::TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
         self.sender.send(TestTelemetryEvent { event, tags: event_tags }).unwrap();
     }
-    fn fork(&mut self, _child_tags: std::collections::BTreeMap<String, String>) -> Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI> {
+    fn fork(&mut self, _child_tags: std::collections::BTreeMap<String, String>) -> Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI> {
         Box::new(MockTelemetryHandle { sender: self.sender.clone() })
     }
 }
@@ -616,7 +616,7 @@ async fn state_management() {
     assert_eq!(
         test_telemetry_event.event,
         TelemetryEvent::FunctionLogEntry(
-            edgeless_telemetry::telemetry_events::TelemetryLogLevel::Info,
+            crate::telemetry::telemetry_events::TelemetryLogLevel::Info,
             "state_test".to_string(),
             "no_state".to_string()
         )
@@ -680,7 +680,7 @@ async fn state_management() {
     assert_eq!(
         test_telemetry_event.event,
         TelemetryEvent::FunctionLogEntry(
-            edgeless_telemetry::telemetry_events::TelemetryLogLevel::Info,
+            crate::telemetry::telemetry_events::TelemetryLogLevel::Info,
             "edgeless_test_state".to_string(),
             "existing_state".to_string()
         )

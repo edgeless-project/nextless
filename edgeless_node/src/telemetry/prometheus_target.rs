@@ -100,14 +100,14 @@ impl PrometheusEventTarget {
     }
 }
 
-impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
+impl crate::telemetry::telemetry_events::EventProcessor for PrometheusEventTarget {
     fn handle(
         &mut self,
-        event: &crate::telemetry_events::TelemetryEvent,
+        event: &crate::telemetry::telemetry_events::TelemetryEvent,
         event_tags: &std::collections::BTreeMap<String, String>,
-    ) -> crate::telemetry_events::TelemetryProcessingResult {
+    ) -> crate::telemetry::telemetry_events::TelemetryProcessingResult {
         match event {
-            crate::telemetry_events::TelemetryEvent::MessageReceived(size) => {
+            crate::telemetry::telemetry_events::TelemetryEvent::MessageReceived(size) => {
                 if let (Some(node_id), Some(function_id), Some(source_node_id), Some(source_function_id), Some(source_port), Some(dest_port)) = (
                     event_tags.get("NODE_ID"),
                     event_tags.get("FUNCTION_ID"),
@@ -128,7 +128,7 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
                         .observe(*size as f64)
                 }
             }
-            crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
                 duration,
                 error,
                 under_duration_soft_limit,
@@ -160,9 +160,9 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
                 }
             }
             _ => {
-                return crate::telemetry_events::TelemetryProcessingResult::PASSED;
+                return crate::telemetry::telemetry_events::TelemetryProcessingResult::PASSED;
             }
         }
-        crate::telemetry_events::TelemetryProcessingResult::FINAL
+        crate::telemetry::telemetry_events::TelemetryProcessingResult::FINAL
     }
 }

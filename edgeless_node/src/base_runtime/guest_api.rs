@@ -10,7 +10,7 @@ pub struct GuestAPIHost {
     pub instance_id: edgeless_api::function_instance::InstanceId,
     pub data_plane: crate::dataplane::handle::DataplaneHandle,
     pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
-    pub telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    pub telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
     pub poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
     pub tracing_context: std::sync::Arc<tokio::sync::Mutex<super::function_instance_runner_common::TracingContext>>,
     pub handle: tokio::runtime::Handle,
@@ -70,9 +70,9 @@ impl GuestAPIHost {
         }
     }
 
-    pub async fn telemetry_log(&mut self, lvl: edgeless_telemetry::telemetry_events::TelemetryLogLevel, target: &str, msg: &str) {
+    pub async fn telemetry_log(&mut self, lvl: crate::telemetry::telemetry_events::TelemetryLogLevel, target: &str, msg: &str) {
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionLogEntry(lvl, target.to_string(), msg.to_string()),
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionLogEntry(lvl, target.to_string(), msg.to_string()),
             std::collections::BTreeMap::new(),
         );
     }

@@ -12,7 +12,6 @@ members = [
     "edgeless_inabox",
     "edgeless_node",
     "edgeless_systemtests",
-    "edgeless_telemetry",
     "edgeless_embedded",
     "edgeless_embedded_emu",
     "edgeless_build",

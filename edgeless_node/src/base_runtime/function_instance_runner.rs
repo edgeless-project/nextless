@@ -26,7 +26,7 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
     function_instance: Option<Box<FunctionInstanceType>>,
     guest_api_host: Option<super::guest_api::GuestAPIHost>,
-    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
     code: Vec<u8>,
     data_plane: crate::dataplane::handle::DataplaneHandle,
     serialized_state: Option<String>,
@@ -44,7 +44,7 @@ impl<FunctionInstanceType: FunctionInstance> super::FunctionInstanceRunner<Funct
         data_plane: crate::dataplane::handle::DataplaneHandle,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
-        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
     ) -> Self {
         let instance_id = spawn_req.instance_id;
         let mut telemetry_handle = telemetry_handle;
@@ -119,7 +119,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
-        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
         guest_api_host: super::guest_api::GuestAPIHost,
         code: Vec<u8>,
         data_plane: crate::dataplane::handle::DataplaneHandle,
@@ -184,7 +184,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         );
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
             std::collections::BTreeMap::new(),
         );
 
@@ -205,7 +205,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             .await?;
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInit(start.elapsed()),
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInit(start.elapsed()),
             std::collections::BTreeMap::new(),
         );
 
@@ -285,7 +285,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
         self.tracing_context.lock().await.parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
                 duration,
                 error: exec_result.is_err(),
                 under_duration_soft_limit: duration < self.duration_soft_limit,
@@ -334,7 +334,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
         self.tracing_context.lock().await.parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
                 duration,
                 error: res.is_err(),
                 under_duration_soft_limit: duration < self.duration_soft_limit,
@@ -356,7 +356,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         Self::get_function_instance(&mut self.function_instance)?.stop().await?;
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionStop(start.elapsed()),
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionStop(start.elapsed()),
             std::collections::BTreeMap::new(),
         );
 
@@ -365,11 +365,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn exit(&mut self, exit_status: Result<(), super::FunctionInstanceError>) {
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionExit(match &exit_status {
-                Ok(_) => edgeless_telemetry::telemetry_events::FunctionExitStatus::Ok,
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionExit(match &exit_status {
+                Ok(_) => crate::telemetry::telemetry_events::FunctionExitStatus::Ok,
                 Err(exit_err) => match exit_err {
-                    FunctionInstanceError::BadCode(_) => edgeless_telemetry::telemetry_events::FunctionExitStatus::CodeError,
-                    _ => edgeless_telemetry::telemetry_events::FunctionExitStatus::InternalError,
+                    FunctionInstanceError::BadCode(_) => crate::telemetry::telemetry_events::FunctionExitStatus::CodeError,
+                    _ => crate::telemetry::telemetry_events::FunctionExitStatus::InternalError,
                 },
             }),
             std::collections::BTreeMap::new(),

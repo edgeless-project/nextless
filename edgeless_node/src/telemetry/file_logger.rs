@@ -30,11 +30,11 @@ impl FileLogger {
 impl super::telemetry_events::EventProcessor for FileLogger {
     fn handle(
         &mut self,
-        event: &crate::telemetry_events::TelemetryEvent,
+        event: &crate::telemetry::telemetry_events::TelemetryEvent,
         event_tags: &std::collections::BTreeMap<String, String>,
-    ) -> crate::telemetry_events::TelemetryProcessingResult {
+    ) -> crate::telemetry::telemetry_events::TelemetryProcessingResult {
         if let Some(outfile) = &mut self.outfile {
-            if let crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted { duration, .. } = event {
+            if let crate::telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted { duration, .. } = event {
                 if let (Some(node_id), Some(function_id)) = (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_ID")) {
                     let latency_ns = duration.as_nanos();
                     // This happens in a seperate task so should not affect the performance too much.
@@ -46,9 +46,9 @@ impl super::telemetry_events::EventProcessor for FileLogger {
                     panic!("Required tags not present!")
                 }
 
-                return crate::telemetry_events::TelemetryProcessingResult::PROCESSED;
+                return crate::telemetry::telemetry_events::TelemetryProcessingResult::PROCESSED;
             }
         }
-        crate::telemetry_events::TelemetryProcessingResult::PROCESSED
+        crate::telemetry::telemetry_events::TelemetryProcessingResult::PROCESSED
     }
 }

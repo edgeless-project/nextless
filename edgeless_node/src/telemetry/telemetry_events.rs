@@ -307,7 +307,7 @@ impl TelemetryProcessor {
                     processing_chain: vec![
                         Box::new(super::file_logger::FileLogger::new()),
                         Box::new(EventLogger::new()),
-                        Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
+                        Box::new(crate::telemetry::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
                     ],
                     receiver,
                 };

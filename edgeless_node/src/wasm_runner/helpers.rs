@@ -47,16 +47,16 @@ pub(crate) fn load_from_vm(
     Ok(memory.data_mut(ctx)[data_ptr as usize..(data_ptr as usize) + data_len as usize].to_vec())
 }
 
-pub(crate) fn level_from_i32(lvl: i32) -> edgeless_telemetry::telemetry_events::TelemetryLogLevel {
+pub(crate) fn level_from_i32(lvl: i32) -> crate::telemetry::telemetry_events::TelemetryLogLevel {
     match lvl {
-        1 => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Error,
-        2 => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Warn,
-        3 => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Info,
-        4 => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Debug,
-        5 => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Trace,
+        1 => crate::telemetry::telemetry_events::TelemetryLogLevel::Error,
+        2 => crate::telemetry::telemetry_events::TelemetryLogLevel::Warn,
+        3 => crate::telemetry::telemetry_events::TelemetryLogLevel::Info,
+        4 => crate::telemetry::telemetry_events::TelemetryLogLevel::Debug,
+        5 => crate::telemetry::telemetry_events::TelemetryLogLevel::Trace,
         _ => {
             tracing::debug!("Actor used unknown log level: {lvl}");
-            edgeless_telemetry::telemetry_events::TelemetryLogLevel::Error
+            crate::telemetry::telemetry_events::TelemetryLogLevel::Error
         }
     }
 }

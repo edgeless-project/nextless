@@ -17,6 +17,8 @@ pub mod native_runner;
 
 pub mod dataplane;
 
+pub mod telemetry;
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
     /// General settings.
@@ -386,7 +388,7 @@ pub async fn edgeless_node_main(
     .await;
 
     // Create the telemetry provider.
-    let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone())
+    let telemetry_provider = crate::telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone())
         .await
         .unwrap_or_else(|_| panic!("could not build the telemetry provider at URL {}", &settings.general.metrics_url));
 

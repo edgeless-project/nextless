@@ -27,7 +27,7 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstanceSync> {
 
     poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
     guest_api_host: Option<super::guest_api::GuestAPIHost>,
-    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
     data_plane: crate::dataplane::handle::DataplaneHandle,
     runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
     tracing_context: std::sync::Arc<tokio::sync::Mutex<super::function_instance_runner_common::TracingContext>>,
@@ -48,7 +48,7 @@ impl<FunctionInstanceType: super::FunctionInstanceSync + 'static> super::Functio
         data_plane: crate::dataplane::handle::DataplaneHandle,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
-        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
     ) -> Self {
         let instance_id = spawn_req.instance_id;
         let mut telemetry_handle = telemetry_handle;
@@ -120,7 +120,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
-        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
         guest_api_host: super::guest_api::GuestAPIHost,
         code: Vec<u8>,
         data_plane: crate::dataplane::handle::DataplaneHandle,
@@ -184,7 +184,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
         }
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
             std::collections::BTreeMap::new(),
         );
 
@@ -206,7 +206,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
         }
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInit(start.elapsed()),
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInit(start.elapsed()),
             std::collections::BTreeMap::new(),
         );
 
@@ -296,7 +296,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
 
         self.tracing_context.blocking_lock().parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
                 duration,
                 error: exec_result.is_err(),
                 under_duration_soft_limit: duration < self.duration_soft_limit,
@@ -345,7 +345,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
 
         self.tracing_context.blocking_lock().parent_context = opentelemetry::Context::new();
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted {
                 duration,
                 error: res.is_err(),
                 under_duration_soft_limit: duration < self.duration_soft_limit,
@@ -367,7 +367,7 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
         Self::get_function_instance(&mut self.function_instance)?.stop()?;
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionStop(start.elapsed()),
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionStop(start.elapsed()),
             std::collections::BTreeMap::new(),
         );
 
@@ -376,11 +376,11 @@ impl<FunctionInstanceType: FunctionInstanceSync> FunctionInstanceTask<FunctionIn
 
     fn exit(&mut self, exit_status: Result<(), super::FunctionInstanceError>) {
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionExit(match &exit_status {
-                Ok(_) => edgeless_telemetry::telemetry_events::FunctionExitStatus::Ok,
+            crate::telemetry::telemetry_events::TelemetryEvent::FunctionExit(match &exit_status {
+                Ok(_) => crate::telemetry::telemetry_events::FunctionExitStatus::Ok,
                 Err(exit_err) => match exit_err {
-                    FunctionInstanceError::BadCode(_) => edgeless_telemetry::telemetry_events::FunctionExitStatus::CodeError,
-                    _ => edgeless_telemetry::telemetry_events::FunctionExitStatus::InternalError,
+                    FunctionInstanceError::BadCode(_) => crate::telemetry::telemetry_events::FunctionExitStatus::CodeError,
+                    _ => crate::telemetry::telemetry_events::FunctionExitStatus::InternalError,
                 },
             }),
             std::collections::BTreeMap::new(),

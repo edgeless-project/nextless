@@ -13,7 +13,7 @@ pub struct RuntimeTask<FunctionInstanceType, FunctionInstanceRunner: super::Func
     receiver: futures::channel::mpsc::UnboundedReceiver<RuntimeRequest>,
     data_plane_provider: crate::dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
-    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
     functions: std::collections::HashMap<edgeless_api::function_instance::InstanceId, FunctionInstanceRunner>,
     _pd: std::marker::PhantomData<FunctionInstanceType>,
@@ -30,7 +30,7 @@ pub enum RuntimeRequest {
 pub fn create<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner<FunctionInstanceType>>(
     data_plane_provider: crate::dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
-    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
 ) -> (RuntimeClient, RuntimeTask<FunctionInstanceType, FunctionInstanceRunner>) {
     let (sender, receiver) = futures::channel::mpsc::unbounded();
     let task: RuntimeTask<FunctionInstanceType, FunctionInstanceRunner> =
@@ -48,7 +48,7 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
         receiver: futures::channel::mpsc::UnboundedReceiver<RuntimeRequest>,
         data_plane_provider: crate::dataplane::handle::DataplaneProvider,
         state_manager: Box<dyn crate::state_management::StateManagerAPI>,
-        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        telemetry_handle: Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>,
         slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
     ) -> Self {
         Self {

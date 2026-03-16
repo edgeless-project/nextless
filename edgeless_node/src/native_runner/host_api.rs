@@ -108,11 +108,11 @@ impl<'a> edgeless_actor_abi::HostApi<'a> for HostApiImpl {
     fn telemetry_log(&mut self, level: edgeless_actor_abi::LogLevel, component: &str, msg: &str) -> edgeless_actor_abi::HostResult<()> {
         self.host.handle.clone().block_on(self.host.telemetry_log(
             match level {
-                edgeless_actor_abi::LogLevel::Error => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Error,
-                edgeless_actor_abi::LogLevel::Warn => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Warn,
-                edgeless_actor_abi::LogLevel::Info => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Warn,
-                edgeless_actor_abi::LogLevel::Debug => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Debug,
-                edgeless_actor_abi::LogLevel::Trace => edgeless_telemetry::telemetry_events::TelemetryLogLevel::Trace,
+                edgeless_actor_abi::LogLevel::Error => crate::telemetry::telemetry_events::TelemetryLogLevel::Error,
+                edgeless_actor_abi::LogLevel::Warn => crate::telemetry::telemetry_events::TelemetryLogLevel::Warn,
+                edgeless_actor_abi::LogLevel::Info => crate::telemetry::telemetry_events::TelemetryLogLevel::Warn,
+                edgeless_actor_abi::LogLevel::Debug => crate::telemetry::telemetry_events::TelemetryLogLevel::Debug,
+                edgeless_actor_abi::LogLevel::Trace => crate::telemetry::telemetry_events::TelemetryLogLevel::Trace,
             },
             component,
             msg,

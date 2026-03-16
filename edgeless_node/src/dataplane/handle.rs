@@ -18,7 +18,7 @@ struct IncommingLink {
     #[allow(unused)]
     target_id: edgeless_api::function_instance::InstanceId,
     target_port: edgeless_api::function_instance::PortId,
-    telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
+    telemetry_handle: Option<Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>>,
 }
 
 #[async_trait::async_trait]
@@ -26,7 +26,7 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
     async fn handle(&mut self, src: edgeless_api::function_instance::InstanceId, msg: Vec<u8>) {
         if let Some(telemetry_handle) = &mut self.telemetry_handle {
             telemetry_handle.observe(
-                edgeless_telemetry::telemetry_events::TelemetryEvent::MessageReceived(msg.len() as u64),
+                crate::telemetry::telemetry_events::TelemetryEvent::MessageReceived(msg.len() as u64),
                 std::collections::BTreeMap::from([
                     ("SOURCE_NODE_ID".to_string(), src.node_id.to_string()),
                     ("SOURCE_FUNCTION_ID".to_string(), src.function_id.to_string()),
@@ -74,7 +74,7 @@ pub struct DataplaneHandle {
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: std::sync::Arc<std::sync::atomic::AtomicU64>,
     #[allow(unused)]
-    telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
+    telemetry_handle: Option<Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>>,
 }
 
 impl DataplaneHandle {
@@ -83,7 +83,7 @@ impl DataplaneHandle {
         link_manager: Box<dyn edgeless_api::link::LinkManager>,
         output_chain: Vec<Box<dyn DataPlaneLink>>,
         receiver: futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>,
-        telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
+        telemetry_handle: Option<Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>>,
     ) -> Self {
         let (main_sender, main_receiver) = tokio::sync::mpsc::unbounded_channel::<DataplaneEvent>();
         let receiver_overwrites = std::sync::Arc::new(tokio::sync::Mutex::new(TemporaryReceivers {
@@ -120,7 +120,7 @@ impl DataplaneHandle {
                     }
                     if let Some(telemetry_handle) = &mut cloned_telemetry {
                         telemetry_handle.observe(
-                            edgeless_telemetry::telemetry_events::TelemetryEvent::MessageReceived(message.payload_len() as u64),
+                            crate::telemetry::telemetry_events::TelemetryEvent::MessageReceived(message.payload_len() as u64),
                             std::collections::BTreeMap::from([
                                 ("SOURCE_NODE_ID".to_string(), source_id.node_id.to_string()),
                                 ("SOURCE_FUNCTION_ID".to_string(), source_id.function_id.to_string()),
@@ -555,7 +555,7 @@ impl DataplaneProvider {
     pub async fn get_handle_for(
         &mut self,
         target: edgeless_api::function_instance::InstanceId,
-        telemetry_handle: Option<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>,
+        telemetry_handle: Option<Box<dyn crate::telemetry::telemetry_events::TelemetryHandleAPI>>,
     ) -> DataplaneHandle {
         let (sender, receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
         let output_chain = vec![
