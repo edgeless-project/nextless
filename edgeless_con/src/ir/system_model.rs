@@ -11,6 +11,7 @@ pub trait Node {
     fn available_link_types(&self) -> LinkProviders;
     fn available_interaction_dialects(&self) -> Vec<crate::ir::interaction::dialect::DialectDescriptor>;
     fn labels(&self) -> Vec<String>;
+    #[allow(unused)]
     fn is_proxy(&self) -> bool;
 }
 

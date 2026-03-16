@@ -80,7 +80,7 @@ impl LedMatrixResource {
 impl LedMatrixResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
-        resource_provider_id: edgeless_api::function_instance::InstanceId,
+        _resource_provider_id: edgeless_api::function_instance::InstanceId,
         sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
     ) -> Self {
         Self {

@@ -24,6 +24,7 @@ fn main() -> anyhow::Result<()> {
 
     let conf_clone = conf.clone();
 
+    #[allow(unused)]
     let (sender, receiver) = std::sync::mpsc::channel::<edgeless_function_types::led_matrix::MatrixFrame>();
 
     setup_tracing(&conf.opentelemetry_export);

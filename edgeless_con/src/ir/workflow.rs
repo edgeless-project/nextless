@@ -9,6 +9,7 @@ pub struct ActiveWorkflow {
     pub(crate) id: edgeless_api::workflow_instance::WorkflowId,
     pub(crate) cluster_id: uuid::Uuid,
 
+    #[allow(unused)]
     pub(crate) original_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
 
     pub(crate) links: std::collections::HashMap<edgeless_api::link::LinkInstanceId, WorkflowLink>,

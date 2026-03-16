@@ -17,6 +17,7 @@ pub struct WorkerNode {
     health_status: edgeless_api::node_management::HealthStatus,
     supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
     // This should probably be based on link types and is a placeholder
+    #[allow(unused)]
     is_proxy: bool,
     #[allow(unused)]
     telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
