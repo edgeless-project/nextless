@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 [package]
 name = "edgeless_cli"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
 rust-version = "1.92"

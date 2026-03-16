@@ -14,14 +14,20 @@ use workflow::WorkflowCommands;
 
 #[derive(Debug, clap::Subcommand)]
 enum Commands {
+    // https://stackoverflow.com/a/73790382
+    #[clap(visible_alias("application"))]
+    /// Interact (e.g., start/stop) with (an) Application(s).
     Workflow {
         #[command(subcommand)]
         workflow_command: WorkflowCommands,
     },
+    #[clap(visible_alias("actor"))]
+    /// Interact (e.g., build) with an Actor.
     Function {
         #[command(subcommand)]
         function_command: FunctionCommands,
     },
+    /// Translate Starlark to json.
     Description {
         #[command(subcommand)]
         description_command: DescriptionCommands,
