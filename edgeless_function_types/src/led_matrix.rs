@@ -19,13 +19,13 @@ impl MatrixFrame {
     }
 }
 
-impl<'a> edgeless_function::Serialize<'a> for MatrixFrame {
+impl<'a> edgeless_function_core::Serialize<'a> for MatrixFrame {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         self.0.data()
     }
 }
 
-impl<'a> edgeless_function::Deserialize<'a> for MatrixFrame {
+impl<'a> edgeless_function_core::Deserialize<'a> for MatrixFrame {
     fn deserialize(raw: &'a [u8]) -> Self {
         let mut frame = MatrixFrame::new();
         frame.0.data_mut().copy_from_slice(raw);

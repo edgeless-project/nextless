@@ -1579,7 +1579,7 @@ dependencies = [
 name = "edgeless_function_types"
 version = "0.1.0"
 dependencies = [
- "edgeless_function",
+ "edgeless_function_core",
  "embedded-graphics",
  "image",
  "log",
@@ -1593,7 +1593,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "edgeless_function",
+ "edgeless_function_core",
  "hyper 1.8.1",
  "serde",
  "serde_json",
