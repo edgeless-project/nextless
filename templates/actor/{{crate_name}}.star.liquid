@@ -1,0 +1,32 @@
+{%- assign inputs = cast_inputs | split: "," -%}
+{%- assign outputs = cast_outputs | split: "," -%}
+{{crate_name | upper_camel_case}} = edgeless_actor_class(
+    id = "{{crate_name}}",
+    version = "0.1",
+    outputs = [
+        {%- for output in outputs %}
+        cast_output("{{output}}", "String"),
+        {%- endfor %}
+    ],
+    inputs = [
+        {%- for input in inputs %}
+        cast_input("{{input}}", "String"),
+        {%- endfor %}
+        {% if generate_http_handler -%}
+        call_input("http_request", "edgeless.http.request", "edgeless.http.response"),
+        {% endif -%}
+    ],
+    inner_structure = [
+        {%- for input in inputs %}
+        sink("{{input}}"),
+        {%- endfor %}
+        {%- for output in outputs %}
+        source("{{output}}"),
+        {%- endfor %}
+        # link("example_cast_in", ["example_cast_out"]),
+    ],
+    code = file("{{crate_name}}.wasm"),
+    code_type = "WASM_BASE"
+)
+
+el_main = {{crate_name | upper_camel_case}}
