@@ -5,7 +5,6 @@
 pub struct Configuration {
     pub position_y: usize,
     pub position_x: usize,
-    pub period_ms: usize,
     pub draw_border: bool,
     pub corner_blocks: bool,
     pub periodic_glider: bool,
@@ -17,7 +16,6 @@ impl Configuration {
 
         let mut position_y = 0;
         let mut position_x = 0;
-        let mut period_ms = 1000;
         let mut draw_border = false;
         let mut corner_blocks = false;
         let mut periodic_glider = false;
@@ -35,13 +33,6 @@ impl Configuration {
                     "position_x" => {
                         if let Ok(v) = v.parse() {
                             position_x = v;
-                        } else {
-                            log::warn!("Bad Configuration");
-                        }
-                    }
-                    "period_ms" => {
-                        if let Ok(v) = v.parse() {
-                            period_ms = v;
                         } else {
                             log::warn!("Bad Configuration");
                         }
@@ -77,7 +68,6 @@ impl Configuration {
         Self {
             position_y,
             position_x,
-            period_ms,
             draw_border,
             corner_blocks,
             periodic_glider,

@@ -1,5 +1,3 @@
-# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
-# SPDX-License-Identifier: MIT
 [workspace]
 
 [profile.dev]
@@ -13,44 +11,27 @@ codegen-units = 1
 strip = true
 
 [package]
-name = "game_of_life"
+name = "game_of_life_clock"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
 include = ["src/**/*", "function.json", "*.star"]
 
 [lib]
-name = "game_of_life"
+name = "game_of_life_clock"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
+log = "0.4"
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
 edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
 edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types" }
-log = "0.4"
-uuid = { version = "1.19" }
-embedded-graphics = { version = "0.8" }
-font8x8 = "0.3.1"
-
+allocator-api2 = { version = "0.2.8", default-features = false, features = [
+    "alloc",
+] }
 
 [features]
-output_drawable = []
-output_update_left_o = []
-output_update_right_o = []
-output_update_top_o = []
-output_update_bottom_o = []
-output_update_top_left_o = []
-output_update_top_right_o = []
-output_update_bottom_left_o = []
-output_update_bottom_right_o = []
-input_update_left_i = []
-input_update_right_i = []
-input_update_top_i = []
-input_update_bottom_i = []
-input_update_top_left_i = []
-input_update_top_right_i = []
-input_update_bottom_left_i = []
-input_update_bottom_right_i = []
-input_iteration_clock_i = []
+
+output_trigger = []

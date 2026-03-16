@@ -1,4 +1,5 @@
 load("../../functions/game_of_life/game_of_life.star", "GameOfLife")
+load("../../functions/game_of_life_clock/game_of_life_clock.star", "GameOfLifeClock")
 load("../../resources/led_matrix.star", "LedMatrix")
 load("full_matrix.star", "instances")
 
@@ -14,13 +15,9 @@ def id_str(id):
 
 def init_payload(instance):
     base = "draw_border=true,corner_blocks=false,position_y={},position_x={}".format(instance["position_y"],instance["position_x"])
-    if instance["id"] == 1:
-        return "period_ms=500," + base
-    if instance["id"] == 11:
-        return "period_ms=500," + base
     if instance["id"] == 3:
-        return "period_ms=0,periodic_glider=true," + base
-    return "period_ms=0," + base
+        return "periodic_glider=true," + base
+    return base
 
 game_instances = {
     instance["id"]: edgeless_actor(
@@ -44,13 +41,20 @@ displays = {
     ) for instance in instances
 }
 
+clock = edgeless_actor(
+    id = "game_of_life_clock",
+    klass = GameOfLifeClock,
+    annotations = {
+        "init-payload": "period_ms=500"
+    }
+)
+
 
 # Display Connections
 [ game_instances[instance["id"]].drawable >> displays[instance["id"]].update for instance in instances ]
 
 # Trigger
-game_instances[11].iteration_clock_o >> [game_instances[instance["id"]].iteration_clock_i for instance in instances ]
-# [ game_instances[instance["id"]].iteration_clock_o >> game_instances[instance["id"]].iteration_clock_i for instance in instances ]
+clock.trigger >> [game_instances[instance["id"]].iteration_clock_i for instance in instances ]
 
 # Sides
 [
@@ -82,7 +86,7 @@ game_instances[11].iteration_clock_o >> [game_instances[instance["id"]].iteratio
 
 wf = edgeless_workflow(
     "game_of_life",
-    game_instances.values() + displays.values(),
+    game_instances.values() + displays.values() + [clock],
     annotations = {
         "feature_flags": "disable_ip_multicast_dialect",
     }

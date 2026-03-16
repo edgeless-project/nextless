@@ -117,13 +117,7 @@ impl GameOfLifeAPI<'_> for GameOfLife {
     }
 
     fn handle_internal(data: &[u8]) {
-        let iteration = u64::from_le_bytes(data.try_into().unwrap());
-
-        let update = Iteration { iteration_id: iteration };
-
-        cast_iteration_clock_o(&update);
-
-        delayed_cast(CONFIGURATION.get().unwrap().period_ms as u64, "self", &(iteration + 1).to_le_bytes());
+        log::info!("Internal Message.");
     }
 
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
@@ -148,10 +142,6 @@ impl GameOfLifeAPI<'_> for GameOfLife {
 
         STATE.set(std::sync::Mutex::new(gs)).unwrap();
         CONFIGURATION.set(config).unwrap();
-
-        if config.period_ms > 0 {
-            delayed_cast(config.period_ms as u64, "self", &1u64.to_le_bytes());
-        }
     }
 
     fn handle_stop() {

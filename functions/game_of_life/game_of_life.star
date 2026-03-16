@@ -11,7 +11,6 @@ GameOfLife = edgeless_actor_class(
         cast_output("update_bottom_left_o", "game_of_life.update_corner"),
         cast_output("update_bottom_right_o", "game_of_life.update_corner"),
         cast_output("drawable", "eft.led_matrix.matrix_frame", optional=False),
-        cast_output("iteration_clock_o", "game_of_life.iteration"),
     ],
     inputs = [
         cast_input("update_left_i", "game_of_life.update_col"),
@@ -36,7 +35,6 @@ GameOfLife = edgeless_actor_class(
            "update_bottom_right_o",
            "drawable"
        ]),
-       source("iteration_clock_o"),
        link("update_left_i", ["drawable"]),
        link("update_right_i", ["drawable"]),
        link("update_top_i", ["drawable"]),
