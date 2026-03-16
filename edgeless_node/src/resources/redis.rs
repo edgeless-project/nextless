@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_dataplane::core::Message;
+use crate::dataplane::core::Message;
 extern crate redis;
 use redis::Commands;
 
@@ -12,7 +12,7 @@ pub struct RedisResourceProvider {
 
 pub struct RedisResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
-    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    dataplane_provider: crate::dataplane::handle::DataplaneProvider,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, RedisResource>,
 }
 
@@ -27,7 +27,7 @@ impl Drop for RedisResource {
 }
 
 impl RedisResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, redis_url: &str, redis_key: &str) -> anyhow::Result<Self> {
+    async fn new(dataplane_handle: crate::dataplane::handle::DataplaneHandle, redis_url: &str, redis_key: &str) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let redis_key = redis_key.to_string();
 
@@ -37,7 +37,7 @@ impl RedisResource {
 
         let handle = tokio::spawn(async move {
             loop {
-                let edgeless_dataplane::core::DataplaneEvent {
+                let crate::dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
                     message,
@@ -62,7 +62,7 @@ impl RedisResource {
 
                 if need_reply {
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(Vec::new()))
+                        .reply(source_id, channel_id, crate::dataplane::core::CallRet::Reply(Vec::new()))
                         .await;
                 }
             }
@@ -74,7 +74,7 @@ impl RedisResource {
 
 impl RedisResourceProvider {
     pub async fn new(
-        dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        dataplane_provider: crate::dataplane::handle::DataplaneProvider,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use crate::core::*;
-use crate::node_local::NodeLocalRouter;
+use crate::dataplane::core::*;
+use crate::dataplane::node_local::NodeLocalRouter;
 use edgeless_api::function_instance::{ComponentId, NodeId};
 use edgeless_api::invocation::InvocationAPI;
 
@@ -135,7 +135,7 @@ impl RemoteLinkProvider {
 mod test {
     use futures::SinkExt;
 
-    use crate::remote_node::*;
+    use crate::dataplane::remote_node::*;
 
     #[tokio::test]
     async fn incomming_message() {
@@ -153,7 +153,7 @@ mod test {
         let mut provider = RemoteLinkProvider::new(node_id).await;
         let mut api = provider.incomming_api().await;
 
-        let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::dataplane::core::DataplaneEvent>();
         provider.new_link(fid_target, sender_1).await;
 
         api.handle(edgeless_api::invocation::Event {
@@ -241,7 +241,7 @@ mod test {
         provider.add_peer(node_id_2, node_2_api).await;
         // let mut api = provider.incomming_api().await;
 
-        let (sender_1, _receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let (sender_1, _receiver_1) = futures::channel::mpsc::unbounded::<crate::dataplane::core::DataplaneEvent>();
         let mut link = provider.new_link(fid_source, sender_1).await;
 
         let res = link

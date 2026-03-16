@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_dataplane::core::Message;
+use crate::dataplane::core::Message;
 
 #[derive(Clone)]
 pub struct EgressResourceProvider {
@@ -11,7 +11,7 @@ pub struct EgressResourceProvider {
 struct EgressResourceProviderInner {
     #[allow(unused)]
     resource_provider_id: edgeless_api::function_instance::InstanceId,
-    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    dataplane_provider: crate::dataplane::handle::DataplaneProvider,
     egress_instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, EgressResource>,
 }
 
@@ -26,12 +26,12 @@ impl Drop for EgressResource {
 }
 
 impl EgressResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle) -> Self {
+    async fn new(dataplane_handle: crate::dataplane::handle::DataplaneHandle) -> Self {
         let mut dataplane_handle = dataplane_handle;
 
         let handle = tokio::spawn(async move {
             loop {
-                let edgeless_dataplane::core::DataplaneEvent {
+                let crate::dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
                     message,
@@ -53,9 +53,7 @@ impl EgressResource {
                 let req = match edgeless_function_types::http::request_from_string(core::str::from_utf8(&message_data).unwrap()) {
                     Ok(val) => val,
                     Err(_) => {
-                        dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
-                            .await;
+                        dataplane_handle.reply(source_id, channel_id, crate::dataplane::core::CallRet::Err).await;
                         continue;
                     }
                 };
@@ -68,14 +66,12 @@ impl EgressResource {
                                 .reply(
                                     source_id,
                                     channel_id,
-                                    edgeless_dataplane::core::CallRet::Reply(serialized_resp.as_bytes().to_vec()),
+                                    crate::dataplane::core::CallRet::Reply(serialized_resp.as_bytes().to_vec()),
                                 )
                                 .await;
                         }
                         Err(_) => {
-                            cloned_dataplane
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
-                                .await;
+                            cloned_dataplane.reply(source_id, channel_id, crate::dataplane::core::CallRet::Err).await;
                         }
                     }
                 });
@@ -136,7 +132,7 @@ impl EgressResource {
 
 impl EgressResourceProvider {
     pub async fn new(
-        dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        dataplane_provider: crate::dataplane::handle::DataplaneProvider,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {

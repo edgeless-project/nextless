@@ -11,7 +11,7 @@ pub struct RuntimeClient {
 
 pub struct RuntimeTask<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner<FunctionInstanceType>> {
     receiver: futures::channel::mpsc::UnboundedReceiver<RuntimeRequest>,
-    data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    data_plane_provider: crate::dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
@@ -28,7 +28,7 @@ pub enum RuntimeRequest {
 
 /// Entrypoint for all runtimes based on the base_runtime.
 pub fn create<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner<FunctionInstanceType>>(
-    data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    data_plane_provider: crate::dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
 ) -> (RuntimeClient, RuntimeTask<FunctionInstanceType, FunctionInstanceRunner>) {
@@ -46,7 +46,7 @@ impl<FunctionInstanceType, FunctionInstanceRunner: super::FunctionInstanceRunner
 {
     fn new(
         receiver: futures::channel::mpsc::UnboundedReceiver<RuntimeRequest>,
-        data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        data_plane_provider: crate::dataplane::handle::DataplaneProvider,
         state_manager: Box<dyn crate::state_management::StateManagerAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,

@@ -1499,29 +1499,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "edgeless_dataplane"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "clap",
- "edgeless_api",
- "edgeless_link_multicast",
- "edgeless_telemetry",
- "futures",
- "opentelemetry",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "tokio",
- "toml 0.7.8",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "edgeless_embedded"
 version = "0.1.0"
 dependencies = [
@@ -1598,7 +1575,6 @@ dependencies = [
  "clap",
  "edgeless_api",
  "edgeless_con",
- "edgeless_dataplane",
  "edgeless_node",
  "env_logger",
  "futures",
@@ -1640,9 +1616,9 @@ dependencies = [
  "clap",
  "edgeless_actor_abi",
  "edgeless_api",
- "edgeless_dataplane",
  "edgeless_function_core",
  "edgeless_function_types",
+ "edgeless_link_multicast",
  "edgeless_telemetry",
  "elfloader",
  "embedded-graphics",
@@ -1655,6 +1631,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
+ "rand 0.8.5",
  "redis",
  "reqwest 0.11.27",
  "rpi-led-panel",
@@ -1686,7 +1663,6 @@ dependencies = [
  "clap",
  "edgeless_api",
  "edgeless_con",
- "edgeless_dataplane",
  "edgeless_node",
  "env_logger",
  "futures",

@@ -20,7 +20,7 @@ pub trait RuntimeAPI {
 pub trait FunctionInstanceRunner<Instance> {
     async fn new(
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
-        data_plane: edgeless_dataplane::handle::DataplaneHandle,
+        data_plane: crate::dataplane::handle::DataplaneHandle,
         runtime_api: futures::channel::mpsc::UnboundedSender<runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
@@ -46,7 +46,7 @@ pub trait FunctionInstance: Send + 'static {
         src: &edgeless_api::function_instance::InstanceId,
         port: &str,
         msg: &[u8],
-    ) -> FunctionInstanceResult<edgeless_dataplane::core::CallRet>;
+    ) -> FunctionInstanceResult<crate::dataplane::core::CallRet>;
     async fn stop(&mut self) -> FunctionInstanceResult<()>;
 }
 
@@ -64,7 +64,7 @@ pub trait FunctionInstanceSync: Send {
         src: &edgeless_api::function_instance::InstanceId,
         port: &str,
         msg: &[u8],
-    ) -> FunctionInstanceResult<edgeless_dataplane::core::CallRet>;
+    ) -> FunctionInstanceResult<crate::dataplane::core::CallRet>;
     fn stop(&mut self) -> FunctionInstanceResult<()>;
 }
 

@@ -15,6 +15,8 @@ pub mod wasmi_runner;
 
 pub mod native_runner;
 
+pub mod dataplane;
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
     /// General settings.
@@ -216,7 +218,7 @@ fn get_capabilities(
 }
 
 async fn fill_resources(
-    data_plane: edgeless_dataplane::handle::DataplaneProvider,
+    data_plane: crate::dataplane::handle::DataplaneProvider,
     node_id: uuid::Uuid,
     settings: &Option<EdgelessNodeResourceSettings>,
     provider_specifications: &mut Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
@@ -376,7 +378,7 @@ pub async fn edgeless_node_main(
     let state_manager = Box::new(state_management::StateManager::new().await);
 
     // Create the data plane.
-    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(
+    let data_plane = crate::dataplane::handle::DataplaneProvider::new(
         settings.general.node_id,
         settings.general.invocation_url.clone(),
         settings.general.invocation_url_coap.clone(),

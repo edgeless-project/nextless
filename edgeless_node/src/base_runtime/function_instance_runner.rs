@@ -15,7 +15,7 @@ use super::{FunctionInstance, FunctionInstanceError};
 /// while the technology specific implementations implement `FunctionInstance` interact and bind a virtualization technology.
 pub struct FunctionInstanceRunner<FunctionInstanceType: FunctionInstance> {
     task_handle: Option<tokio::task::JoinHandle<()>>,
-    data_plane: edgeless_dataplane::handle::DataplaneHandle,
+    data_plane: crate::dataplane::handle::DataplaneHandle,
     poison_pill_sender: tokio::sync::broadcast::Sender<()>,
     _instance: PhantomData<FunctionInstanceType>,
 }
@@ -28,7 +28,7 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     guest_api_host: Option<super::guest_api::GuestAPIHost>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     code: Vec<u8>,
-    data_plane: edgeless_dataplane::handle::DataplaneHandle,
+    data_plane: crate::dataplane::handle::DataplaneHandle,
     serialized_state: Option<String>,
     init_payload: Option<String>,
     runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
@@ -41,7 +41,7 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
 impl<FunctionInstanceType: FunctionInstance> super::FunctionInstanceRunner<FunctionInstanceType> for FunctionInstanceRunner<FunctionInstanceType> {
     async fn new(
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
-        data_plane: edgeless_dataplane::handle::DataplaneHandle,
+        data_plane: crate::dataplane::handle::DataplaneHandle,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
@@ -122,7 +122,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         guest_api_host: super::guest_api::GuestAPIHost,
         code: Vec<u8>,
-        data_plane: edgeless_dataplane::handle::DataplaneHandle,
+        data_plane: crate::dataplane::handle::DataplaneHandle,
         serialized_state: Option<String>,
         init_param: Option<String>,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
@@ -220,7 +220,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
-                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port, source_port: _, context: span_context} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                crate::dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port, source_port: _, context: span_context} =  Box::pin(self.data_plane.receive_next()).fuse() => {
                     self.process_message(
                         source_id,
                         channel_id,
@@ -237,15 +237,13 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
         channel_id: u64,
-        message: edgeless_dataplane::core::Message,
+        message: crate::dataplane::core::Message,
         target_port: edgeless_api::function_instance::PortId,
         context: opentelemetry::trace::SpanContext,
     ) -> Result<(), super::FunctionInstanceError> {
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, target_port, &payload, context).await,
-            edgeless_dataplane::core::Message::Call(payload) => {
-                self.process_call_message(source_id, target_port, &payload, channel_id, context).await
-            }
+            crate::dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, target_port, &payload, context).await,
+            crate::dataplane::core::Message::Call(payload) => self.process_call_message(source_id, target_port, &payload, channel_id, context).await,
             _ => {
                 tracing::debug!("Unprocessed Message");
                 Ok(())

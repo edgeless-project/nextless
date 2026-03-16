@@ -8,7 +8,7 @@ use futures::FutureExt;
 /// Those need to be made available to the guest using a virtualization-specific interface/binding.
 pub struct GuestAPIHost {
     pub instance_id: edgeless_api::function_instance::InstanceId,
-    pub data_plane: edgeless_dataplane::handle::DataplaneHandle,
+    pub data_plane: crate::dataplane::handle::DataplaneHandle,
     pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
     pub telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     pub poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
@@ -43,10 +43,10 @@ impl GuestAPIHost {
         Ok(())
     }
 
-    pub async fn call_alias(&mut self, alias: &str, msg: &[u8]) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
+    pub async fn call_alias(&mut self, alias: &str, msg: &[u8]) -> Result<crate::dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
-                Ok(edgeless_dataplane::core::CallRet::Err)
+                Ok(crate::dataplane::core::CallRet::Err)
             },
             call_res = Box::pin(self.data_plane.call_alias(alias.to_string(), msg, self.tracing_context.lock().await.parent_context.clone()).fuse()) => {
                 Ok(call_res)
@@ -59,10 +59,10 @@ impl GuestAPIHost {
         target: edgeless_api::function_instance::InstanceId,
         target_port: edgeless_api::function_instance::PortId,
         msg: &[u8],
-    ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
+    ) -> Result<crate::dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
-                Ok(edgeless_dataplane::core::CallRet::Err)
+                Ok(crate::dataplane::core::CallRet::Err)
             },
             call_res = Box::pin(self.data_plane.call(target, target_port, msg, self.tracing_context.lock().await.parent_context.clone())).fuse() => {
                 Ok(call_res)

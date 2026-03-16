@@ -74,13 +74,13 @@ impl<'a> edgeless_actor_abi::HostApi<'a> for HostApiImpl {
             ))
             .map_err(|_| edgeless_actor_abi::HostError::Internal)
             .map(|r| match r {
-                edgeless_dataplane::core::CallRet::NoReply => edgeless_actor_abi::CallRet::NoReply,
-                edgeless_dataplane::core::CallRet::Reply(data) => {
+                crate::dataplane::core::CallRet::NoReply => edgeless_actor_abi::CallRet::NoReply,
+                crate::dataplane::core::CallRet::Reply(data) => {
                     let mut v = allocator_api2::vec::Vec::new_in(&self.alloc as &dyn allocator_api2::alloc::Allocator);
                     v.extend_from_slice(&data[..]);
                     edgeless_actor_abi::CallRet::Reply(v)
                 }
-                edgeless_dataplane::core::CallRet::Err => edgeless_actor_abi::CallRet::Err,
+                crate::dataplane::core::CallRet::Err => edgeless_actor_abi::CallRet::Err,
             })
     }
 
@@ -95,13 +95,13 @@ impl<'a> edgeless_actor_abi::HostApi<'a> for HostApiImpl {
             .block_on(self.host.call_alias(output_port.0, msg.0))
             .map_err(|_| edgeless_actor_abi::HostError::Internal)
             .map(|r| match r {
-                edgeless_dataplane::core::CallRet::NoReply => edgeless_actor_abi::CallRet::NoReply,
-                edgeless_dataplane::core::CallRet::Reply(data) => {
+                crate::dataplane::core::CallRet::NoReply => edgeless_actor_abi::CallRet::NoReply,
+                crate::dataplane::core::CallRet::Reply(data) => {
                     let mut v = allocator_api2::vec::Vec::new_in(&self.alloc as &dyn allocator_api2::alloc::Allocator);
                     v.extend_from_slice(&data[..]);
                     edgeless_actor_abi::CallRet::Reply(v)
                 }
-                edgeless_dataplane::core::CallRet::Err => edgeless_actor_abi::CallRet::Err,
+                crate::dataplane::core::CallRet::Err => edgeless_actor_abi::CallRet::Err,
             })
     }
 

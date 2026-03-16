@@ -89,8 +89,8 @@ pub async fn call_raw(
         .await
         .map_err(|_| wasmtime::Error::msg("call error"))?;
     match call_ret {
-        edgeless_dataplane::core::CallRet::NoReply => Ok(0),
-        edgeless_dataplane::core::CallRet::Reply(data) => {
+        crate::dataplane::core::CallRet::NoReply => Ok(0),
+        crate::dataplane::core::CallRet::Reply(data) => {
             let len = data.len();
 
             let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, &data).await?;
@@ -99,7 +99,7 @@ pub async fn call_raw(
 
             Ok(1)
         }
-        edgeless_dataplane::core::CallRet::Err => Ok(2),
+        crate::dataplane::core::CallRet::Err => Ok(2),
     }
 }
 
@@ -148,8 +148,8 @@ pub async fn call(
         .await
         .map_err(|_| wasmtime::Error::msg("call error"))?;
     match call_ret {
-        edgeless_dataplane::core::CallRet::NoReply => Ok(0),
-        edgeless_dataplane::core::CallRet::Reply(data) => {
+        crate::dataplane::core::CallRet::NoReply => Ok(0),
+        crate::dataplane::core::CallRet::Reply(data) => {
             let len = data.len();
 
             let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, &data).await?;
@@ -158,7 +158,7 @@ pub async fn call(
 
             Ok(1)
         }
-        edgeless_dataplane::core::CallRet::Err => Ok(2),
+        crate::dataplane::core::CallRet::Err => Ok(2),
     }
 }
 

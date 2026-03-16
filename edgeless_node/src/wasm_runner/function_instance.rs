@@ -541,7 +541,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         src: &edgeless_api::function_instance::InstanceId,
         port: &str,
         msg: &[u8],
-    ) -> Result<edgeless_dataplane::core::CallRet, crate::base_runtime::FunctionInstanceError> {
+    ) -> Result<crate::dataplane::core::CallRet, crate::base_runtime::FunctionInstanceError> {
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
             .await
@@ -614,7 +614,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             .map_err(crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let ret = match callret_type {
-            0 => Ok(edgeless_dataplane::core::CallRet::NoReply),
+            0 => Ok(crate::dataplane::core::CallRet::NoReply),
             1 => {
                 // load the output pointer (inside the WASM memory) (layer of indirection to work around only using one return param)
                 let out_ptr: [u8; 4] = self.memory.data_mut(&mut self.store)[out_ptr_ptr as usize..(out_ptr_ptr as usize) + 4]
@@ -633,9 +633,9 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 // load the atual output param
                 let out_raw = self.memory.data_mut(&mut self.store)[out_ptr as usize..(out_ptr as usize) + out_len as usize].to_vec();
                 let out = out_raw;
-                Ok(edgeless_dataplane::core::CallRet::Reply(out))
+                Ok(crate::dataplane::core::CallRet::Reply(out))
             }
-            _ => Ok(edgeless_dataplane::core::CallRet::Err),
+            _ => Ok(crate::dataplane::core::CallRet::Err),
         };
 
         self.edgeless_mem_free

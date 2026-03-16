@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use crate::core::*;
+use crate::dataplane::core::*;
 use edgeless_api::invocation::InvocationAPI;
 use futures::SinkExt;
 
@@ -136,10 +136,10 @@ mod test {
 
         let provider = NodeLocalLinkProvider::new();
 
-        let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::dataplane::core::DataplaneEvent>();
         let mut handle_1 = provider.new_link(fid_1, sender_1).await;
 
-        let (sender_2, mut receiver_2) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let (sender_2, mut receiver_2) = futures::channel::mpsc::unbounded::<crate::dataplane::core::DataplaneEvent>();
         let _handle_2 = provider.new_link(fid_2, sender_2).await;
 
         assert!(receiver_1.try_next().is_err());
@@ -148,7 +148,7 @@ mod test {
         let ret_1 = handle_1
             .handle_send(
                 &fid_3,
-                crate::core::Message::Cast(Vec::new()),
+                crate::dataplane::core::Message::Cast(Vec::new()),
                 &fid_1,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
@@ -158,14 +158,14 @@ mod test {
             .as_mut()
             .await;
 
-        assert_eq!(ret_1, crate::core::LinkProcessingResult::PASSED);
+        assert_eq!(ret_1, crate::dataplane::core::LinkProcessingResult::PASSED);
         assert!(receiver_1.try_next().is_err());
         assert!(receiver_2.try_next().is_err());
 
         let ret_2 = handle_1
             .handle_send(
                 &fid_2,
-                crate::core::Message::Cast(Vec::new()),
+                crate::dataplane::core::Message::Cast(Vec::new()),
                 &fid_1,
                 0,
                 edgeless_api::function_instance::PortId("test".to_string()),
@@ -175,7 +175,7 @@ mod test {
             .as_mut()
             .await;
 
-        assert_eq!(ret_2, crate::core::LinkProcessingResult::FINAL);
+        assert_eq!(ret_2, crate::dataplane::core::LinkProcessingResult::FINAL);
         assert!(receiver_1.try_next().is_err());
         assert!(receiver_2.try_next().unwrap().is_some());
     }

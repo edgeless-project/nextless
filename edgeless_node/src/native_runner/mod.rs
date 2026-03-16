@@ -114,7 +114,7 @@ impl crate::base_runtime::FunctionInstanceSync for NativeFunctionInstance {
         src: &edgeless_api::function_instance::InstanceId,
         port: &str,
         msg: &[u8],
-    ) -> crate::base_runtime::FunctionInstanceResult<edgeless_dataplane::core::CallRet> {
+    ) -> crate::base_runtime::FunctionInstanceResult<crate::dataplane::core::CallRet> {
         (self.fns.handle_call)(
             edgeless_actor_abi::ActorId {
                 node_id: src.node_id.into_bytes(),
@@ -124,9 +124,9 @@ impl crate::base_runtime::FunctionInstanceSync for NativeFunctionInstance {
             msg,
         )
         .map(|ret| match ret {
-            edgeless_actor_abi::CallRet::NoReply => edgeless_dataplane::core::CallRet::NoReply,
-            edgeless_actor_abi::CallRet::Reply(data) => edgeless_dataplane::core::CallRet::Reply(Vec::from(data.as_slice())),
-            edgeless_actor_abi::CallRet::Err => edgeless_dataplane::core::CallRet::Err,
+            edgeless_actor_abi::CallRet::NoReply => crate::dataplane::core::CallRet::NoReply,
+            edgeless_actor_abi::CallRet::Reply(data) => crate::dataplane::core::CallRet::Reply(Vec::from(data.as_slice())),
+            edgeless_actor_abi::CallRet::Err => crate::dataplane::core::CallRet::Err,
         })
         .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(e.into()))
     }

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_dataplane::core::Message;
+use crate::dataplane::core::Message;
 use opentelemetry::trace::TraceContextExt;
 use std::io::prelude::*;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -14,7 +14,7 @@ pub struct FileLogResourceProvider {
 struct FileLogResourceProviderInner {
     #[allow(unused)]
     resource_provider_id: edgeless_api::function_instance::InstanceId,
-    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    dataplane_provider: crate::dataplane::handle::DataplaneProvider,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, FileLogResource>,
 }
 
@@ -29,7 +29,7 @@ impl Drop for FileLogResource {
 }
 
 impl FileLogResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, filename: &str, add_timestamp: bool) -> anyhow::Result<Self> {
+    async fn new(dataplane_handle: crate::dataplane::handle::DataplaneHandle, filename: &str, add_timestamp: bool) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
 
         let mut outfile = std::fs::OpenOptions::new().create(true).append(true).open(filename)?;
@@ -38,7 +38,7 @@ impl FileLogResource {
 
         let handle = tokio::spawn(async move {
             loop {
-                let edgeless_dataplane::core::DataplaneEvent {
+                let crate::dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
                     message,
@@ -89,7 +89,7 @@ impl FileLogResource {
 
                 if need_reply {
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(Vec::new()))
+                        .reply(source_id, channel_id, crate::dataplane::core::CallRet::Reply(Vec::new()))
                         .await;
                 }
             }
@@ -101,7 +101,7 @@ impl FileLogResource {
 
 impl FileLogResourceProvider {
     pub async fn new(
-        dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        dataplane_provider: crate::dataplane::handle::DataplaneProvider,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {

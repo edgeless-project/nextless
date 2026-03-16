@@ -24,7 +24,6 @@ wasmtime-wasi = { version = "10" }
 clap = { version = "4.3", features=["derive"] }
 toml = "0.7"
 edgeless_api = {path = "../edgeless_api" }
-edgeless_dataplane = {path = "../edgeless_dataplane"  }
 edgeless_con = {path = "../edgeless_con" }
 edgeless_node = {path = "../edgeless_node" }
 redis = "*"

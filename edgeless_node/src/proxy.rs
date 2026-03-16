@@ -20,7 +20,7 @@ impl Drop for ProxyManager {
 pub struct ProxyManagerTask {
     receiver: tokio::sync::mpsc::UnboundedReceiver<ProxyManagerRequest>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, ProxyInstance>,
-    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    dataplane_provider: crate::dataplane::handle::DataplaneProvider,
 }
 
 pub struct ProxyInstance {
@@ -35,8 +35,8 @@ impl Drop for ProxyInstance {
 
 pub struct ProxyInstanceTask {
     control_receiver: tokio::sync::mpsc::UnboundedReceiver<ProxyInstanceRequest>,
-    internal_dataplane: edgeless_dataplane::handle::DataplaneHandle,
-    external_dataplane: edgeless_dataplane::handle::DataplaneHandle,
+    internal_dataplane: crate::dataplane::handle::DataplaneHandle,
+    external_dataplane: crate::dataplane::handle::DataplaneHandle,
     inner_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
     inner_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
     external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
@@ -60,12 +60,12 @@ impl ProxyInstanceTask {
                 futures::select! {
                     internal_message = self.internal_dataplane.receive_next().fuse() => {
                         match internal_message.message {
-                            edgeless_dataplane::core::Message::Cast(msg) => {
+                            crate::dataplane::core::Message::Cast(msg) => {
                                 if let Err(e) = self.external_dataplane.send_alias(internal_message.target_port.0, &msg, opentelemetry::Context::new()).await {
                                     tracing::error!("Proxy External Send Error: {e}");
                                 }
                             },
-                            edgeless_dataplane::core::Message::Call(msg) => {
+                            crate::dataplane::core::Message::Call(msg) => {
                                 let reply = self.external_dataplane.call_alias(internal_message.target_port.0, &msg, opentelemetry::Context::new()).await;
                                 self.internal_dataplane.reply(internal_message.source_id, internal_message.channel_id, reply).await;
                             },
@@ -78,12 +78,12 @@ impl ProxyInstanceTask {
                     },
                     external_message = self.external_dataplane.receive_next().fuse() => {
                         match external_message.message {
-                            edgeless_dataplane::core::Message::Cast(msg) => {
+                            crate::dataplane::core::Message::Cast(msg) => {
                                 if let Err(e) = self.internal_dataplane.send_alias(external_message.target_port.0, &msg, opentelemetry::Context::new()).await {
                                     tracing::error!("Proxy Internal Send Error: {e}");
                                 }
                             },
-                            edgeless_dataplane::core::Message::Call(msg) => {
+                            crate::dataplane::core::Message::Call(msg) => {
                                 let reply = self.internal_dataplane.call_alias(external_message.target_port.0, &msg, opentelemetry::Context::new()).await;
                                 self.external_dataplane.reply(external_message.source_id, external_message.channel_id, reply).await;
                             },
@@ -118,8 +118,8 @@ impl ProxyInstanceTask {
 impl ProxyInstance {
     async fn create(
         spec: edgeless_api::proxy_instance::ProxySpec,
-        internal_dataplane: edgeless_dataplane::handle::DataplaneHandle,
-        external_dataplane: edgeless_dataplane::handle::DataplaneHandle,
+        internal_dataplane: crate::dataplane::handle::DataplaneHandle,
+        external_dataplane: crate::dataplane::handle::DataplaneHandle,
     ) -> Self {
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<ProxyInstanceRequest>();
 
@@ -140,7 +140,7 @@ impl ProxyInstance {
 }
 
 impl ProxyManager {
-    pub async fn start(dataplane_provider: edgeless_dataplane::handle::DataplaneProvider) -> Self {
+    pub async fn start(dataplane_provider: crate::dataplane::handle::DataplaneProvider) -> Self {
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<ProxyManagerRequest>();
 
         let t = ProxyManagerTask {

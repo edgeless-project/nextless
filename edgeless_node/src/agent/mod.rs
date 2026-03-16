@@ -3,8 +3,8 @@ use std::time::Duration;
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+use crate::dataplane::core::EdgelessDataplanePeerSettings;
 use edgeless_api::{controller::ControllerAPI, proxy_instance::ProxyInstanceAPI};
-use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
 enum AgentRequest {
@@ -44,7 +44,7 @@ pub struct AgentTask {
     actor_runtimes: std::collections::HashMap<edgeless_api::node_registration::RuntimeType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
     resource_providers: std::collections::HashMap<String, ResourceDesc>,
     proxy: Box<dyn ProxyInstanceAPI>,
-    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    dataplane_provider: crate::dataplane::handle::DataplaneProvider,
 
     // After spawning a new function, the function´s class is only used to determine which runner to start it on.
     // When stopping, only the stop_function_id is provided which does not allow to know which runner it is
@@ -72,7 +72,7 @@ impl Agent {
         runners: std::collections::HashMap<edgeless_api::node_registration::RuntimeType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
         resources: std::collections::HashMap<String, ResourceDesc>,
         node_id: uuid::Uuid,
-        data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        data_plane_provider: crate::dataplane::handle::DataplaneProvider,
         proxy: Box<dyn ProxyInstanceAPI>,
         controller_url: String,
         node_urls: NodeUrls,

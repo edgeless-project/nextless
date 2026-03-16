@@ -7,9 +7,9 @@ use opentelemetry::trace::Tracer;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::core::*;
-use crate::node_local::*;
-use crate::remote_node::*;
+use crate::dataplane::core::*;
+use crate::dataplane::node_local::*;
+use crate::dataplane::remote_node::*;
 use rand::seq::SliceRandom;
 
 #[derive(Clone)]
@@ -44,7 +44,7 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
                 source_port: edgeless_api::function_instance::PortId("UNKNOWN".to_string()),
                 target_port: self.target_port.clone(),
                 channel_id: 0,
-                message: crate::core::Message::Cast(msg),
+                message: crate::dataplane::core::Message::Cast(msg),
                 context: opentelemetry::trace::SpanContext::empty_context(),
             })
             .unwrap();
@@ -56,7 +56,7 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
 #[derive(Clone)]
 #[allow(clippy::type_complexity)]
 pub struct DataplaneHandle {
-    alias_mapping: crate::alias_mapping::AliasMapping,
+    alias_mapping: crate::dataplane::alias_mapping::AliasMapping,
     slf: edgeless_api::function_instance::InstanceId,
     incomming_links: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkInstanceId, Box<IncommingLink>>>>,
     sender: tokio::sync::mpsc::UnboundedSender<DataplaneEvent>,
@@ -147,7 +147,7 @@ impl DataplaneHandle {
         });
 
         DataplaneHandle {
-            alias_mapping: crate::alias_mapping::AliasMapping::new(),
+            alias_mapping: crate::dataplane::alias_mapping::AliasMapping::new(),
             slf: receiver_id,
             sender: main_sender.clone(),
             incomming_links: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
@@ -649,7 +649,7 @@ impl edgeless_api::link::LinkInstanceAPI for DataplaneProvider {
 
 #[cfg(test)]
 mod test {
-    use crate::handle::*;
+    use crate::dataplane::handle::*;
 
     #[tokio::test]
     async fn local_normal_path() {
@@ -674,7 +674,7 @@ mod test {
         let res = handle_2.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&res.message),
-            std::mem::discriminant(&crate::core::Message::Cast(Vec::new()))
+            std::mem::discriminant(&crate::dataplane::core::Message::Cast(Vec::new()))
         );
     }
 
@@ -703,7 +703,7 @@ mod test {
         let req = handle_2.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&req.message),
-            std::mem::discriminant(&crate::core::Message::Call(Vec::new()))
+            std::mem::discriminant(&crate::dataplane::core::Message::Call(Vec::new()))
         );
 
         handle_2.reply(req.source_id, req.channel_id, CallRet::NoReply).await;
@@ -764,7 +764,7 @@ mod test {
         let cast_req = handle_2.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&cast_req.message),
-            std::mem::discriminant(&crate::core::Message::Cast(Vec::new()))
+            std::mem::discriminant(&crate::dataplane::core::Message::Cast(Vec::new()))
         );
 
         let cloned_id_1 = fid_1;
@@ -784,7 +784,7 @@ mod test {
         let call_req = handle_1.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&call_req.message),
-            std::mem::discriminant(&crate::core::Message::Call(Vec::new()))
+            std::mem::discriminant(&crate::dataplane::core::Message::Call(Vec::new()))
         );
         handle_1.reply(call_req.source_id, call_req.channel_id, CallRet::NoReply).await;
 

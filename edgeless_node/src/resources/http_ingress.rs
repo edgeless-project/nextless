@@ -10,12 +10,12 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 struct ResourceDesc {
     host: String,
     allow: std::collections::HashSet<edgeless_function_types::http::EdgelessHTTPMethod>,
-    dataplane: edgeless_dataplane::handle::DataplaneHandle,
+    dataplane: crate::dataplane::handle::DataplaneHandle,
 }
 
 struct IngressState {
     active_resources: std::collections::HashMap<InstanceId, ResourceDesc>,
-    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    dataplane_provider: crate::dataplane::handle::DataplaneProvider,
 }
 
 #[derive(Clone)]
@@ -93,7 +93,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         .call_alias("new_request".to_string(), &serialized_msg, request_context.clone())
                         .await;
 
-                    if let edgeless_dataplane::core::CallRet::Reply(data) = res {
+                    if let crate::dataplane::core::CallRet::Reply(data) = res {
                         let processor_response: edgeless_function_types::http::EdgelessHTTPResponse = serde_json::from_slice(&data)?;
                         let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
                             processor_response.body.unwrap_or_default(),
@@ -124,7 +124,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 }
 
 pub async fn ingress_task(
-    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    dataplane_provider: crate::dataplane::handle::DataplaneProvider,
     ingress_id: edgeless_api::function_instance::InstanceId,
     ingress_url: String,
 ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>> {

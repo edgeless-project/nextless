@@ -89,8 +89,8 @@ pub fn call_raw(
         )
         .map_err(|_| wasmi::Error::new("call error"))?;
     match call_ret {
-        edgeless_dataplane::core::CallRet::NoReply => Ok(0),
-        edgeless_dataplane::core::CallRet::Reply(data) => {
+        crate::dataplane::core::CallRet::NoReply => Ok(0),
+        crate::dataplane::core::CallRet::Reply(data) => {
             let len = data.len();
 
             let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_slice())?;
@@ -99,7 +99,7 @@ pub fn call_raw(
 
             Ok(1)
         }
-        edgeless_dataplane::core::CallRet::Err => Ok(2),
+        crate::dataplane::core::CallRet::Err => Ok(2),
     }
 }
 
@@ -145,8 +145,8 @@ pub fn call(
         .block_on(caller.data_mut().host.call_alias(&target, &payload))
         .map_err(|_| wasmi::Error::new("call error"))?;
     match call_ret {
-        edgeless_dataplane::core::CallRet::NoReply => Ok(0),
-        edgeless_dataplane::core::CallRet::Reply(data) => {
+        crate::dataplane::core::CallRet::NoReply => Ok(0),
+        crate::dataplane::core::CallRet::Reply(data) => {
             let len = data.len();
 
             let data_ptr = copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_slice())?;
@@ -155,7 +155,7 @@ pub fn call(
 
             Ok(1)
         }
-        edgeless_dataplane::core::CallRet::Err => Ok(2),
+        crate::dataplane::core::CallRet::Err => Ok(2),
     }
 }
 

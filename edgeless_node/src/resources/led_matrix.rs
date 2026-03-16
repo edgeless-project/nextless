@@ -22,7 +22,7 @@ pub struct LedMatrixResourceProvider {
 }
 
 struct LedMatrixResourceProviderInner {
-    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    dataplane_provider: crate::dataplane::handle::DataplaneProvider,
     sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, LedMatrixResource>,
 }
@@ -39,7 +39,7 @@ impl Drop for LedMatrixResource {
 
 impl LedMatrixResource {
     async fn new(
-        dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        dataplane_handle: crate::dataplane::handle::DataplaneHandle,
         #[allow(unused)] sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
     ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
@@ -57,13 +57,13 @@ impl LedMatrixResource {
 
         let handle = tokio::spawn(async move {
             loop {
-                let edgeless_dataplane::core::DataplaneEvent { message, target_port, .. } = dataplane_handle.receive_next().await;
+                let crate::dataplane::core::DataplaneEvent { message, target_port, .. } = dataplane_handle.receive_next().await;
 
                 if &target_port.0 != "update" {
                     continue;
                 }
 
-                let edgeless_dataplane::core::Message::Cast(message_data) = message else {
+                let crate::dataplane::core::Message::Cast(message_data) = message else {
                     continue;
                 };
 
@@ -79,7 +79,7 @@ impl LedMatrixResource {
 
 impl LedMatrixResourceProvider {
     pub async fn new(
-        dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        dataplane_provider: crate::dataplane::handle::DataplaneProvider,
         _resource_provider_id: edgeless_api::function_instance::InstanceId,
         sender: std::sync::mpsc::Sender<edgeless_function_types::led_matrix::MatrixFrame>,
     ) -> Self {

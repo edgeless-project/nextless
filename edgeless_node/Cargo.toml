@@ -38,7 +38,6 @@ clap = { version = "4.3", features = ["derive"] }
 toml = "0.7"
 edgeless_api = { path = "../edgeless_api", features = ["grpc_impl"] }
 edgeless_telemetry = { path = "../edgeless_telemetry" }
-edgeless_dataplane = { path = "../edgeless_dataplane" }
 edgeless_function_types = { path = "../edgeless_function_types", features = ["hyper", "http"] }
 edgeless_function_core = { path = "../edgeless_function_core" }
 hyper = { version = "1.2", features = ["full"] }
@@ -80,6 +79,9 @@ elfloader = { git = "https://github.com/raphaelhetzel/rust-elfloader.git", branc
 embedded-graphics = { version = "0.8" }
 rpi-led-panel = { version = "0.8", optional = true }
 embedded-graphics-simulator = {version = "0.8.0", optional = true }
+
+rand = "0.8"
+edgeless_link_multicast = { path = "../edgeless_link_multicast" }
 
 [build-dependencies]
 tonic-build = "0.10"

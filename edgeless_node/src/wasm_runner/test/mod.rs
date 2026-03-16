@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::base_runtime::RuntimeAPI;
+use crate::dataplane::core::CallRet;
+use crate::dataplane::handle::DataplaneHandle;
 use edgeless_api::function_instance::InstanceId;
-use edgeless_dataplane::core::CallRet;
-use edgeless_dataplane::handle::DataplaneHandle;
 use edgeless_telemetry::telemetry_events::TelemetryEvent;
 
 #[derive(Clone)]
@@ -101,7 +101,7 @@ async fn basic_lifecycle() {
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
 
     let state_manager = Box::new(crate::state_management::StateManager::new().await);
-    let dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
+    let dataplane_provider = crate::dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
 
     let (telemetry_mock_sender, mut telemetry_mock_receiver) = tokio::sync::mpsc::unbounded_channel::<TestTelemetryEvent>();
     let telemetry_handle = Box::new(MockTelemetryHandle {
@@ -179,7 +179,7 @@ async fn messaging_test_setup() -> (
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
 
     let state_manager = Box::new(crate::state_management::StateManager::new().await);
-    let mut dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
+    let mut dataplane_provider = crate::dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
 
     // shared insert
     let test_peer_fid = edgeless_api::function_instance::InstanceId::new(node_id);
@@ -303,7 +303,7 @@ async fn messaging_cast_raw_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Cast("cast_raw_output".as_bytes().to_vec())
+        crate::dataplane::core::Message::Cast("cast_raw_output".as_bytes().to_vec())
     );
 }
 
@@ -330,7 +330,7 @@ async fn messaging_call_raw_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Call("call_raw_output".as_bytes().to_vec())
+        crate::dataplane::core::Message::Call("call_raw_output".as_bytes().to_vec())
     );
 
     test_peer_handle
@@ -364,7 +364,7 @@ async fn messaging_delayed_cast_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Cast("delayed_cast_output".as_bytes().to_vec())
+        crate::dataplane::core::Message::Cast("delayed_cast_output".as_bytes().to_vec())
     );
 
     let timeout_t_r = tokio::time::timeout(tokio::time::Duration::from_secs(2), telemetry_mock_receiver.recv()).await;
@@ -402,7 +402,7 @@ async fn messaging_cast_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Cast("cast_output".as_bytes().to_vec())
+        crate::dataplane::core::Message::Cast("cast_output".as_bytes().to_vec())
     );
 }
 
@@ -429,7 +429,7 @@ async fn messaging_call_output() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Call("call_output".as_bytes().to_vec())
+        crate::dataplane::core::Message::Call("call_output".as_bytes().to_vec())
     );
 
     next_handle.reply(test_message.source_id, test_message.channel_id, CallRet::NoReply).await;
@@ -463,7 +463,7 @@ async fn function_in_call_can_be_stopped() {
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Call("call_output".as_bytes().to_vec())
+        crate::dataplane::core::Message::Call("call_output".as_bytes().to_vec())
     );
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
@@ -564,7 +564,7 @@ async fn state_management() {
         output_mocks: output_mocks.clone(),
     });
 
-    let mut dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
+    let mut dataplane_provider = crate::dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
 
     let (telemetry_mock_sender, mut telemetry_mock_receiver) = tokio::sync::mpsc::unbounded_channel::<TestTelemetryEvent>();
     let telemetry_handle = Box::new(MockTelemetryHandle {
