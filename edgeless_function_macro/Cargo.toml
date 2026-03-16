@@ -14,5 +14,4 @@ proc-macro2 = "1.0"
 quote = "1"
 syn = "2.0"
 edgeless_function_core = { path = "../edgeless_function_core" }
-edgeless_actor_abi = { path = "../edgeless_actor_abi" }
 serde = { version = "1.0", features = ["derive"], default-features = false }

@@ -102,27 +102,27 @@ pub struct EdgelessHTTPResponse {
     pub headers: std::collections::HashMap<String, String>,
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for EdgelessHTTPRequest {
+impl<'a> edgeless_function::Deserialize<'a> for EdgelessHTTPRequest {
     fn deserialize(raw: &'a [u8]) -> Self {
         let str_message = core::str::from_utf8(raw).unwrap();
         request_from_string(str_message).unwrap()
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for EdgelessHTTPResponse {
+impl<'a> edgeless_function::Deserialize<'a> for EdgelessHTTPResponse {
     fn deserialize(raw: &'a [u8]) -> Self {
         let str_message = core::str::from_utf8(raw).unwrap();
         response_from_string(str_message).unwrap()
     }
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for EdgelessHTTPRequest {
+impl<'a> edgeless_function::Serialize<'a> for EdgelessHTTPRequest {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         request_to_string(self).as_bytes().to_vec()
     }
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for EdgelessHTTPResponse {
+impl<'a> edgeless_function::Serialize<'a> for EdgelessHTTPResponse {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         response_to_string(self).as_bytes().to_vec()
     }

@@ -29,7 +29,7 @@ pub struct SensorId {
     pub component_id: [u8; 16],
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for NumberedTestMessage {
+impl<'a> edgeless_function::Serialize<'a> for NumberedTestMessage {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = Vec::with_capacity(self.payload.len() + 8);
         out.extend_from_slice(&self.sequence_number.to_be_bytes());
@@ -39,7 +39,7 @@ impl<'a> edgeless_function_core::Serialize<'a> for NumberedTestMessage {
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for NumberedTestMessage {
+impl<'a> edgeless_function::Deserialize<'a> for NumberedTestMessage {
     fn deserialize(raw: &'a [u8]) -> Self {
         assert!(raw.len() >= 16);
         let payload_len = u64::from_be_bytes(raw[8..16].try_into().unwrap());
@@ -57,7 +57,7 @@ impl<'a> edgeless_function_core::Deserialize<'a> for NumberedTestMessage {
     }
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for EncryptedNumberedTestMessage {
+impl<'a> edgeless_function::Serialize<'a> for EncryptedNumberedTestMessage {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = Vec::with_capacity(self.payload.len() + 8);
         out.extend_from_slice(&self.sequence_number.to_be_bytes());
@@ -67,7 +67,7 @@ impl<'a> edgeless_function_core::Serialize<'a> for EncryptedNumberedTestMessage 
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for EncryptedNumberedTestMessage {
+impl<'a> edgeless_function::Deserialize<'a> for EncryptedNumberedTestMessage {
     fn deserialize(raw: &'a [u8]) -> Self {
         assert!(raw.len() >= 16);
         let payload_len = u64::from_be_bytes(raw[8..16].try_into().unwrap());
@@ -82,7 +82,7 @@ impl<'a> edgeless_function_core::Deserialize<'a> for EncryptedNumberedTestMessag
     }
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for MockSensorValue {
+impl<'a> edgeless_function::Serialize<'a> for MockSensorValue {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = Vec::with_capacity(size_of::<MockSensorValue>());
         out.extend_from_slice(&self.sequence_number.to_be_bytes());
@@ -93,7 +93,7 @@ impl<'a> edgeless_function_core::Serialize<'a> for MockSensorValue {
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for MockSensorValue {
+impl<'a> edgeless_function::Deserialize<'a> for MockSensorValue {
     fn deserialize(raw: &'a [u8]) -> Self {
         assert!(raw.len() >= size_of::<MockSensorValue>());
 
@@ -113,7 +113,7 @@ impl<'a> edgeless_function_core::Deserialize<'a> for MockSensorValue {
 #[cfg(test)]
 mod test {
     use super::*;
-    use edgeless_function_core::{Deserialize, Serialize};
+    use edgeless_function::{Deserialize, Serialize};
 
     #[test]
     fn numbered_test_message() {

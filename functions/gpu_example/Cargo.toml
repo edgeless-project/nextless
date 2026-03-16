@@ -26,7 +26,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 edgeless_function = { path = "../../edgeless_function" }
-edgeless_function_core = { path = "../../edgeless_function_core" }
 edgeless_function_gpu = { path = "../../edgeless_function_gpu" }
 log = "0.4"
 pollster = "0.4"

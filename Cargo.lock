@@ -1568,7 +1568,6 @@ dependencies = [
 name = "edgeless_function_macro"
 version = "0.1.0"
 dependencies = [
- "edgeless_actor_abi",
  "edgeless_function_core",
  "proc-macro2",
  "quote",
@@ -1580,7 +1579,7 @@ dependencies = [
 name = "edgeless_function_types"
 version = "0.1.0"
 dependencies = [
- "edgeless_function_core",
+ "edgeless_function",
  "embedded-graphics",
  "image",
  "log",
@@ -1594,7 +1593,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "edgeless_function_core",
+ "edgeless_function",
  "hyper 1.8.1",
  "serde",
  "serde_json",
