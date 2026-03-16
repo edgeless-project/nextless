@@ -7,9 +7,6 @@
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 extern crate alloc;
 
-#[cfg(feature = "std")]
-pub mod lcg;
-
 /// Guest Codegen based on function.json
 // #[cfg(feature = "std")]
 pub use edgeless_function_macro::generate;
