@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: MIT
 [package]
 name = "edgeless_cli"
-version = "0.2.0"
+# This was bumped from 0.2 to 3.0 due to Homebrew.
+version = "3.0.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
 rust-version = "1.92"
