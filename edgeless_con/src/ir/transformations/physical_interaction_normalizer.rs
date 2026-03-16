@@ -18,10 +18,10 @@ impl super::StatelessPhysicalTransformation for PhysicalInteractionNormalizer {
         _peer_clusters: &crate::ir::Clusters,
     ) -> Vec<super::PhysicalChange> {
         let mut dialect_registry = crate::ir::interaction::dialect::DialectRegistry::only_physical_overlay();
-        let Ok(interactions) = super::physical_interaction_specializer::collect_physical_interactions(workflow, &mut dialect_registry) else {
+        let Ok(interactions) = crate::ir::support::port_utils::collect_physical_interactions(workflow, &mut dialect_registry) else {
             return Vec::new();
         };
-        super::physical_interaction_specializer::distribute_physical_interactions(interactions, workflow, &mut dialect_registry)
+        crate::ir::support::port_utils::distribute_physical_interactions(interactions, workflow, &mut dialect_registry)
             .map_err(|e| {
                 tracing::warn!("Failure distributing physical interactions: {e}");
             })
