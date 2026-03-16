@@ -25,12 +25,7 @@ crate-type = ["cdylib"]
 [dependencies]
 log = "0.4"
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
-edgeless_function_core = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_core" }
-edgeless_actor_abi = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_actor_abi" }
 edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types" }
-allocator-api2 = { version = "0.2.8", default-features = false, features = [
-    "alloc",
-] }
 
 [features]
 

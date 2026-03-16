@@ -9,7 +9,6 @@
 // https://github.com/bytecodealliance/wit-bindgen/tree/main/crates/guest-rust/macro
 // https://users.rust-lang.org/t/acceptable-for-procedural-macros-to-write-outside-of-source-file/69295
 
-use edgeless_function_core::PortMethod;
 use quote::quote;
 
 #[proc_macro]
@@ -46,13 +45,13 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let feature = format!("input_{key}");
 
         match val.method {
-            PortMethod::CAST => {
+            edgeless_function_core::PortMethod::CAST => {
                 let method_name = quote::format_ident!("handle_cast_{}", key.to_lowercase());
                 let cloned_ident = type_ident.clone();
                 cast_inputs.push(quote! {
                     #[cfg(feature = #feature)]
                     if port == #key {
-                        let param = <<#parsed_ident as #trait_name>::#cloned_ident as edgeless_function_core::Deserialize>::deserialize(encoded_message);
+                        let param = <<#parsed_ident as #trait_name>::#cloned_ident as edgeless_function::Deserialize>::deserialize(encoded_message);
                         <#parsed_ident as #trait_name>::#method_name(src.clone(), param);
                         return Ok(());
                     }
@@ -63,7 +62,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     fn #method_name(src : InstanceId, data: Self::#type_ident);
                 }
             },
-            PortMethod::CALL => {
+            edgeless_function_core::PortMethod::CALL => {
                 // assert!(val.return_data_type.is_some());
 
                 let (return_type_ident, return_statement) = if let Some(rdt) = val.return_data_type.as_ref() {
@@ -72,10 +71,10 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     types.entry(return_type_ident.clone()).and_modify(|(_input, output)| *output = true).or_insert((false, true));
 
                     let return_statement = quote! {
-                        let serialized = <<#parsed_ident as #trait_name>::#return_type_ident as edgeless_function_core::Serialize>::serialize(&res);
-                        let mut buffer = allocator_api2::vec::Vec::new_in(&allocator_api2::alloc::Global as &dyn allocator_api2::alloc::Allocator);
+                        let serialized = <<#parsed_ident as #trait_name>::#return_type_ident as edgeless_function::Serialize>::serialize(&res);
+                        let mut buffer = edgeless_function::allocator_api2::vec::Vec::new_in(&edgeless_function::allocator_api2::alloc::Global as &dyn edgeless_function::allocator_api2::alloc::Allocator);
                         buffer.extend_from_slice(serialized.as_ref());
-                        return Ok(edgeless_actor_abi::CallRet::Reply(buffer));
+                        return Ok(edgeless_function::abi::CallRet::Reply(buffer));
                     };
 
                     (Some(return_type_ident), return_statement)
@@ -93,7 +92,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 call_inputs.push(quote! {
                     #[cfg(feature = #feature)]
                     if port == #key {
-                        let param = <<#parsed_ident as #trait_name>::#cloned_ident as edgeless_function_core::Deserialize>::deserialize(encoded_message);
+                        let param = <<#parsed_ident as #trait_name>::#cloned_ident as edgeless_function::Deserialize>::deserialize(encoded_message);
                         let res = <#parsed_ident as #trait_name>::#method_name(src, param);
                         #return_statement
                     }
@@ -128,20 +127,20 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let feature = format!("output_{output_id}");
 
             match output_spec.method {
-                PortMethod::CAST => {
+                edgeless_function_core::PortMethod::CAST => {
                     let handler_ident = quote::format_ident!("cast_{}", output_id);
 
                     quote! {
                         fn #handler_ident(payload: &<#parsed_ident as #trait_name>::#type_ident) {
                             #[cfg(feature = #feature)]
                             {
-                                let serialized = <<#parsed_ident as #trait_name>::#type_ident as edgeless_function_core::Serialize>::serialize(payload);
+                                let serialized = <<#parsed_ident as #trait_name>::#type_ident as edgeless_function::Serialize>::serialize(payload);
                                 cast(#output_id, serialized.as_ref());
                             }
                         }
                     }
                 }
-                PortMethod::CALL => {
+                edgeless_function_core::PortMethod::CALL => {
                     let (return_type_ident, return_statement) = if let Some(rdt) = output_spec.return_data_type.as_ref() {
                         let return_type_name = rdt.replace('.', "_").to_uppercase();
                         let return_type_ident = quote::format_ident!("{}", return_type_name);
@@ -152,7 +151,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                         let return_statement = quote! {
                             if let edgeless_function::CallRet::Reply(val) = res {
-                                return Ok(<<#parsed_ident as #trait_name>::#return_type_ident as edgeless_function_core::Deserialize>::deserialize(&val))
+                                return Ok(<<#parsed_ident as #trait_name>::#return_type_ident as edgeless_function::Deserialize>::deserialize(&val))
                             } else {
                                 return Err(())
                             }
@@ -169,12 +168,12 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     };
 
                     let handler_ident = quote::format_ident!("call_{}", output_id);
-                    let rt = if let Some(return_type_ident) = return_type_ident  {
-                        quote!{
+                    let rt = if let Some(return_type_ident) = return_type_ident {
+                        quote! {
                             Result<<#parsed_ident as #trait_name<'a>>::#return_type_ident, ()>
                         }
                     } else {
-                        quote!{
+                        quote! {
                             Result<(), ()>
                         }
                     };
@@ -182,7 +181,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         fn #handler_ident<'a>(payload: &'a <#parsed_ident as #trait_name>::#type_ident) -> #rt {
                             #[cfg(feature = #feature)]
                             {
-                                let serialized = <<#parsed_ident as #trait_name>::#type_ident as edgeless_function_core::Serialize>::serialize(payload);
+                                let serialized = <<#parsed_ident as #trait_name>::#type_ident as edgeless_function::Serialize>::serialize(payload);
                                 let res = call(#output_id, serialized.as_ref());
                                 #return_statement
                             }
@@ -201,11 +200,11 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let mut traits = Vec::new();
 
         if *input {
-            traits.push(quote!(edgeless_function_core::Deserialize<'a>));
+            traits.push(quote!(edgeless_function::Deserialize<'a>));
         }
 
         if *output {
-            traits.push(quote!(edgeless_function_core::Serialize<'a>));
+            traits.push(quote!(edgeless_function::Serialize<'a>));
         }
 
         quote! {
@@ -218,10 +217,10 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         #[cfg(not(target_arch = "wasm32"))]
         #[no_mangle]
-        fn init<'a>(host_api: &'static mut dyn edgeless_actor_abi::HostApi<'static>) -> edgeless_actor_abi::GuestApi<'a> {
+        fn init<'a>(host_api: &'static mut dyn edgeless_function::abi::HostApi<'static>) -> edgeless_function::abi::GuestApi<'a> {
             unsafe { edgeless_function::interface_dynlib::HOST_API = Some(host_api) };
 
-            let addr = edgeless_actor_abi::GuestApi {
+            let addr = edgeless_function::abi::GuestApi {
                 handle_cast: handle_cast,
                 handle_call: handle_call,
                 handle_init: handle_init,
@@ -246,7 +245,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         //edgeless_actor_abi::HandleCast
         #[no_mangle]
-        pub fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_actor_abi::ActorResult<()> {
+        pub fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_function::abi::ActorResult<()> {
             #(#cast_inputs)*
 
             if port == "INTERNAL" {
@@ -254,14 +253,14 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 return Ok(());
             }
 
-            Err(edgeless_actor_abi::ActorError::UndefinedPort)
+            Err(edgeless_function::abi::ActorError::UndefinedPort)
         }
 
         //edgeless_actor_abi::HandleCall
         #[no_mangle]
-        pub fn handle_call<'a>(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_actor_abi::ActorResult<edgeless_actor_abi::CallRet<'a>> {
+        pub fn handle_call<'a>(src: InstanceId, port: &str, encoded_message: &[u8]) -> edgeless_function::abi::ActorResult<edgeless_function::abi::CallRet<'a>> {
             #(#call_inputs)*
-            return Err(edgeless_actor_abi::ActorError::UndefinedPort);
+            return Err(edgeless_function::abi::ActorError::UndefinedPort);
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -309,9 +308,9 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let ret = handle_call(instance_id, port, payload).unwrap();
 
             let (ret, output_params) = match ret {
-                edgeless_actor_abi::CallRet::NoReply => (0, None),
-                edgeless_actor_abi::CallRet::Reply(reply) => (1, Some(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(&reply).consume())),
-                edgeless_actor_abi::CallRet::Err => (2, None),
+                edgeless_function::abi::CallRet::NoReply => (0, None),
+                edgeless_function::abi::CallRet::Reply(reply) => (1, Some(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(&reply).consume())),
+                edgeless_function::abi::CallRet::Err => (2, None),
             };
             if let (Some((output_ptr, output_len))) = output_params {
                 *out_ptr_ptr = output_ptr;
@@ -346,7 +345,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         //edgeless_actor_abi::HandleInit
         #[cfg(not(target_arch = "wasm32"))]
         #[no_mangle]
-        pub fn handle_init(payload: Option<&[u8]>, serialized_state: Option<&[u8]>) -> edgeless_actor_abi::ActorResult<()> {
+        pub fn handle_init(payload: Option<&[u8]>, serialized_state: Option<&[u8]>) -> edgeless_function::abi::ActorResult<()> {
             <#parsed_ident as #trait_name>::handle_init(payload, serialized_state);
             Ok(())
         }
@@ -360,7 +359,7 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         //edgeless_actor_abi::HandleStop
         #[cfg(not(target_arch = "wasm32"))]
         #[no_mangle]
-        fn handle_stop() -> edgeless_actor_abi::ActorResult<()> {
+        fn handle_stop() -> edgeless_function::abi::ActorResult<()> {
             <#parsed_ident as #trait_name>::handle_stop();
             Ok(())
         }

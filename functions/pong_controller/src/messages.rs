@@ -14,7 +14,7 @@ pub struct PongRenderRequest {
     pub points_2: u64,
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for PongRenderRequest {
+impl<'a> edgeless_function::Serialize<'a> for PongRenderRequest {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = [0u8; 8 * 8];
 
@@ -31,7 +31,7 @@ impl<'a> edgeless_function_core::Serialize<'a> for PongRenderRequest {
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for PongRenderRequest {
+impl<'a> edgeless_function::Deserialize<'a> for PongRenderRequest {
     fn deserialize(raw: &'a [u8]) -> Self {
         let paddle_1_y = u64::from_le_bytes(raw[..8].try_into().unwrap());
         let paddle_2_y = u64::from_le_bytes(raw[8..16].try_into().unwrap());

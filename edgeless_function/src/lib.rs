@@ -59,6 +59,12 @@ pub use output_api_dynlib as output_api;
 
 pub use output_api::*;
 
+// RE-Exports used by the macro / common actors.
+pub use allocator_api2;
+pub use edgeless_actor_abi as abi;
+pub use edgeless_function_core::Deserialize;
+pub use edgeless_function_core::Serialize;
+
 pub enum CallRet {
     NoReply,
     Reply(owned_data::OwnedByteBuff),

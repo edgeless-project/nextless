@@ -26,7 +26,7 @@ pub struct UpdateCorner {
     pub new_state: super::Field,
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for UpdateRow {
+impl<'a> edgeless_function::Serialize<'a> for UpdateRow {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = [0u8; (9 * 16 + 8)];
 
@@ -43,7 +43,7 @@ impl<'a> edgeless_function_core::Serialize<'a> for UpdateRow {
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for UpdateRow {
+impl<'a> edgeless_function::Deserialize<'a> for UpdateRow {
     fn deserialize(raw: &'a [u8]) -> Self {
         let mut updates = [super::Field {
             state: super::FieldState::Dead,
@@ -73,7 +73,7 @@ impl<'a> edgeless_function_core::Deserialize<'a> for UpdateRow {
     }
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for UpdateCol {
+impl<'a> edgeless_function::Serialize<'a> for UpdateCol {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = [0u8; (9 * 16 + 8)];
 
@@ -90,7 +90,7 @@ impl<'a> edgeless_function_core::Serialize<'a> for UpdateCol {
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for UpdateCol {
+impl<'a> edgeless_function::Deserialize<'a> for UpdateCol {
     fn deserialize(raw: &'a [u8]) -> Self {
         let mut updates = [super::Field {
             state: super::FieldState::Dead,
@@ -120,7 +120,7 @@ impl<'a> edgeless_function_core::Deserialize<'a> for UpdateCol {
     }
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for UpdateCorner {
+impl<'a> edgeless_function::Serialize<'a> for UpdateCorner {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         let mut out = [0u8; 17];
 
@@ -135,7 +135,7 @@ impl<'a> edgeless_function_core::Serialize<'a> for UpdateCorner {
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for UpdateCorner {
+impl<'a> edgeless_function::Deserialize<'a> for UpdateCorner {
     fn deserialize(raw: &'a [u8]) -> Self {
         let iteration = u64::from_le_bytes(raw[..8].try_into().unwrap());
         let last_change = u64::from_le_bytes(raw[8..16].try_into().unwrap());
@@ -156,13 +156,13 @@ impl<'a> edgeless_function_core::Deserialize<'a> for UpdateCorner {
     }
 }
 
-impl<'a> edgeless_function_core::Serialize<'a> for Iteration {
+impl<'a> edgeless_function::Serialize<'a> for Iteration {
     fn serialize(&'a self) -> impl core::convert::AsRef<[u8]> {
         self.iteration_id.to_le_bytes()
     }
 }
 
-impl<'a> edgeless_function_core::Deserialize<'a> for Iteration {
+impl<'a> edgeless_function::Deserialize<'a> for Iteration {
     fn deserialize(raw: &'a [u8]) -> Self {
         let iteration_id = u64::from_le_bytes(raw.try_into().unwrap());
 

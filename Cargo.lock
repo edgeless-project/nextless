@@ -1549,6 +1549,7 @@ version = "0.1.0"
 dependencies = [
  "allocator-api2",
  "edgeless_actor_abi",
+ "edgeless_function_core",
  "edgeless_function_macro",
  "log",
  "static_cell 2.1.1",

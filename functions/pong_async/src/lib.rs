@@ -13,7 +13,7 @@ struct PingType {
     msg: String,
 }
 
-impl edgeless_function_core::Deserialize<'_> for PingType {
+impl edgeless_function::Deserialize<'_> for PingType {
     fn deserialize(data: &[u8]) -> Self {
         PingType {
             msg: String::from_utf8(data.to_vec()).unwrap(),
@@ -21,7 +21,7 @@ impl edgeless_function_core::Deserialize<'_> for PingType {
     }
 }
 
-impl edgeless_function_core::Serialize<'_> for PongType {
+impl edgeless_function::Serialize<'_> for PongType {
     fn serialize(&self) -> Vec<u8> {
         self.msg.as_bytes().to_vec()
     }
