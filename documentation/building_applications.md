@@ -52,11 +52,16 @@ el_main = wf
 
 ```
 
+One can bootstrap a new Application using [cargo-generate](https://github.com/cargo-generate/cargo-generate):
+```
+cargo generate --git https://github.com/edgeless-project/nextless templates/application
+```
+
 The developers need to include any Actor Class description they want to use in their application (cf. [building_actors.md](building_actors.md)).  
-Furthermore, they need to include the resource descriptions of resources they want to include in their application.
+Furthermore, they need to include the Resource descriptions of Resources they want to include in their application.
 Those can be found [here](https://github.com/edgeless-project/nextless/tree/development/resources).
 
-For each logical actor/resource, there needs to be an instance created by a call to `edgeless_actor`/`edgeless_resource` that is also added to the list in `edgeless_workflow`.
+For each logical Actor/Resource, there needs to be an instance created by a call to `edgeless_actor`/`edgeless_resource` that is also added to the list in `edgeless_workflow`.
 
 ## Actor Instances
 
@@ -72,13 +77,13 @@ There are various annotations limiting the placement of the logical instances:
 * `"node_ids_denied": "uuid,uuid"`: Prevents instances from being spawned on the listed node uuids.
 * `"runtime_dialects_allowed": "WASM,NATIVE_DYNAMIC"`: Limits the instance to use one of the listed runtimes.
 * `"runtime_dialects_denied": "WASM,NATIVE_DYNAMIC"`: Prevents instances from using one of the listed runtimes.
-* `"node_label_filter_allowed": "a&b&c|d&e|f"`: Boolean logic on the existance of node-labels. An instance can only be placed if the filter matches.
-* `"node_label_filter_denied": "g&h&i|j&k|l"`: Boolean logic on the existance of node-labels. An instance won't be placed if the filter matches.
+* `"node_label_filter_allowed": "a&b&c|d&e|f"`: Boolean logic on the existence of node-labels. An instance can only be placed if the filter matches.
+* `"node_label_filter_denied": "g&h&i|j&k|l"`: Boolean logic on the existence of node-labels. An instance won't be placed if the filter matches.
 
 ## Resource Instances
 
 With the exception of the `init-payload`, those annotations also exist when creating a Resource instance with `edgeless_resource`.
-For the resources, the developers need to fill the parameter `configurations`. The configuration differs between the Resource Classes.
+For the Resources, the developers need to fill the parameter `configurations`. The configuration differs between the Resource Classes.
 
 We ship multiple Resource Classes, including the following:
 
@@ -104,7 +109,7 @@ We ship multiple Resource Classes, including the following:
 ## Linking Ports
 
 The Ports of Actors/Resources need to be linked together.
-Unlinked ports may result in the removal of instances.
+Unlinked ports may result in the removal of Actors/Resources.
 
 There are multiple options to do this:
 

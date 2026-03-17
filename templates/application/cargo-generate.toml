@@ -1,0 +1,7 @@
+[template]
+cargo_generate_version = ">=0.9.0"
+
+[placeholders]
+actor_name = {prompt = "What's the name of the actor you want to include?", default = "example_actor_1", type = "string"}
+include_http_ingress = { prompt = "Include HTTP Ingress Resource?", default = false, type = "bool" }
+include_led_matrix = { prompt = "Include LED Matrix Resource?", default = false, type = "bool" }

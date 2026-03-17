@@ -72,7 +72,7 @@ Every Actor needs to implement the following handlers:
 
 Furthermore, the Actors need to implement a handler for each input port. Those handlers contain the input's name and are different for `cast` and `call` handlers---the latter requires a return value:
 
-`fn handle_cast_input_name(src: InstanceId, message: String) {}`: As `cast` handler receives the instance id of the sender and the deserialized message---this is a String in the example above, but could be any struct implementing `edgeless_function::Deserialize`.
+`fn handle_cast_input_name(src: InstanceId, message: String) {}`: A `cast` handler receives the instance id of the sender and the deserialized message---this is a String in the example above, but could be any struct implementing `edgeless_function::Deserialize`.
 
 
 `fn handle_call_input_name_2(_src: InstanceId, req: edgeless_function_types::http::EdgelessHTTPRequest) -> edgeless_function_types::http::EdgelessHTTPResponse {}`: A `call` handler receives the same inputs as a cast handler but also requires a return value. The framework handles serialization and the return value needs to implement `edgeless_function::Serialize`.
@@ -97,7 +97,7 @@ In their implementation of the input handlers, the developers may use any librar
 
 * `cast_output_name(message: &Self::OUTPUT_TYPE)`: Send a `cast` message to the Actor's output port `output_name`. The framework will handle serialization of the outgoing message using `edgeless_function::Serialize`.
 * `call_output_name_2(message: &Self::OUTPUT_TYPE) -> Result<&Self::INPUT_TYPE, ()>`: Send a `call` message to the Actor's output port `output_name_2` and wait for the response. The framework handles serialization using `edgeless_function::{Serialize, Deserialize}`.
-* `delayed_cast(delay_ms: u64, "self", msg: &[u8])`: After a delay, send a message to the Actor itself. The developers needs to handle serialization / deserialization of their message. This is received by `handle_internal`.
+* `delayed_cast(delay_ms: u64, "self", msg: &[u8])`: After a delay, send a message to the calling Actor. The developers needs to handle serialization / deserialization of their message. This is received by `handle_internal`.
 
 ## Cargo.toml
 

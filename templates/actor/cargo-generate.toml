@@ -2,6 +2,7 @@
 cargo_generate_version = ">=0.9.0"
 
 [placeholders]
-cast_inputs = {prompt = "Please list the names of the input ports to add.", default = "example_cast_in,example_cast_in2", type = "string" }
-cast_outputs = {prompt = "Please list the names of the output ports to add.", default = "example_cast_out", type = "string" }
-generate_http_handler = {prompt = "Generate HTTP Handler?", default = false, type = "bool" }
+cast_inputs = {prompt = "Please list the names of the input ports to add (comma separated).", default = "", type = "string" }
+cast_outputs = {prompt = "Please list the names of the output ports to add (comma separated).", default = "", type = "string" }
+generate_http_handler = { prompt = "Generate HTTP Handler?", default = false, type = "bool" }
+generate_matrix_output = { prompt = "Generate Output for LED Matrix?", default = false, type = "bool" }

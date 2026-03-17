@@ -1,0 +1,59 @@
+load("../{{actor_name}}/{{actor_name}}.star", "{{actor_name | upper_camel_case}}")
+{% if include_http_ingress -%}
+load("../../nextless/resources/http_ingress.star", "HTTPIngress")
+{% endif -%}
+{% if include_led_matrix -%}
+load("../../nextless/resources/led_matrix.star", "LedMatrix")
+{% endif -%}
+# Add load statements for Actors and Resources here.
+
+my_actor = edgeless_actor(
+    id = "my_actor",
+    klass = {{actor_name | upper_camel_case}},
+    annotations = {}
+)
+
+{% if include_http_ingress -%}
+ingress = edgeless_resource(
+    id = "ingress_1",
+    klass = HTTPIngress,
+    configurations = {
+        "host": "demo.localhost",
+        "methods": "GET"
+    }
+)
+{%- endif %}
+
+{% if include_led_matrix -%}
+led_matrix = edgeless_resource(
+    id = "led-matrix-1-1",
+    klass = LedMatrix,
+    configurations = {},
+    annotations = {}
+)
+{%- endif %}
+
+{% if include_http_ingress -%}
+ingress.new_request >> my_actor.http_request
+{% endif -%}
+{% if include_led_matrix -%}
+my_actor.drawable >> led_matrix.update
+{% endif -%}
+# You need to link all required ports here.
+
+wf = edgeless_workflow(
+    "{{crate_name}}",
+    [
+        my_actor,
+        {% if include_http_ingress -%}
+        ingress,
+        {% endif -%}
+        {% if include_led_matrix -%}
+        led_matrix,
+        {% endif -%}
+        # You need to add all services here.
+    ],
+    annotations = {}
+)
+
+el_main = wf
