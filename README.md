@@ -119,6 +119,8 @@ The developers need to implement this trait to define the Behavior of their Acto
 While implementing this trait, the developers need to map the abstract types to a Rust type implementing our framework's serialization and deserialization traits and implement handlers for the incoming ports,e.g., `handle_cast_data_in`.
 They can use generated functions for sending data to output ports, e.g., `cast_accepted_out`.
 
+To learn more about building Actors, please refer to [documentation/building_actors.md](documentation/building_actors.md).
+
 The set of Actors/Resources constituting an application is defined in an Application Specification:
 
 ```star
@@ -166,6 +168,8 @@ Furthermore, it defines Interactions between the actors.
 
 In the example, the Sensor is directly linked to the Filter [3],
 while the Filter's output and the Dashboard's input are mapped together using an abstract topic that is resolved in the orchestration system.
+
+To learn more about building Applications, please refer to [documentation/building_applications.md](documentation/building_applications.md).
 
 [3]: The arrow syntax has been inspired by Apache Airflow.
 
