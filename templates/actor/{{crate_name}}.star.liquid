@@ -7,6 +7,9 @@
         {%- for output in outputs %}
         cast_output("{{output}}", "String"),
         {%- endfor %}
+        {% if generate_matrix_output -%}
+        cast_output("drawable", "eft.led_matrix.matrix_frame")
+        {%- endif %}
     ],
     inputs = [
         {%- for input in inputs %}
@@ -14,7 +17,7 @@
         {%- endfor %}
         {% if generate_http_handler -%}
         call_input("http_request", "eft.http.request", "eft.http.response"),
-        {% endif -%}
+        {%- endif %}
     ],
     inner_structure = [
         {%- for input in inputs %}
@@ -23,6 +26,12 @@
         {%- for output in outputs %}
         source("{{output}}"),
         {%- endfor %}
+        {% if generate_http_handler -%}
+        sink("http_request"),
+        {% endif -%}
+        {% if generate_matrix_output -%}
+        source("drawable"),
+        {% endif -%}
         # link("example_cast_in", ["example_cast_out"]),
     ],
     code = file("{{crate_name}}.wasm"),
