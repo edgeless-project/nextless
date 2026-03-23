@@ -1,0 +1,4 @@
+controller_grpc_listen_url = "http://0.0.0.0:7001"
+controller_coap_listen_url = "coap://0.0.0.0:7001"
+# prometheus_url = "http://127.0.0.1:9090"
+placement_strategy = "${PLACEMENT_STRATEGY}"

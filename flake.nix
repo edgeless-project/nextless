@@ -44,7 +44,6 @@
           nativeBuildInputs = with pkgs; [
             openssl.dev
             vulkan-loader
-            perl
             pkg-config
             protobuf
             makeWrapper
@@ -139,7 +138,6 @@
             };
         };
 
-
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
             vulkan-loader
@@ -172,6 +170,21 @@
             # espup install
             source ~/export-esp.sh
           '';
+        };
+      }
+    ) //
+    flake-utils.lib.eachSystem [
+      "x86_64-linux"
+      "aarch64-linux"
+    ] (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        nextless_pkgs = self.packages.${system};
+      in
+      {
+        containers = {
+          nextless_node = (import ./nix/containers/nextless_node.nix) {inherit pkgs nextless_pkgs;};
+          nextless_controller = (import ./nix/containers/nextless_controller.nix) {inherit pkgs nextless_pkgs;};
         };
       }
     );

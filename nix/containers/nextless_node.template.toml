@@ -1,0 +1,18 @@
+[general]
+node_id = "${NODE_ID}"
+agent_url = "http://0.0.0.0:7021"
+agent_url_announced = "${AGENT_URL_ANNOUNCED}"
+invocation_url = "http://0.0.0.0:7022"
+invocation_url_announced = "${INVOCATION_URL_ANNOUNCED}"
+metrics_url = "http://0.0.0.0:7023"
+controller_url = "${CONTROLLER_URL}"
+
+[wasmtime_runtime]
+enabled = true
+
+[native_runtime]
+enabled = true
+
+[resources]
+http_ingress_url = "http://0.0.0.0:7035"
+http_ingress_provider = "http-ingress-1"
