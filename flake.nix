@@ -25,7 +25,6 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        nextless_pkgs = self.packages.${system};
         toolchain = with fenix.packages.${system}; combine [
           minimal.toolchain
           targets.wasm32-unknown-unknown.latest.rust-std
@@ -180,11 +179,16 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         nextless_pkgs = self.packages.${system};
+        toolchain = with fenix.packages.${system}; combine [
+          minimal.toolchain
+          targets.wasm32-unknown-unknown.latest.rust-std
+        ];
       in
       {
         containers = {
           nextless_node = (import ./nix/containers/nextless_node.nix) {inherit pkgs nextless_pkgs;};
           nextless_controller = (import ./nix/containers/nextless_controller.nix) {inherit pkgs nextless_pkgs;};
+          nextless_playground = (import ./nix/containers/nextless_playground.nix) {inherit pkgs nextless_pkgs toolchain;};
         };
       }
     );
