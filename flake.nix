@@ -25,8 +25,9 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        nextless_pkgs = self.packages.${system};
         toolchain = with fenix.packages.${system}; combine [
-          latest.toolchain
+          minimal.toolchain
           targets.wasm32-unknown-unknown.latest.rust-std
         ];
         node_package = {
@@ -39,6 +40,7 @@
             allowBuiltinFetchGit = true;
           };
           src = pkgs.lib.cleanSource ./.;
+          strictDeps = true;
           nativeBuildInputs = with pkgs; [
             openssl.dev
             vulkan-loader
@@ -48,11 +50,12 @@
             makeWrapper
           ];
           buildInputs = with pkgs; [
+            openssl
             vulkan-loader
           ];
           postInstall = ''
             wrapProgram $out/bin/edgeless_node_d \
-              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [pkgs.vulkan-loader]}
+              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [pkgs.openssl pkgs.vulkan-loader]}
           '';
         };
       in {
