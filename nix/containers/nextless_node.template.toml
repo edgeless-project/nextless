@@ -16,3 +16,5 @@ enabled = true
 [resources]
 http_ingress_url = "http://0.0.0.0:7035"
 http_ingress_provider = "http-ingress-1"
+http_egress_provider = "http-egress-1"
+file_log_provider = "file-log-1"

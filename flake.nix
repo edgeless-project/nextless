@@ -188,7 +188,7 @@
         containers = {
           nextless_node = (import ./nix/containers/nextless_node.nix) {inherit pkgs nextless_pkgs;};
           nextless_controller = (import ./nix/containers/nextless_controller.nix) {inherit pkgs nextless_pkgs;};
-          nextless_playground = (import ./nix/containers/nextless_playground.nix) {inherit pkgs nextless_pkgs toolchain;};
+          nextless_playground = (import ./nix/containers/nextless_playground.nix) {inherit pkgs nextless_pkgs toolchain system;};
         };
       }
     );

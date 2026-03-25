@@ -21,9 +21,10 @@ impl {{crate_name | upper_camel_case}}API<'_> for {{crate_name | upper_camel_cas
     {%endif -%}
     {%- if generate_http_handler %}
     fn handle_call_http_request(_src: InstanceId, req: Self::EFT_HTTP_REQUEST) -> Self::EFT_HTTP_RESPONSE {
+        log::info!("HTTP request received! Path: {}", req.path);
         edgeless_function_types::http::EdgelessHTTPResponse {
             status: 404,
-            body: Some(Vec::<u8>::from("Not Found")),
+            body: Some(Vec::<u8>::from("Handler not configured.")),
             headers: std::collections::HashMap::<String, String>::new(),
         }
     }
