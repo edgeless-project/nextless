@@ -22,6 +22,6 @@ tmux send-keys -t $S:main.2 "edgeless_con_d" C-m
 
 tmux select-pane -t $S:main.0 -T development_environment
 tmux select-pane -t $S:main.0
-tmux send-keys -t $S:main.0 "cat README.md" C-m
+tmux send-keys -t $S:main.0 "glow -w 120 README.md" C-m
 
 tmux attach -t $S

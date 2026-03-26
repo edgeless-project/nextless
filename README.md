@@ -42,6 +42,16 @@ In addition to the static optimizations, the system also tracks the runtime perf
 [1]: Term inspired by the Actor model.  
 [2]: Term inspired by MLIR.
 
+## Further Documentation
+
+You can find the discussion of an example application below.
+
+* [Qickstart Guide](./documentation/quickstart.md)
+* [Installation](./documentation/installation.md)
+* [Actor Reference](./documentation/building_actors.md)
+* [Application Reference](./documentation/building_applications.md)
+* [System Overview](./documentation/system_components.md)
+
 ## Example
 
 <img src="documentation/demo_with_background.png" alt="demo_application" width="500"/>

@@ -138,6 +138,7 @@ pkgs.dockerTools.buildImage {
       vim
       nano
       curl
+      glow
 
       cargo-generate
       toolchain
