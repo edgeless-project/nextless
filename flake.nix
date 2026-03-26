@@ -63,7 +63,7 @@
             rustc = toolchain;
           }).buildRustPackage rec {
             pname = "edgeless_cli";
-            version = "0.1";
+            version = "3.0.1";
             doCheck = false;
             buildAndTestSubdir = "edgeless_cli";
             cargoLock = {
@@ -78,6 +78,7 @@
               protobuf
             ];
             buildInputs = with pkgs; [
+              openssl
               toolchain
               makeWrapper
               gcc
@@ -89,7 +90,8 @@
                   toolchain
                   pkgs.gcc
                   pkgs.binaryen
-                ]}
+                ]} \
+                --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath [pkgs.openssl]}
             '';
           };
           nextless_node = (pkgs.makeRustPlatform {
@@ -141,6 +143,7 @@
           buildInputs = with pkgs; [
             vulkan-loader
             openssl.dev
+            openssl
             pkg-config
             protobuf
             # mold
