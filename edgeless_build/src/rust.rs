@@ -106,6 +106,10 @@ pub(crate) fn build_rust(
         cmd.arg(format!("-Zbuild-std={build_std_components}"));
     }
 
+    if target_configuration.ends_with(".json") {
+        cmd.arg("-Zjson-target-spec");
+    }
+
     let build_output = cmd.output().map_err(|e| BuildError::Toolchain {
         msg: format!("Could not call cargo build: {cmd:?}."),
         source: Some(e.into()),
