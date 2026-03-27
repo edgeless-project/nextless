@@ -313,7 +313,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                                 let new_id = new_instance.id().unwrap();
                                 required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
                                     component_id: new_component_id,
-                                    action: super::PhysicalComponentChangeAction::Update(new_instance),
+                                    action: super::PhysicalComponentChangeAction::Insert(logical_component_id.to_string(), new_instance),
                                 }));
                                 required_changes.extend(i.mark_lost_replaced(new_id));
                             }
@@ -362,7 +362,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                         let new_id = new_instance.id().unwrap();
                         required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
                             component_id: new_component_id,
-                            action: super::PhysicalComponentChangeAction::Update(new_instance),
+                            action: super::PhysicalComponentChangeAction::Insert(logical_component_id.to_string(), new_instance),
                         }));
                         required_changes.extend(i.mark_dead_replaced(new_id));
                     }
