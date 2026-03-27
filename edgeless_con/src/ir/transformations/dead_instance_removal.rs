@@ -343,14 +343,14 @@ fn remove_outputs_and_calculate_removable_peer_destinations(
     let mut peer_destination_port_entries_to_remove = Vec::new();
     for output_to_remove in output_ports_to_remove {
         let Some(removed_entry) = active_instance.physical_ports_mut().physical_output_mapping.remove(&output_to_remove) else {
-            tracing::warn!("Output to remove not found");
+            tracing::warn!("Output to remove not found.");
             continue;
         };
 
         let Ok(concrete_port_mapping) =
             crate::ir::interaction::dialect::physical_overlay::PhysicalOverlaySourcePort::as_concrete(removed_entry.mapping.as_ref())
         else {
-            tracing::warn!("Bad Mapping");
+            tracing::warn!("Bad mapping.");
             continue;
         };
 

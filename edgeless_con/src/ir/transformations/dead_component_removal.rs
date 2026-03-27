@@ -291,7 +291,7 @@ impl DeadComponentRemoval {
     fn remove_unused_functions(slf: &mut std::collections::HashMap<String, (crate::ir::logical_model::LogicalComponent, bool)>) -> bool {
         let before = slf.len();
 
-        slf.retain(|_f_id, (f_spec, _)| {
+        slf.retain(|f_id, (f_spec, _)| {
             let crate::ir::logical_model::LogicalComponent::Actor(actor) = &f_spec else {
                 return true;
             };
@@ -321,6 +321,7 @@ impl DeadComponentRemoval {
                 }
 
                 if !keep_if_triggered_by_side_effect {
+                    tracing::info!("Removing Actor not receiving any inputs: {}.", f_id);
                     return false;
                 }
             }
@@ -343,6 +344,7 @@ impl DeadComponentRemoval {
                 }
 
                 if !keep_if_triggers_side_effect {
+                    tracing::info!("Removing Actor not sending any outputs: {}.", f_id);
                     return false;
                 }
             }

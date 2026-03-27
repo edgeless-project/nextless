@@ -33,7 +33,6 @@ impl<P: super::transformations::placement::strategy::PlacementStrategy> ManagedW
         peer_clusters: &crate::ir::Clusters,
         global_state: &super::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>,
     ) -> Vec<super::RequiredChange> {
-        tracing::info!("Initial Spawn");
         self.pipeline.apply_all(&mut self.wf, nodes, peer_clusters, global_state);
         self.materialize()
     }

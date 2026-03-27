@@ -81,11 +81,11 @@ fn optimize_component_single_active_port(
 
             if let Some((_, score)) = node_score {
                 if score + 10 < traffic_per_node[0].1 {
-                    tracing::info!("Detected suboptimal placement (single_port; local<remote): {component_id}. Will now attempt migration.");
+                    tracing::debug!("Detected suboptimal placement (single_port; local<remote): {component_id}. Will now attempt migration.");
                     required_changes.extend(instance.plan_migration());
                 }
             } else {
-                tracing::info!("Detected suboptimal placement (single_port; no local traffic): {component_id}. Will now attempt migration.");
+                tracing::debug!("Detected suboptimal placement (single_port; no local traffic): {component_id}. Will now attempt migration.");
                 required_changes.extend(instance.plan_migration());
             }
         }
@@ -124,7 +124,7 @@ fn optimize_component_multiple_active_ports(
                 let frequent_port_link_cost = *port_link_costs.get(&port_weights[i].0).unwrap();
                 let infrequent_port_link_cost = *port_link_costs.get(&port_weights[i + 1].0).unwrap();
                 if frequent_port_link_cost > infrequent_port_link_cost + REQUIRED_LINK_COST_DELTA {
-                    tracing::info!("Detected suboptimal placement (multi_port): {component_id}. Will now attempt migration.");
+                    tracing::debug!("Detected suboptimal placement (multi_port): {component_id}. Will now attempt migration.");
                     required_changes.extend(instance.plan_migration());
                     return required_changes;
                 }

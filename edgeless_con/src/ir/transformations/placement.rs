@@ -237,7 +237,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                     if let Some(new_instance) = new_instance {
                         let new_id = new_instance.id().unwrap();
                         if new_id.node_id == c.id().node_id {
-                            tracing::info!(
+                            tracing::debug!(
                                 "Migrating Instance: Node would be equal {}({}). {}",
                                 logical_component_id,
                                 c.id(),
@@ -245,7 +245,7 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                             );
                             required_changes.extend(i.abort_migration());
                         } else {
-                            tracing::info!(
+                            tracing::debug!(
                                 "MigratingInstance: Found Replacement node for {} in {} ({}); Will migrate: {} -> {}",
                                 &logical_component_id,
                                 workflow.id.workflow_id,
@@ -400,12 +400,12 @@ impl<P: strategy::PlacementStrategy> DefaultPlacement<P> {
                 find_candidates_for_resource(placement_constraints, logical_resource, nodes, global_state.instance_counts)
             }
             LogicalComponent::SubApplication(_logical_sub_flow) => {
-                tracing::warn!("Tried to place SubApplication");
-                tracing::warn!("Peer Clusters: {:?}", peer_clusters.keys());
+                tracing::warn!("Tried to place SubApplication.");
+                tracing::warn!("Peer Clusters: {:?}.", peer_clusters.keys());
                 vec![]
             }
             LogicalComponent::Proxy(_logical_proxy) => {
-                tracing::warn!("Tried to place Proxy");
+                tracing::warn!("Tried to place Proxy.");
                 vec![]
             }
         };

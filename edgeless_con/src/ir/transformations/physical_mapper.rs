@@ -38,7 +38,7 @@ impl super::StatelessPhysicalTransformation for PhysicalConnectionMapper {
                 let p = m.downcast_ref::<crate::ir::interaction::dialect::logical_overlay::LogicalOverlaySourcePort>();
 
                 let Some(logical_output) = p else {
-                    tracing::warn!("Received unexpected dialect: {:?}. Normalization Failure?", output.dialect_type.base_type);
+                    tracing::warn!("Received unexpected dialect: {:?}. Normalization failure?", output.dialect_type.base_type);
                     continue;
                 };
 
@@ -118,7 +118,7 @@ fn map_unicast(
             };
 
             let Some(target_instance_id) = target_instance else {
-                tracing::warn!("Could not find phyiscal target instance.");
+                tracing::debug!("Could not find physical target instance.");
                 let old_mapping = c_instance.physical_ports_mut().physical_output_mapping.remove(&source_port_id);
                 if old_mapping.is_some() {
                     *changed = true;
@@ -440,16 +440,4 @@ mod test {
             })
         )
     }
-
-    #[test]
-    fn unicast_mapping_closer_node() {}
-
-    #[test]
-    fn unicast_mapping_random_node() {}
-
-    #[test]
-    fn anycast_mapping() {}
-
-    #[test]
-    fn multicast_mapping() {}
 }

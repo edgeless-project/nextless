@@ -32,10 +32,19 @@ impl<'a> super::TransformationPipeline<LogicalPipelineState<'a>> for DefaultLogi
         global_state: &LogicalPipelineState,
     ) {
         let changes = self.topic_converter.apply(workflow, &global_state.logical_interaction_normalizer_state);
+        if changes.len() > 0 {
+            tracing::debug!("Topic Converter: {changes:?}");
+        }
         workflow.apply_logical_changes(changes);
         let changes = self.workflow_splitter.apply(workflow);
+        if changes.len() > 0 {
+            tracing::debug!("Workflow Splitter: {changes:?}");
+        }
         workflow.apply_logical_changes(changes);
         let changes = self.dead_component_removal.apply(workflow);
+        if changes.len() > 0 {
+            tracing::debug!("Dead Component Removal: {changes:?}");
+        }
         workflow.apply_logical_changes(changes);
     }
 

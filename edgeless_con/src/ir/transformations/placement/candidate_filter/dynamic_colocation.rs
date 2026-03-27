@@ -15,7 +15,7 @@ impl super::FilterStrategy for DynamicColocation {
         let mut node_rates_abs = std::collections::HashMap::<uuid::Uuid, f64>::new();
 
         let Some((_, component_instances)) = workflow.get_component_with_instances(&logical_component_id) else {
-            tracing::warn!("Could not find logical component that should be filtered");
+            tracing::warn!("Could not find logical component that should be filtered.");
             return candidates;
         };
 

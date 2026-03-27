@@ -45,14 +45,14 @@ impl super::StatefulLogicalTransformation<LogicalInteractionNormalizerState> for
                         constraints: std::collections::BTreeSet::new(),
                     },
                 ) else {
-                    tracing::warn!("Cannot Plan Translation to Logical Overlay: {:?}", i.dialect_type.base_type);
+                    tracing::warn!("Cannot plan translation to 'Logical Overlay' dialect: {:?}", i.dialect_type.base_type);
                     return Vec::new();
                 };
 
                 let translated_interactions = reg.try_translate(&i, &target_dialect);
 
                 let Ok(translated_interactions) = translated_interactions else {
-                    tracing::warn!("Cannot Translate to Logical Overlay: {:?}", i.dialect_type.base_type);
+                    tracing::warn!("Cannot translate to 'Logical Overlay': dialect {:?}", i.dialect_type.base_type);
                     return Vec::new();
                 };
 

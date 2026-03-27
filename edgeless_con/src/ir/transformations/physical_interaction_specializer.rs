@@ -37,7 +37,7 @@ impl super::StatefulPhysicalTransformation<PhysicalInteractionSpecializerState> 
         let mut reg = global_state.dialect_registry.blocking_lock();
 
         let Ok(interactions) = support::port_utils::collect_physical_interactions(workflow, &mut reg) else {
-            tracing::warn!("Failure Collecting Interactions");
+            tracing::warn!("Failure collecting interactions");
             return vec![];
         };
 
@@ -74,7 +74,7 @@ impl super::StatefulPhysicalTransformation<PhysicalInteractionSpecializerState> 
                     tracing::debug!("No Link Configuration Required");
                 }
                 interaction::LinkConfigurationResult::Err(link_configuration_error) => {
-                    tracing::warn!("Link Configuration Error {link_configuration_error}");
+                    tracing::warn!("Link configuration error: {link_configuration_error}");
                 }
             }
         }

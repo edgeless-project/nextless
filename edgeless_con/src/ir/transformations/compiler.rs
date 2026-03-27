@@ -86,6 +86,11 @@ fn build_new_image(
     image_ident: crate::ir::behavior::BehaviorImageId,
     store: &crate::ir::support::image_cache::ImageCache,
 ) -> Option<crate::ir::behavior::BehaviorImage> {
+    tracing::info!(
+        "Compiling image for behavior: {}; Destination dialect: {}.",
+        logical_instance.image.spec.behavior_id.id,
+        image_ident.dialect_type.base_type,
+    );
     let image_result = crate::ir::behavior::dialect::DialectRegistry::new_default().try_translate(&logical_instance.image.main_image, &image_ident);
 
     match image_result {
@@ -94,7 +99,7 @@ fn build_new_image(
             return Some(image);
         }
         Err(e) => {
-            tracing::warn!("Failed Compiling Image:\n{e}");
+            tracing::warn!("Failed compiling image: {e}");
             None
         }
     }

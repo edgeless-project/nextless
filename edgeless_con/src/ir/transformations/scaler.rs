@@ -70,7 +70,7 @@ fn scale_to_all_nodes(
     let missing_nodes = available_allowed_node_ids.difference(&covered_nodes);
 
     for missing_node in missing_nodes {
-        tracing::info!("AllNode Actor {logical_function_id}: Spawning instance cover node {missing_node} ");
+        tracing::debug!("AllNode Actor {logical_function_id}: Spawning instance cover node {missing_node} ");
 
         let mut node_filter = f.node_filters();
         node_filter.node_ids_allowed = Some(vec![missing_node.clone()]);
@@ -97,7 +97,7 @@ fn scale_singleton(
         }
     }
 
-    tracing::info!("Singleton Actor {logical_function_id}: Spawning missing instance");
+    tracing::debug!("Singleton Actor {logical_function_id}: Spawning missing instance");
 
     let (component_id, component) = super::super::PhysicalComponentState::request_new_instance();
 
@@ -132,7 +132,7 @@ fn scale_scalable(
     };
 
     if missing_instance_count > 0 {
-        tracing::info!("Scalable Actor {logical_function_id}: Spawning {missing_instance_count} instances to reach min_instances");
+        tracing::debug!("Scalable Actor {logical_function_id}: Spawning {missing_instance_count} instances to reach min_instances");
         for _i in 0..missing_instance_count {
             let (component_id, component) = super::super::PhysicalComponentState::request_new_instance();
             required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
@@ -183,7 +183,7 @@ fn scale_scalable(
     };
 
     if can_scale_up && should_scale_up && wait_period_exceeded {
-        tracing::info!("Attempting to Scale Up. Message Rate:{message_rate} Processing Rate:{processing_rate}");
+        tracing::debug!("Attempting to Scale Up. Message Rate:{message_rate} Processing Rate:{processing_rate}");
         let (component_id, component) = super::super::PhysicalComponentState::request_new_instance();
         required_changes.push(super::PhysicalChange::Component(super::PhysicalComponentChange {
             component_id,

@@ -45,7 +45,7 @@ impl WeightedRandom {
             .filter_map(|c| match c {
                 crate::ir::transformations::placement::Candidate::Actor(actor_candidate) => Some(actor_candidate),
                 crate::ir::transformations::placement::Candidate::Resource(_) => {
-                    tracing::warn!("Bad Candidate for actor selection");
+                    tracing::warn!("Bad candidate for actor selection.");
                     None
                 }
             })

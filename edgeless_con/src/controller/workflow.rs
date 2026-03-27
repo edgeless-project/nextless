@@ -146,7 +146,6 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         }
     }
 
-    #[tracing::instrument(name = "controller_management_event", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn handle_management_event(&mut self, event: WorkflowManagementEvent) -> Result<(), WorkflowError> {
         match event {
             WorkflowManagementEvent::PatchExternal(patch_request) => self.patch(&patch_request).await,
@@ -161,6 +160,35 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         &mut self,
         on_start_completed: impl FnOnce(anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>) + Send,
     ) -> WorkflowResult {
+        let actor_ids: Vec<_> = self
+            .wf
+            .wf
+            .components_with_instances()
+            .filter_map(|(id, component, _)| {
+                if std::matches!(component, crate::ir::LogicalComponent::Actor(_)) {
+                    return Some(id.to_string());
+                }
+                None
+            })
+            .collect();
+
+        let resource_ids: Vec<_> = self
+            .wf
+            .wf
+            .components_with_instances()
+            .filter_map(|(id, component, _)| {
+                if std::matches!(component, crate::ir::LogicalComponent::Resource(_)) {
+                    return Some(id.to_string());
+                }
+                None
+            })
+            .collect();
+
+        tracing::info!(
+            "Spawning new Application; Actors: [{}]; Resources: [{}].",
+            actor_ids.join(","),
+            resource_ids.join(",")
+        );
         let start = tokio::time::Instant::now();
 
         let required_changes = {
@@ -223,6 +251,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         Ok(())
     }
 
+    #[tracing::instrument(name = "controller_workflow_patch", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn patch(&mut self, req: &edgeless_api::common::PatchRequest) -> WorkflowResult {
         let required_changes = {
             let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
@@ -238,6 +267,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         Ok(())
     }
 
+    #[tracing::instrument(name = "controller_workflow_node_removal", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn node_removal(&mut self, removed_nodes: &std::collections::HashSet<edgeless_api::function_instance::NodeId>) -> WorkflowResult {
         let start = tokio::time::Instant::now();
 
@@ -267,14 +297,17 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         Ok(())
     }
 
+    #[tracing::instrument(name = "controller_workflow_node_addition", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn node_addition(&mut self, added_nodes: Vec<super::node::WorkerNode>) -> WorkflowResult {
         for n in added_nodes {
             self.nodes.insert(n.node_id(), n);
         }
-        self.optimize().await
+        self.optimize_inner().await
     }
 
+    #[tracing::instrument(name = "controller_workflow_stop", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn stop(&mut self) -> WorkflowResult {
+        tracing::info!("Stopping Application.");
         let changes = {
             let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
                 self.nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
@@ -288,6 +321,10 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
 
     #[tracing::instrument(name = "controller_workflow_optimize", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
     async fn optimize(&mut self) -> WorkflowResult {
+        self.optimize_inner().await
+    }
+
+    async fn optimize_inner(&mut self) -> WorkflowResult {
         let required_changes = {
             let ir_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, &dyn crate::ir::Node> =
                 self.nodes.iter().map(|(n_id, node)| (*n_id, node as &dyn crate::ir::Node)).collect();
@@ -297,21 +334,15 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             })
         };
         if let Err(errs) = self.materialize(required_changes).await {
-            tracing::error!("Failures materializing periodic optimization: {}.", errs.join(";"));
+            tracing::error!("Failures materializing changes to the workflow: {}.", errs.join(";"));
         }
         // TODO: Decide on how to handle these errors
         Ok(())
     }
 
-    #[tracing::instrument(name = "materialize", skip_all, fields(workflow_id = self.wf.wf.id.to_string()))]
-    async fn materialize(
-        &mut self,
-        // wf_id: edgeless_api::workflow_instance::WorkflowId,
-        required_changes: Vec<RequiredChange>,
-    ) -> Result<(), Vec<String>> {
+    #[tracing::instrument(name = "materialize", skip_all)]
+    async fn materialize(&mut self, required_changes: Vec<RequiredChange>) -> Result<(), Vec<String>> {
         let mut results = Vec::<Result<(), String>>::new();
-
-        let wf_id = self.wf.wf.id.clone();
 
         // This could be parallel
         for f in required_changes.into_iter() {
@@ -326,7 +357,6 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     annotations,
                 } => {
                     self.start_workflow_function_on_node(
-                        &wf_id,
                         function_name,
                         function_id,
                         image,
@@ -347,7 +377,6 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     provider_id,
                 } => {
                     self.start_workflow_resource_on_node(
-                        &wf_id,
                         resource_name,
                         resource_id,
                         class_type,
@@ -435,7 +464,6 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     #[allow(clippy::too_many_arguments)]
     async fn start_workflow_function_on_node(
         &mut self,
-        wf_id: &edgeless_api::workflow_instance::WorkflowId,
         f_name: String,
         function_id: edgeless_api::function_instance::InstanceId,
         image: super::super::ir::behavior::BehaviorImage,
@@ -485,15 +513,14 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         match response {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    tracing::warn!("Function instance {wf_id}:{f_name} creation rejected: {error}");
-                    Err(format!("function instance creation rejected: {error} "))
+                    Err(format!("Instance for Actor '{f_name}' could not be started: {error}."))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    tracing::info!("Workflow {} function {} started with fid {}", wf_id, &f_name, &id);
+                    tracing::info!("Instance for Actor '{}' started on node '{}'.", &f_name, &id.node_id);
                     Ok(())
                 }
             },
-            Err(err) => Err(format!("failed interaction when creating a function instance: {err}")),
+            Err(err) => Err(format!("Interaction error when creating an Actor instance: {err}.")),
         }
     }
 
@@ -502,6 +529,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             if let Err(e) = node_api.fn_client().unwrap().stop(function_id).await {
                 Err(format!("Stopping Node Function Failed: {e}"))
             } else {
+                tracing::info!("Actor instance stopped on node {}", function_id.node_id);
                 Ok(())
             }
         } else {
@@ -512,7 +540,6 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     #[allow(clippy::too_many_arguments)]
     async fn start_workflow_resource_on_node(
         &mut self,
-        wf_id: &edgeless_api::workflow_instance::WorkflowId,
         r_name: String,
         resource_id: edgeless_api::function_instance::InstanceId,
         class_type: String,
@@ -540,15 +567,14 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         match response {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                    tracing::warn!("Resource start rejected: {error}");
-                    Err(format!("resource start rejected: {error} "))
+                    Err(format!("Instance for Resource '{r_name}' could not be started: {error}."))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    tracing::info!("Workflow {} resource {} started with fid {}", wf_id, &r_name, &id);
+                    tracing::info!("Instance for Resource '{}' started on node '{}'.", &r_name, &id.node_id);
                     Ok(())
                 }
             },
-            Err(err) => Err(format!("failed interaction when starting a resource: {err}")),
+            Err(err) => Err(format!("Interaction error when creating a Resource instance: {err}.")),
         }
     }
 
@@ -557,6 +583,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             if let Err(e) = node_api.resource_client().unwrap().stop(resource_id).await {
                 Err(format!("Stopping Node Resource Failed: {e}"))
             } else {
+                tracing::info!("Resouce instance stopped on node {}.", resource_id.node_id);
                 Ok(())
             }
         } else {
@@ -571,6 +598,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     ) -> Result<(), String> {
         if let Some(mut cluster_api) = self.workflow_client(&subflow_id.node_id).await {
             cluster_api.start(spawn_req).await.map_err(|e| e.to_string())?;
+            tracing::info!("Started subflow on cluster '{}'.", subflow_id.node_id);
             Ok(())
         } else {
             Err("Failed to start subflow".to_string())
@@ -601,7 +629,10 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             })
             .await
         {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                tracing::info!("Started proxy on node '{}'.", proxy_id.node_id);
+                Ok(())
+            }
             Err(err) => Err(format!("failed starting proxy: {err}")),
         }
     }
@@ -624,6 +655,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                 })
                 .await
                 .map_err(|e| e.to_string())?;
+            tracing::info!("Created link on node '{}'.", node_id);
             Ok(())
         } else {
             Err("Node Not Found".to_string())
@@ -637,6 +669,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
     ) -> Result<(), String> {
         if let Some(node) = self.nodes.get_mut(&node_id) {
             node.link_instance_client().unwrap().remove(link_id).await.map_err(|e| e.to_string())?;
+            tracing::info!("Removed link from node '{}'.", node_id);
             Ok(())
         } else {
             Err("Node Not Found".to_string())
@@ -666,7 +699,14 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     })
                     .await
                 {
-                    Ok(_) => Ok(()),
+                    Ok(_) => {
+                        tracing::info!(
+                            "Updated port mapping for instance of Actor '{}' on node '{}'.",
+                            name_in_workflow,
+                            origin_id.node_id
+                        );
+                        Ok(())
+                    }
                     Err(err) => Err(format!("failed interaction when patching component {name_in_workflow}: {err}")),
                 }
             }
@@ -682,7 +722,14 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     })
                     .await
                 {
-                    Ok(_) => Ok(()),
+                    Ok(_) => {
+                        tracing::info!(
+                            "Updated port mapping for instance of Resource '{}' on node '{}'.",
+                            name_in_workflow,
+                            origin_id.node_id
+                        );
+                        Ok(())
+                    }
                     Err(err) => Err(format!("failed interaction when patching component {name_in_workflow}: {err}")),
                 }
             }
@@ -698,7 +745,14 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
                     })
                     .await
                 {
-                    Ok(_) => Ok(()),
+                    Ok(_) => {
+                        tracing::info!(
+                            "Updated port mapping for instance of Subflow '{}' on cluster '{}'.",
+                            name_in_workflow,
+                            origin_id.node_id
+                        );
+                        Ok(())
+                    }
                     Err(err) => Err(format!("failed interaction when patching component {name_in_workflow}: {err}")),
                 }
             }
