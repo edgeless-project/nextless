@@ -28,7 +28,7 @@ crate-type = ["cdylib"]
 edgeless_function = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function" }
 edgeless_function_types = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_types", features = ["vision", "std"] }
 edgeless_function_gpu = { git = "https://github.com/edgeless-project/nextless.git", branch = "development", package = "edgeless_function_gpu" }
-wonnx = { git = "https://github.com/raphaelhetzel/wonnx.git", branch = "wgpu_custom", default-features = false, features = [
+wonnx = { git = "https://github.com/edgeless-project/wonnx.git", branch = "wgpu_custom", default-features = false, features = [
     "custom",
 ] }
 log = "0.4"
