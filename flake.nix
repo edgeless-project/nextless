@@ -29,150 +29,16 @@
           minimal.toolchain
           targets.wasm32-unknown-unknown.latest.rust-std
         ];
-        node_package = {
-          pname = "edgeless_node_d";
-          version = "0.1";
-          doCheck = false;
-          buildAndTestSubdir = "edgeless_node";
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-            allowBuiltinFetchGit = true;
-          };
-          src = pkgs.lib.cleanSource ./.;
-          strictDeps = true;
-          nativeBuildInputs = with pkgs; [
-            openssl.dev
-            vulkan-loader
-            pkg-config
-            protobuf
-            makeWrapper
-          ];
-          buildInputs = with pkgs; [
-            openssl
-            vulkan-loader
-          ];
-          postInstall = ''
-            wrapProgram $out/bin/edgeless_node_d \
-              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [pkgs.openssl pkgs.vulkan-loader]}
-          '';
-        };
+        nextless_node_packages = (import ./nix/packages/nextless_node.nix) {inherit pkgs toolchain;};
       in {
         packages = {
-          nextless_cli = (pkgs.makeRustPlatform {
-            cargo = toolchain;
-            rustc = toolchain;
-          }).buildRustPackage rec {
-            pname = "edgeless_cli";
-            version = "3.0.1";
-            doCheck = false;
-            buildAndTestSubdir = "edgeless_cli";
-            cargoLock = {
-              lockFile = ./Cargo.lock;
-              allowBuiltinFetchGit = true;
-            };
-            src = pkgs.lib.cleanSource ./.;
-            nativeBuildInputs = with pkgs; [
-              openssl.dev
-              perl
-              pkg-config
-              protobuf
-            ];
-            buildInputs = with pkgs; [
-              openssl
-              toolchain
-              makeWrapper
-              gcc
-              binaryen
-            ];
-            postInstall = ''
-              wrapProgram $out/bin/edgeless_cli \
-                --set PATH ${pkgs.lib.makeBinPath [
-                  toolchain
-                  pkgs.gcc
-                  pkgs.binaryen
-                ]} \
-                --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath [pkgs.openssl]}
-            '';
-          };
-          nextless_node = (pkgs.makeRustPlatform {
-            cargo = toolchain;
-            rustc = toolchain;
-          }).buildRustPackage node_package;
-          nextless_node_led_matrix = (pkgs.makeRustPlatform {
-            cargo = toolchain;
-            rustc = toolchain;
-          }).buildRustPackage (node_package // {
-            buildFeatures = [ "hardware_led_matrix" ];
-          });
-          nextless_controller = (pkgs.makeRustPlatform {
-            cargo = toolchain;
-            rustc = toolchain;
-          }).buildRustPackage rec {
-            pname = "edgeless_con_d";
-            version = "0.1";
-            doCheck = false;
-            buildAndTestSubdir = "edgeless_con";
-            cargoLock = {
-              lockFile = ./Cargo.lock;
-              allowBuiltinFetchGit = true;
-            };
-            src = pkgs.lib.cleanSource ./.;
-            nativeBuildInputs = with pkgs; [
-              openssl.dev
-              perl
-              pkg-config
-              protobuf
-            ];
-            buildInputs = with pkgs; [
-              openssl #TODO Unify OpenSSL Usage
-              toolchain
-              makeWrapper
-              gcc
-              binaryen
-            ];
-              # https://discourse.nixos.org/t/program-compiled-with-rust-cannot-find-libssl-so-3-at-runtime/27196
-            postInstall = ''
-              wrapProgram $out/bin/edgeless_con_d \
-                --set PATH ${pkgs.lib.makeBinPath [toolchain pkgs.gcc pkgs.binaryen]} \
-                --set LD_LIBRARY_PATH ${pkgs.lib.makeLibraryPath [pkgs.openssl]}
-            '';
-            };
+          nextless_cli = (import ./nix/packages/nextless_cli.nix) {inherit pkgs toolchain;};
+          nextless_node = nextless_node_packages.nextless_node;
+          nextless_node_led_matrix = nextless_node_packages.nextless_node_led_matrix;
+          nextless_controller = (import ./nix/packages/nextless_controller.nix) {inherit pkgs toolchain;};
         };
 
-        devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            vulkan-loader
-            openssl.dev
-            openssl
-            pkg-config
-            protobuf
-            # mold
-            gcc
-            libgcc
-            binaryen #wasm-opt
-            curl # libcurl used in the cli. Not sure why it is not needed in the CLI.
-            # While i would prefer to use fenix here, we depend on the ESP toolchain and rust-toolchain.toml
-            # which are specific to rustup / espup.
-            # toolchain
-            rustup
-            espup
-            espflash
-            binutils
-            lld
-            SDL2
-            (pkgs.python3.withPackages (pypkg: [
-              pypkg.jupyter
-              pypkg.pandas
-              pypkg.scapy
-              pypkg.seaborn
-            ]))
-          ];
-          shellHook = ''
-            # rustup install stable
-            # espup install
-            source ~/export-esp.sh
-          '';
-        };
+        devShell = (import ./nix/devshell.nix) {inherit pkgs;};
       }
     ) //
     flake-utils.lib.eachSystem [
