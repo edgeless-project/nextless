@@ -2,8 +2,8 @@ load("../../resources/http_ingress.star", "HTTPIngress")
 load("../../resources/led_matrix.star", "LedMatrix")
 load("../../functions/pong_controller/pong_controller.star", "PongController")
 load("../../functions/pong_renderer/pong_renderer.star", "PongRenderer")
-load("two_x_two.star", "instances")
-load("addr_conf_local.star", "host")
+load("two_x_three.star", "instances")
+load("addr_conf.star", "host")
 
 def id_str(id):
     unpadded = "%x" % (id)
@@ -20,7 +20,7 @@ controller = edgeless_actor(
     klass = PongController,
     annotations = {
         "node_ids_allowed": id_str(1),
-        "init-payload": "size_y={},size_x={}".format(128, 128)
+        "init-payload": "size_y={},size_x={}".format(128, 192)
     }
 )
 
