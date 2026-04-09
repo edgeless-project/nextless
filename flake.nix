@@ -60,5 +60,12 @@
           nextless_playground = (import ./nix/containers/nextless_playground.nix) {inherit pkgs nextless_pkgs toolchain system;};
         };
       }
-    );
+    ) //
+    {
+      nixosModules = {
+        nextless = ./nix/nixos_module.nix;
+        default = self.nixosModules.nextless; # disko states this is a convention.
+      };
+    }
+    ;
 }
