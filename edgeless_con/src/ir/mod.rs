@@ -3,13 +3,38 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+//! Model and Transformation Engine
+//!
+//! This module houses the compiler-inspired aspects of this project.
+//!
+//! [ManagedWorkflow](managed_workflow::ManagedWorkflow) represents the engine's entry point.\
+//! It wraps the workflow's Logical and physical Models and provides methods to apply transformations to those models.\
+//! Those methods require passing the system model and inter-workflow global state and return a set of changes.\
+//! The engine does not interact with the node to materialize those changes.
+//!
+//! Transformations must implement one of the following traits:
+//! * [StatelessLogicalTransformation](transformations::StatelessLogicalTransformation)
+//! * [StatefulLogicalTransformation](transformations::StatefulLogicalTransformation)
+//! * [StatelessPhysicalTransformation](transformations::StatelessPhysicalTransformation)
+//! * [StatefulPhysicalTransformation](transformations::StatefulPhysicalTransformation)
+//!
+//! New transformations have to be added to one of the pipeline phases:
+//! * [DefaultLogicalPipeline](pipeline::default_logical::DefaultLogicalPipeline)
+//! * [DefaultOrchestrationPipeline](pipeline::default_orchestration::DefaultOrchestrationPipeline)
+//! * [DefaultPhysicalPipeline](pipeline::default_physical::DefaultPhysicalPipeline)
+//!
+//! Actor behaviors are represented by a [BehaviorDialect](behavior::dialect::BehaviorDialect).\
+//! Ports mappings are represented by a [InteractionDialect](interaction::dialect::InteractionDialect).\
+//! Inspired by MLIR, translations between dialects happen using these traits and the dialect registries.
+//!
+
 pub mod actor;
 pub mod behavior;
 pub mod component;
 pub mod interaction;
 pub mod link;
 pub mod logical_model;
-pub mod managed_worflow;
+pub mod managed_workflow;
 pub mod physical_model;
 pub mod pipeline;
 pub mod proxy;
@@ -23,9 +48,9 @@ pub mod workflow;
 #[cfg(test)]
 mod test;
 
-pub use logical_model::*;
-pub use physical_model::*;
-pub use system_model::*;
+pub(crate) use logical_model::*;
+pub(crate) use physical_model::*;
+pub(crate) use system_model::*;
 
 pub trait TelemetryProvider: TelemetryProviderClone + Sync + Send {
     fn component_statistics_for(&self, component_id: &edgeless_api::function_instance::InstanceId) -> Box<dyn ComponentRuntimeStatistics>;
@@ -76,6 +101,7 @@ pub struct InternalPorts {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
+/// Changes passed from the engine to the service.
 pub enum RequiredChange {
     StartFunction {
         function_id: edgeless_api::function_instance::InstanceId,

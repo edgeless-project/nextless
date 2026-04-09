@@ -23,7 +23,7 @@ pub struct ControllerTask<P: crate::ir::transformations::placement::strategy::Pl
 }
 
 impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'static> ControllerTask<P> {
-    pub fn new(
+    pub(crate) fn new(
         cluster_id: edgeless_api::function_instance::NodeId,
         request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
         telemetry_provider: Option<Box<dyn crate::ir::TelemetryProvider>>,
@@ -50,7 +50,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
         }
     }
 
-    pub async fn run(&mut self) {
+    pub(crate) async fn run(&mut self) {
         self.main_loop().await;
     }
 
@@ -121,7 +121,7 @@ impl<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'st
             workflow_id: uuid::Uuid::new_v4(),
         };
 
-        let wf = super::super::ir::managed_worflow::ManagedWorkflow::new(
+        let wf = super::super::ir::managed_workflow::ManagedWorkflow::new(
             spawn_workflow_request.clone(),
             wf_id.clone(),
             self.cluster_id.clone(),

@@ -51,6 +51,7 @@ You can find the discussion of an example application below.
 * [Actor Reference](./documentation/building_actors.md)
 * [Application Reference](./documentation/building_applications.md)
 * [System Overview](./documentation/system_components.md)
+* [Controller (containing the Compiler-Inspired Aspects)](./edgeless_con/README.md)
 
 ## Example
 

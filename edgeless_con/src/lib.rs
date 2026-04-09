@@ -2,9 +2,15 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-mod controller;
-mod ir;
-pub mod prometheus_telemetry_provider;
+
+//! Nextless Controller
+//!
+//! This crate is split into the service-related parts (module [controller]) and the model and transformation engine (module [ir]).
+//!
+//! The compiler-inspired aspects can be found in the [ir] module.
+
+pub mod controller;
+pub mod ir;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConSettings {
@@ -14,12 +20,6 @@ pub struct EdgelessConSettings {
     pub prometheus_url: Option<String>,
     pub placement_strategy: String,
     pub opentelemetry_export: Option<OpenTelemetryExportConfig>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct EdgelessConOrcConfig {
-    pub domain_id: String,
-    pub orchestrator_url: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]

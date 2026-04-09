@@ -3,17 +3,21 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+//! Nextless Controller Service
+//!
+//! [Controller] represents the main entry point of a Nextless Controller instance.
+//!
+//! The instance's logic is implemented by an actor-like [ControllerTask](server::ControllerTask),
+//! which receives requests from one or more clients ([ControllerClient](client::ControllerClient)).
+
 pub mod client;
 pub mod image_repository;
 pub mod node;
 pub mod peer_cluster;
+pub mod prometheus_telemetry_provider;
 pub mod resource_provider;
 pub mod server;
 pub mod workflow;
-// TODO(raphaelhetzel) Split and fix
-// #[cfg(test)]
-// pub mod test;
-//
 
 pub struct Controller {
     sender: futures::channel::mpsc::UnboundedSender<ControllerRequest>,
@@ -52,9 +56,7 @@ impl Controller {
         controller_settings: crate::EdgelessConSettings,
     ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         if let Some(prometheus_url) = &controller_settings.prometheus_url {
-            let tp = Box::new(crate::prometheus_telemetry_provider::PrometheusTelemetryProvider::new(
-                prometheus_url.clone(),
-            ));
+            let tp = Box::new(prometheus_telemetry_provider::PrometheusTelemetryProvider::new(prometheus_url.clone()));
             Self::new(Some(tp), controller_settings.placement_strategy)
         } else {
             Self::new(None, controller_settings.placement_strategy)

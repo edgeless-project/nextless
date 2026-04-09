@@ -22,7 +22,7 @@ enum WorkflowInstanceState {
 }
 
 struct WorkflowTask<P: crate::ir::transformations::placement::strategy::PlacementStrategy> {
-    wf: crate::ir::managed_worflow::ManagedWorkflow<P>,
+    wf: crate::ir::managed_workflow::ManagedWorkflow<P>,
     global_pipeline_state: std::sync::Arc<crate::ir::pipeline::default::DefaultTransformationPipelineState<P::GlobalState>>,
     receiver: tokio::sync::mpsc::UnboundedReceiver<WorkflowManagementEvent>,
     nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, super::node::WorkerNode>,
@@ -52,7 +52,7 @@ pub type WorkflowResult = Result<(), WorkflowError>;
 
 impl WorkflowInstance {
     pub(crate) async fn launch<P: crate::ir::transformations::placement::strategy::PlacementStrategy + 'static>(
-        wf: super::super::ir::managed_worflow::ManagedWorkflow<P>,
+        wf: super::super::ir::managed_workflow::ManagedWorkflow<P>,
         start_completed: impl FnOnce(anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>) + Send + 'static,
         initial_nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, super::node::WorkerNode>,
         initial_peer_clusters: std::collections::HashMap<edgeless_api::function_instance::NodeId, super::peer_cluster::PeerCluster>,

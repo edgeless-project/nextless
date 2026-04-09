@@ -13,7 +13,7 @@ pub struct ControllerClient {
 }
 
 impl ControllerClient {
-    pub fn new_client(
+    pub(crate) fn new_client(
         sender: futures::channel::mpsc::UnboundedSender<super::ControllerRequest>,
         repo: super::image_repository::ImageRepository,
     ) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
