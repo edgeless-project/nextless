@@ -541,6 +541,14 @@ pub async fn edgeless_node_main(
         edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), cloned_agent_url).await
     }));
 
+    if let Ok((_, ip_str, _)) = edgeless_api::util::parse_http_host(&settings.general.agent_url) {
+        if let Ok(ip) = ip_str.parse::<std::net::IpAddr>() {
+            if !ip.is_loopback() {
+                tracing::warn!("Agent gRPC server listening on IP {ip_str}. As nextless does not currently contain any security features, it should only receive traffic from fully trusted networks!")
+            }
+        }
+    }
+
     // Wait for all the tasks to complete.
     let _ = futures::future::join_all(async_tasks).await;
 }

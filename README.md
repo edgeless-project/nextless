@@ -12,6 +12,7 @@ to enable the efficient execution of complex serverless applications on sets of 
 Nextless is a research fork of the [EDGELESS reference implementation](https://github.com/edgeless-project/edgeless).
 
 The system is in an early work-in-progress state and should not be used for anything beyond experimentation.
+The system does not contain any security features and should only be used in fully trusted networks.
 
 ## Overview
 

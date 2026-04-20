@@ -34,6 +34,11 @@ impl crate::base_runtime::FunctionInstanceSync for NativeFunctionInstance {
         guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
         code: &[u8],
     ) -> crate::base_runtime::FunctionInstanceResult<Box<Self>> {
+        // To do this securely, the compiler needs to enforce certain rules.
+        // The system must also ensure the binary comes from a compiler enforcing those rules.
+        // https://www.usenix.org/conference/atc18/presentation/boucher
+        // https://dl.acm.org/doi/10.1145/3477113.3487272
+        tracing::warn!("Security Warning: Starting a native actor. Nextless is currently missing security features and this is insecure.");
         unsafe {
             let buffer = rustix::mm::mmap_anonymous(
                 std::ptr::null_mut(),

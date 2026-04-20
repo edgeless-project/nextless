@@ -37,6 +37,14 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
     let server_task =
         edgeless_api::grpc_impl::controller::WorkflowInstanceAPIServer::run(controller.get_api_client(), settings.controller_grpc_listen_url.clone());
 
+    if let Ok((_, ip_str, _)) = edgeless_api::util::parse_http_host(&settings.controller_grpc_listen_url) {
+        if let Ok(ip) = ip_str.parse::<std::net::IpAddr>() {
+            if !ip.is_loopback() {
+                tracing::warn!("Security Warning: Controller gRPC server listening on IP {ip_str}. As nextless does not currently contain any security features, it should only receive traffic from fully trusted networks!")
+            }
+        }
+    }
+
     let coap_server_task = if let Some(url) = settings.controller_coap_listen_url {
         if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
             if proto != edgeless_api::util::Proto::COAP {
