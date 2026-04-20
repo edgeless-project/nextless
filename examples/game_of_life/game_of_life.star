@@ -15,7 +15,7 @@ def id_str(id):
 
 def init_payload(instance):
     base = "draw_border=true,corner_blocks=false,position_y={},position_x={}".format(instance["position_y"],instance["position_x"])
-    if instance["id"] == 3:
+    if instance["id"] in [1,3,5]:
         return "periodic_glider=true," + base
     return base
 
@@ -88,7 +88,7 @@ wf = edgeless_workflow(
     "game_of_life",
     game_instances.values() + displays.values() + [clock],
     annotations = {
-        "feature_flags": "disable_ip_multicast_dialect",
+        "feature_flags": "disable_ip_multicast_dialect,disable_actor_optimization",
     }
 )
 

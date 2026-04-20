@@ -10,8 +10,8 @@ PongRenderer = edgeless_actor_class(
     inner_structure = [
         link("render", ["drawable"])
     ],
-    code = file("pong_renderer.wasm"),
-    code_type = "WASM_BASE"
+    code = file("pong_renderer.tar.gz"),
+    code_type = "RUST_BASE"
 )
 
 el_main = PongRenderer

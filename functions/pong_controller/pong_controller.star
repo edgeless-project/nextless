@@ -11,8 +11,8 @@ PongController = edgeless_actor_class(
         source("render"),
         sink("user_input"),
     ],
-    code = file("pong_controller.wasm"),
-    code_type = "WASM_BASE"
+    code = file("pong_controller.tar.gz"),
+    code_type = "RUST_BASE"
 )
 
 el_main = PongController

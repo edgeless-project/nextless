@@ -8,8 +8,8 @@ GameOfLifeClock = edgeless_actor_class(
     inner_structure = [
         source("trigger"),
     ],
-    code = file("game_of_life_clock.wasm"),
-    code_type = "WASM_BASE"
+    code = file("game_of_life_clock.tar.gz"),
+    code_type = "RUST_BASE"
 )
 
 el_main = GameOfLifeClock

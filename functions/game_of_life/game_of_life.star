@@ -45,8 +45,8 @@ GameOfLife = edgeless_actor_class(
        link("update_bottom_right_i", ["drawable"]),
 
     ],
-    code = file("game_of_life.wasm"),
-    code_type = "WASM_BASE"
+    code = file("game_of_life.tar.gz"),
+    code_type = "RUST_BASE"
 )
 
 el_main = GameOfLife
