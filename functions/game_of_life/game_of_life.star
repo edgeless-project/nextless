@@ -45,6 +45,7 @@ GameOfLife = edgeless_actor_class(
        link("update_bottom_right_i", ["drawable"]),
 
     ],
+    # Note: During the Demo, we include a Wasm image as an extra image as compilation takes too long on a Pi 4.
     code = file("game_of_life.tar.gz"),
     code_type = "RUST_BASE"
 )

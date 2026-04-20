@@ -11,6 +11,7 @@ PongController = edgeless_actor_class(
         source("render"),
         sink("user_input"),
     ],
+    # Note: During the Demo, we include a Wasm image as an extra image as compilation takes too long on a Pi 4.
     code = file("pong_controller.tar.gz"),
     code_type = "RUST_BASE"
 )

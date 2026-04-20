@@ -8,6 +8,7 @@ GameOfLifeClock = edgeless_actor_class(
     inner_structure = [
         source("trigger"),
     ],
+    # Note: During the Demo, we include a Wasm image as an extra image as compilation takes too long on a Pi 4.
     code = file("game_of_life_clock.tar.gz"),
     code_type = "RUST_BASE"
 )
