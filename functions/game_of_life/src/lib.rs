@@ -32,10 +32,17 @@ impl GameOfLifeAPI<'_> for GameOfLife {
         log::debug!("Handle Clock: {}", clock_update.iteration_id);
 
         let mut game_state = STATE.get().unwrap().lock().unwrap();
+        let configuration = CONFIGURATION.get().unwrap();
 
-        if CONFIGURATION.get().unwrap().periodic_glider {
+        if configuration.periodic_glider {
             if clock_update.iteration_id % 30 == 0 {
                 game_state.spawn_glider(7, 7);
+            }
+        }
+
+        if configuration.periodic_noise {
+            if clock_update.iteration_id % 60 == 0 {
+                game_state.spawn_noise(configuration.position_x, configuration.position_y, clock_update.iteration_id);
             }
         }
 

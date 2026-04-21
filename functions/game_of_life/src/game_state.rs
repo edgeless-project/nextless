@@ -8,6 +8,7 @@
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::prelude::*;
 use font8x8::UnicodeFonts;
+use rand::{RngExt, SeedableRng};
 
 #[derive(Debug)]
 pub struct GameState {
@@ -101,6 +102,20 @@ impl GameState {
         self.set_alive(center_y + 1, center_x - 1);
         self.set_alive(center_y + 1, center_x);
         self.set_alive(center_y + 1, center_x + 1);
+    }
+
+    pub fn spawn_noise(&mut self, position_x: usize, position_y: usize, iteration: u64) {
+        // https://stackoverflow.com/a/67652214
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(position_x as u64 + position_y as u64 + iteration);
+        for y in 6..12 {
+            for x in 6..12 {
+                if rng.random_bool(0.5) {
+                    self.set_alive(y, x);
+                } else {
+                    self.set_dead(y, x);
+                }
+            }
+        }
     }
 
     pub fn spawn_blinker(&mut self, center_y: usize, center_x: usize) {

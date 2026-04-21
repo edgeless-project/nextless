@@ -8,6 +8,7 @@ pub struct Configuration {
     pub draw_border: bool,
     pub corner_blocks: bool,
     pub periodic_glider: bool,
+    pub periodic_noise: bool,
 }
 
 impl Configuration {
@@ -19,6 +20,7 @@ impl Configuration {
         let mut draw_border = false;
         let mut corner_blocks = false;
         let mut periodic_glider = false;
+        let mut periodic_noise = false;
 
         for kv in kvs {
             if let Some((k, v)) = kv.split_once("=") {
@@ -58,6 +60,13 @@ impl Configuration {
                             log::warn!("Bad Configuration");
                         }
                     }
+                    "periodic_noise" => {
+                        if let Ok(v) = v.parse() {
+                            periodic_noise = v;
+                        } else {
+                            log::warn!("Bad Configuration");
+                        }
+                    }
                     _ => {
                         log::info!("Unknown Configuration Key");
                     }
@@ -71,6 +80,7 @@ impl Configuration {
             draw_border,
             corner_blocks,
             periodic_glider,
+            periodic_noise,
         }
     }
 }

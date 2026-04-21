@@ -14,7 +14,7 @@ def id_str(id):
     return full
 
 def init_payload(instance):
-    base = "draw_border=true,corner_blocks=false,position_y={},position_x={}".format(instance["position_y"],instance["position_x"])
+    base = "corner_blocks=false,position_y={},position_x={}".format(instance["position_y"],instance["position_x"])
     if instance["id"] in [1,3,5]:
         return "periodic_glider=true," + base
     if instance["id"] in [7,9,11,13,15]:
