@@ -11,7 +11,7 @@ to enable the efficient execution of complex serverless applications on sets of 
 
 Nextless is a research fork of the [EDGELESS reference implementation](https://github.com/edgeless-project/edgeless).
 
-The system is in an early work-in-progress state and should not be used for anything beyond experimentation.
+The system is in an early work-in-progress state and should not be used for anything beyond experimentation.  
 The system does not contain any security features and should only be used in fully trusted networks.
 
 ## Overview
@@ -184,6 +184,60 @@ while the Filter's output and the Dashboard's input are mapped together using an
 To learn more about building Applications, please refer to [documentation/building_applications.md](documentation/building_applications.md).
 
 [3]: The arrow syntax has been inspired by Apache Airflow.
+
+## Repository Structure
+
+This repository mostly consists of folders representing Rust crates (`edgeless_*`).
+
+### System Components
+
+The main system components (cf. [documentation/system_components.md](documentation/system_components.md)) can be found in the following folders/crates:
+
+* `edgeless_con` houses the controller implementing the compiler-inspired aspects of the project.
+* `edgeless_cli` provides the CLI tool to build actors and interact with the controller.
+* `edgeless_node` houses the implementation of the worker node. 
+
+### Actors, Applications, and Resources
+
+The repository contains a set of example applications to be executed by a deployment of nextless.  
+Those can be found in the following folders:
+
+* `functions` contains the set of Rust-based example actors included with this repository.
+* `resources` provides the descriptions of the resources included with the (embedded) worker node.
+* `examples` contains example applications using those actors and resources.
+
+### Inter-Component APIs
+
+There is a set of crates that defines the APIs enabling the components to interact.
+
+* `edgeless_api` provides the main APIs used for the interaction between the main system components. 
+  * It also defines types used across the components.
+* `egeless_api_core` represents the parts of the API usable by the `#![no_std]` embedded efforts.
+
+### Actor-related APIs
+
+These crates define the APIs used to implement Rust-based actors and enable those actors to interact with the worker node.
+
+* `edgeless_function` represents the main crate used by every function.
+  * It uses the procmacro-crate `edgeless_function_macro` to provide the `edgeless_function::generate!()` macro.
+* `edgeless_function_types` contains shared type definitions for messages sent between actors.
+* `edgeless_function_gpu` provides the actor-side implementation of our wgpu-based GPU support.
+* `edgeless_actor_abi` represents the ABI used between the native actors and the native runtime.
+
+### Helper Crates
+
+* `edgeless_build` provides the functionality used to build images (Wasm and native) from Rust-based actors.
+  * It is used by `edgeless_cli` and `edgeless_con`.
+  * It relies on a nightly Rust compiler.
+* `edgeless_config` defines the Starlark-based description of actors and applications.
+
+### Embedded Efforts
+
+This repository also contains an experimental port of the worker node to microcontroller-based devices.
+
+* `edgeless_embedded` represents the core of the embedded effort and contains the device-independent implementation of the embedded worker node.
+* `edgeless_embedded_esp32` contains the esp32(-s3) specific wrapper of the core `edgeless_embedded` and the device-specific implementation.
+* `edgeless_embedded_emu` contains a wrapper of the core `edgeless_embedded` that can be executed on Linux-based nodes (it relies on `embassy-net-tuntap`).
 
 ## Naming Inconsistencies
 
