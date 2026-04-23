@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
 #[derive(Clone)]
 pub struct ProxyInstanceClient {
     client: crate::grpc_impl::api::proxy_instance_client::ProxyInstanceClient<tonic::transport::Channel>,

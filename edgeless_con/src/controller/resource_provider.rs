@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
 #[derive(serde::Serialize, Clone)]
 pub struct ResourceProvider {
     pub class_type: String,

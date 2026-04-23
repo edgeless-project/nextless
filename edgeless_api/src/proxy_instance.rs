@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
 #[derive(Clone)]
 pub struct ProxySpec {
     pub instance_id: crate::function_instance::InstanceId,

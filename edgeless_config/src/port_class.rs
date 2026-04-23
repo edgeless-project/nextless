@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
 #![allow(clippy::needless_lifetimes)]
 
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, Clone, serde::Serialize, serde::Deserialize)]

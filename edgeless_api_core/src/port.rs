@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Port<const N: usize>(pub heapless::String<N>);
 

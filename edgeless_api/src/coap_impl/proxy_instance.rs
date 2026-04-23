@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
 #[async_trait::async_trait]
 impl crate::proxy_instance::ProxyInstanceAPI for super::CoapClient {
     async fn start(&mut self, _request: crate::proxy_instance::ProxySpec) -> anyhow::Result<()> {

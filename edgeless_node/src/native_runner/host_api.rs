@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
 pub(crate) struct HostApiImpl {
     pub(crate) host: crate::base_runtime::guest_api::GuestAPIHost,
     pub(crate) alloc: talc::Talck<spin::Mutex<()>, talc::ErrOnOom>,

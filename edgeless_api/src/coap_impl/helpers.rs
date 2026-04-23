@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
+
 use std::str::FromStr;
 
 pub fn std_outputs_to_core_ouputs(
