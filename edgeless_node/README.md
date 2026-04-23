@@ -29,8 +29,8 @@ All of those runtimes rely on shared functionality found in `./src/base_runtime`
 
 The node contains a set of resources found in `./src/resources`.
 
-The current implementation does not contain a resource framework.
-The resources are therefore implemented on a rather low level (directly interacting with the dataplane), and there is a lot of duplicate functionality.
+The current implementation does not contain a resource framework.  
+The resources are therefore implemented on a rather low level (directly interacting with the dataplane), and there is a lot of duplication.
 
 # Dataplane
 
@@ -42,12 +42,12 @@ The dataplane module also handles the port-name to recipient mapping.
 
 Each node has a global `DataplaneProvider`.
 
-Each actor/resource is represented by a `DataplaneHandle`.
-This `DataplaneHandle` is created by the `DataplaneProvider`.
+Each actor/resource is represented by a `DataplaneHandle`.  
+This `DataplaneHandle` is created by the `DataplaneProvider`.  
 The handle is cloneable and internally runs a tokio task.
 
 The dataplane in its current form is mostly designed around the overlay-based interactions.  
-It also contains support for controller-defined dedicated links.
+It additionally provides support for controller-defined dedicated links.  
 The remote overlay interactions are backed by the `InvocationAPI` of the `edgeless_api` crate.
 
 # Telemetry / Metrics
@@ -61,5 +61,5 @@ The handles contain a set of tags and route the events towards an `EventProcesso
 
 The implementation contains two main `EventProcessors`:
 
-* `PrometheusEventTarget` exposed the events as Prometheus metrics served over HTTP.
+* `PrometheusEventTarget` exposes the events as Prometheus metrics served over HTTP.
 * `EventLogger` outputs the events to stdout.

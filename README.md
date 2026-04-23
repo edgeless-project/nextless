@@ -199,24 +199,25 @@ The main system components (cf. [documentation/system_components.md](documentati
 
 ### Actors, Applications, and Resources
 
-The repository contains a set of example applications to be executed by a deployment of nextless.  
-Those can be found in the following folders:
+The repository contains a set of example applications that can be deployed to a Nextless cluster.  
+The applications and their components can be found in the following folders:
 
 * `functions` contains the set of Rust-based example actors included with this repository.
 * `resources` provides the descriptions of the resources included with the (embedded) worker node.
-* `examples` contains example applications using those actors and resources.
+* `examples` contains the example applications using those actors and resources.
 
 ### Inter-Component APIs
 
-There is a set of crates that defines the APIs enabling the components to interact.
+There is a set of crates that define the APIs enabling the components to interact.
 
 * `edgeless_api` provides the main APIs used for the interaction between the main system components. 
-  * It also defines types used across the components.
-* `egeless_api_core` represents the parts of the API usable by the `#![no_std]` embedded efforts.
+  * It also defines shared types used across the components.
+* `egeless_api_core` represents the parts of the APIs usable by the `#![no_std]` embedded efforts.
 
 ### Actor-related APIs
 
-These crates define the APIs used to implement Rust-based actors and enable those actors to interact with the worker node.
+These crates define the APIs used to implement Rust-based actors.  
+They enable those actors to interact with the worker node.
 
 * `edgeless_function` represents the main crate used by every function.
   * It uses the procmacro-crate `edgeless_function_macro` to provide the `edgeless_function::generate!()` macro.
@@ -236,7 +237,7 @@ These crates define the APIs used to implement Rust-based actors and enable thos
 This repository also contains an experimental port of the worker node to microcontroller-based devices.
 
 * `edgeless_embedded` represents the core of the embedded effort and contains the device-independent implementation of the embedded worker node.
-* `edgeless_embedded_esp32` contains the esp32(-s3) specific wrapper of the core `edgeless_embedded` and the device-specific implementation.
+* `edgeless_embedded_esp32` contains the esp32(-s3) specific wrapper of the core `edgeless_embedded` and the device-specific sensor/actuator implementation.
 * `edgeless_embedded_emu` contains a wrapper of the core `edgeless_embedded` that can be executed on Linux-based nodes (it relies on `embassy-net-tuntap`).
 
 ## Naming Inconsistencies
