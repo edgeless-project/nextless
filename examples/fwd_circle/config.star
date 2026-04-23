@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 
 
 NUM_NODES = 10

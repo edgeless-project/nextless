@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/native_benefit_fwd/native_benefit_fwd.star", "NativeBenefitFwd")
 load("../../functions/latency_harness/latency_harness.star", "LatencyHarness")
 

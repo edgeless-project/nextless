@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/latency_harness/latency_harness.star", "LatencyHarness")
 load("../../functions/basic_forwarder/basic_forwarder.star", "BasicForwarder")
 load("./config.star", "fwd_id", "harness_id", "num_fwds", "fake_work_delay_ms", "inter_message_delay_ms")

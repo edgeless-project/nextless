@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 HTTPEgress = edgeless_resource_class(
     id = "http-egress",
     outputs = [],

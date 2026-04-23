@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 DemoDashboard = edgeless_actor_class(
     id = "demo_dashboard",
     version = "0.1",

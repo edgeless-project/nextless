@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 LedMatrixDemo = edgeless_actor_class(
     id = "led_matrix_demo",
     version = "0.1",

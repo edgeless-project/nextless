@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 HTTPRequestor = edgeless_actor_class(
     id = "http_requestor",
     version = "0.1",

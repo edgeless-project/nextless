@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/ping_async/pinger.star", "Pinger")
 load("../../functions/pong_async/ponger.star", "Ponger")
 

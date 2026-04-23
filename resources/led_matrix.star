@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 LedMatrix = edgeless_resource_class(
     id = "led-matrix",
     outputs = [],

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/http_processor/http_processor.star", "HTTPProcessor")
 load("../../resources/http_ingress.star", "HTTPIngress")
 load("../../resources/file_log.star", "FileLog")

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/message_generator/message_generator.star", "MessageGenerator")
 load("../../resources/file_log.star", "FileLog")
 

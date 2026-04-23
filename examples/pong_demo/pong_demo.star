@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../resources/http_ingress.star", "HTTPIngress")
 load("../../resources/led_matrix.star", "LedMatrix")
 load("../../functions/pong_controller/pong_controller.star", "PongController")

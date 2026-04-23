@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 LatencyHarness = edgeless_actor_class(
     id = "latency_harness",
     version = "0.1",

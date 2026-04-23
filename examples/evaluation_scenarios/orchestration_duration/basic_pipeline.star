@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../../functions/demo_sensor/demo_sensor_wasm.star", "DemoSensor")
 load("../../../functions/demo_dashboard/demo_dashboard_wasm.star", "DemoDashboard")
 load("../../../resources/http_ingress.star", "HTTPIngress")

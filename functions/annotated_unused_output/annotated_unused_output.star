@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 AnnotatedUnusedOutput = edgeless_actor_class(
     id = "annotated_unused_output",
     version = "0.1",

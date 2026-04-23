@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 NativeBenefitFwd = edgeless_actor_class(
     id = "native_benefit_fwd",
     version = "0.1",

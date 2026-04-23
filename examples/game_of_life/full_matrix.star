@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 inputs = [
     [5, 4, 3, 2, 1],
     [10, 9, 8, 7, 6],

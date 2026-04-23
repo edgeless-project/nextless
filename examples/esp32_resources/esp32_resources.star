@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 #load("../../functions/esp_test_fun/esp_test_fun.star", "EspTestFun")
 load("../../functions/esp_test_fun_no_std/esp_test_fun_no_std.star", "EspSensorP")
 load("../../resources/scd_30.star", "SCD30Sensor")

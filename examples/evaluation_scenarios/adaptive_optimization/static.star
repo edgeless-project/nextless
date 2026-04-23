@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../../functions/basic_consumer/basic_consumer.star", "BasicConsumer")
 load("../../../functions/unbalanced_source/unbalanced_source.star", "UnbalancedSource")
 

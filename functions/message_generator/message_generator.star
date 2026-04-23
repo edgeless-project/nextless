@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 MessageGenerator = edgeless_actor_class(
     id = "message_generator",
     version = "0.1",

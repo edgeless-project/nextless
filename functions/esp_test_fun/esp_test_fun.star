@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 EspTestFun = edgeless_actor_class(
     id = "esp_test_fun",
     version = "0.1",

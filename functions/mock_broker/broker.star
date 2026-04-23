@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 MockBroker = edgeless_actor_class(
     id = "mock_broker",
     version = "0.1",

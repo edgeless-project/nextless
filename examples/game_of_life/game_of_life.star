@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/game_of_life/game_of_life.star", "GameOfLife")
 load("../../functions/game_of_life_clock/game_of_life_clock.star", "GameOfLifeClock")
 load("../../resources/led_matrix.star", "LedMatrix")

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 GameOfLife = edgeless_actor_class(
     id = "game_of_life",
     version = "0.1",

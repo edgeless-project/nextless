@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/yolox_wonnx/yolox.star", "YoloxNano")
 load("../../functions/image_detection_tester/detection_tester.star", "DetectionTester")
 load("../../functions/image_scaler/scaler.star", "ImageScaler")

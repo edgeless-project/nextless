@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 NativeProcessor = edgeless_actor_class(
     id = "native_processor",
     version = "0.1",

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../../functions/mock_producer/producer.star", "MockProducer")
 load("../../../functions/mock_consumer/consumer.star", "MockConsumer")
 

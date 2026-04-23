@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 YoloxNano = edgeless_actor_class(
     id = "yolox_nano",
     version = "0.1",

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/led_matrix_demo/led_matrix_demo.star", "LedMatrixDemo")
 load("../../resources/led_matrix.star", "LedMatrix")
 

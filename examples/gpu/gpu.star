@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2025 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 load("../../functions/gpu_example/gpu.star", "GPUExample")
 
 gpu_example = edgeless_actor(

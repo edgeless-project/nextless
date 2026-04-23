@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: © 2026 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 PongController = edgeless_actor_class(
     id = "pong_controller",
     version = "0.1",
