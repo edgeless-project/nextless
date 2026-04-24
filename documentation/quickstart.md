@@ -4,7 +4,7 @@ In this quickstart guide, we go through the process of defining an Actor and App
 
 This quickstart guide assumes a running installation of the controller and a node with an HTTP Ingress Resource.  
 It also assumes you are in a directory next to a directory `nextless` containing the project's source code---this is used for the Resource definitions.  
-Alternatively, you can change the paths to the Resource definitions in the application description.
+Alternatively, you can change the paths to the Resource definitions in the Application description.
 
 You can generate an ephemeral environment fulfilling these requirements using our playground container:
 ```bash

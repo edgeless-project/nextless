@@ -47,8 +47,8 @@ The engine wraps the physical instances in a state machine (`crate::ir::physical
 
 The set of both logical and physical instances is modified by the transformations (`crate::ir::transformations::*`).  
 They are grouped into  
-* the Logical Phase logically optimizing the requested application input (represented by `crate::ir::pipeline::default_logical::DefaultLogicalPipeline`) and   
-* the Physical Phase handling typical orchestration tasks such as scaling and placement and the optimization of the application instances.
+* the Logical Phase logically optimizing the requested Application input (represented by `crate::ir::pipeline::default_logical::DefaultLogicalPipeline`) and   
+* the Physical Phase handling typical orchestration tasks such as scaling and placement and the optimization of the Actor instances.
 
 The Physical Phase is represented by `crate::ir::pipeline::default_orchestration::DefaultOrchestrationPipeline` and `crate::ir::pipeline::default_physical::DefaultPhysicalPipeline`.
 

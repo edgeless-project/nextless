@@ -9,14 +9,14 @@ and subsequently receives commands (e.g., to start/stop an actor) from this cont
 
 The worker node allows executing actors using one of three runtimes:
 
-* Wasm (wasmtime): Our primary Wasm runtime based on Wasmtime.
+* Wasm (wasmtime): Our primary Wasm runtime is based on Wasmtime.
   * This runtime provides support for GPU-acceleration using wgpu.
     * The actor-side implementation of our wgpu interface is provided by the crate `edgeless_function_gpu`.
-* Wasm (wasmi): A secondary Wasm runtime based on the interpreter-based Wasmi.
-  * This can be used on devices that do not allow for JIT-compilation.
-* Native: An experimental runtime allowing for native execution using Rust/language-based isolation.
-  * This relies on a custom ABI (`edgeless_function_abi`) and a userspace ELF loader.
-  * The images are device-specific but OS-independent.
+* Wasm (wasmi): Our secondary Wasm runtime is based on the interpreter-based Wasmi.
+  * It can be used on devices that do not allow for JIT-compilation.
+* Native: An experimental runtime allowing for native execution using Rust- and language-based isolation.
+  * This runtime relies on a custom ABI (`edgeless_function_abi`) and a userspace ELF loader.
+  * Its images are device-specific but OS-independent.
   * This requires additional work to be secure!
     * The compiler needs to enforce certain rules.
     * The node must ensure the binaries were built by a compiler enforcing those rules.
@@ -47,7 +47,7 @@ This `DataplaneHandle` is created by the `DataplaneProvider`.
 The handle is cloneable and internally runs a tokio task.
 
 The dataplane in its current form is mostly designed around the overlay-based interactions.  
-It additionally provides support for controller-defined dedicated links.  
+It additionally provides support for controller-managed dedicated links, e.g., a link using IP-Multicast.  
 The remote overlay interactions are backed by the `InvocationAPI` of the `edgeless_api` crate.
 
 # Telemetry / Metrics
