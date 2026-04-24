@@ -20,7 +20,15 @@ fn main() -> anyhow::Result<()> {
         edgeless_api::util::create_template(&args.template, edgeless_node::edgeless_node_default_conf().as_str())?;
         return anyhow::Ok(());
     }
-    let conf: edgeless_node::EdgelessNodeSettings = toml::from_str(&std::fs::read_to_string(args.config_file)?)?;
+
+    let Ok(conf_str) = std::fs::read_to_string(args.config_file.clone()) else {
+        panic!(
+            "Could not read node configuration file '{}'. You can generate the default configuration using the command 'edgeless_node_d -t {}'",
+            args.config_file, args.config_file,
+        );
+    };
+
+    let conf: edgeless_node::EdgelessNodeSettings = toml::from_str(&conf_str)?;
 
     let conf_clone = conf.clone();
 

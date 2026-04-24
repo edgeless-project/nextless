@@ -71,15 +71,16 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
 }
 
 pub fn edgeless_con_default_conf() -> String {
-    String::from(
-        r##"controller_grpc_listen_url = "http://127.0.0.1:7001"
-            controller_coap_listen_url = "coap://127.0.0.1:7001"
-            prometheus_url = "http://127.0.0.1:9090"
-            placement_strategy = "random"
+    let con_settings = EdgelessConSettings {
+        controller_grpc_listen_url: "http://127.0.0.1:7001".to_string(),
+        controller_coap_listen_url: None,
+        prometheus_url: None,
+        placement_strategy: "random".to_string(),
+        opentelemetry_export: Some(OpenTelemetryExportConfig {
+            enabled: false,
+            endpoint: "http://localhost:4318/v1/traces".to_string(),
+        }),
+    };
 
-            [opentelemetry_export]
-            enabled = false
-            endpoint = "http://localhost:4318/v1/traces"
-"##,
-    )
+    toml::to_string_pretty(&con_settings).expect("Could not serialize default controller settings.")
 }

@@ -18,7 +18,15 @@ fn main() -> anyhow::Result<()> {
         edgeless_api::util::create_template(&args.template, edgeless_con::edgeless_con_default_conf().as_str())?;
         return Ok(());
     }
-    let conf: edgeless_con::EdgelessConSettings = toml::from_str(&std::fs::read_to_string(args.config_file)?)?;
+
+    let Ok(conf_str) = std::fs::read_to_string(args.config_file.clone()) else {
+        panic!(
+            "Could not read controller configuration file '{}'. You can generate the default configuration using the command 'edgeless_con_d -t {}'",
+            args.config_file, args.config_file,
+        );
+    };
+
+    let conf: edgeless_con::EdgelessConSettings = toml::from_str(&conf_str)?;
 
     setup_tracing(&conf.opentelemetry_export);
 

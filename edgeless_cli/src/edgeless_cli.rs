@@ -45,14 +45,16 @@ struct Args {
     template: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 struct CLiConfig {
     controller_url: String,
 }
 
 #[derive(Debug, thiserror::Error)]
 enum CliError {
-    #[error("Could not load the cli configuration file '{file}'")]
+    #[error(
+        "Could not load the cli configuration file '{file}'. You can generate the default configuration using the command 'edgeless_cli -t '{file}'."
+    )]
     ConfigurationError { file: String, source: anyhow::Error },
 }
 
@@ -87,8 +89,8 @@ async fn main() -> anyhow::Result<()> {
 }
 
 pub fn edgeless_cli_default_conf() -> String {
-    String::from(
-        r##"controller_url = "http://127.0.0.1:7001"
-"##,
-    )
+    let cli_settings = CLiConfig {
+        controller_url: "http://127.0.0.1:7001".to_string(),
+    };
+    toml::to_string_pretty(&cli_settings).expect("Could not serialize default CLI settings!")
 }

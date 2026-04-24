@@ -554,50 +554,48 @@ pub async fn edgeless_node_main(
 }
 
 pub fn edgeless_node_default_conf() -> String {
-    let caps = get_capabilities(
-        vec![edgeless_api::node_registration::RuntimeType {
-            base_type: "WASM".to_string(),
-            features: Vec::new(),
-        }],
-        NodeCapabilitiesUser::empty(),
-    );
+    let node_settings_general = EdgelessNodeGeneralSettings {
+        node_id: uuid::Uuid::new_v4(),
+        agent_url: "http://127.0.0.1:7021".to_string(),
+        agent_url_announced: "".to_string(),
+        invocation_url: "http://127.0.0.1:7002".to_string(),
+        invocation_url_announced: "".to_string(),
+        invocation_url_coap: None,
+        invocation_url_announced_coap: None,
+        metrics_url: "http://127.0.0.1:7003".to_string(),
+        controller_url: "http://127.0.0.1:7001".to_string(),
+    };
 
-    format!(
-        "{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}",
-        r##"[general]
-node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
-agent_url = "http://127.0.0.1:7021"
-agent_url_announced = ""
-invocation_url = "http://127.0.0.1:7002"
-invocation_url_announced = ""
-invocation_url_coap = "coap://127.0.0.1:7002"
-invocation_url_announced_coap = ""
-metrics_url = "http://127.0.0.1:7003"
-controller_url = "http://127.0.0.1:7001"
+    let wasmtime_settings = EdgelessNodeWasmtimeRuntimeSettings {
+        enabled: true,
+        wgpu: Some(false),
+    };
 
-[wasm_runtime]
-enabled = true
+    let wasmi_settings = EdgelessNodeWasmiRuntimeSettings { enabled: false };
 
-[container_runtime]
-enabled = false
-guest_api_host_url = "http://127.0.0.1:7100"
+    let native_runtime_settings = NativeRuntimeSettings {
+        enabled: false,
+        aes: Some(false),
+    };
 
-[resources]
-http_ingress_url = "http://127.0.0.1:7035"
-http_ingress_provider = "http-ingress-1"
-http_egress_provider = "http-egress-1"
-file_log_provider = "file-log-1"
-redis_provider = "redis-1"
+    let resource_settings = EdgelessNodeResourceSettings {
+        http_ingress_url: Some("http://127.0.0.1:7035".to_string()),
+        http_ingress_provider: Some("http-ingress-1".to_string()),
+        http_egress_provider: Some("http-egress-1".to_string()),
+        file_log_provider: Some("file-log-1".to_string()),
+        redis_provider: None,
+        led_matrix: None,
+    };
 
-[user_node_capabilities]
-"##,
-        caps.num_cpus,
-        caps.model_name_cpu,
-        caps.clock_freq_cpu,
-        caps.num_cores,
-        caps.mem_size,
-        r##"labels = []
-is_tee_running = false
-has_tpm = false"##
-    )
+    let node_settings = EdgelessNodeSettings {
+        general: node_settings_general,
+        wasmtime_runtime: Some(wasmtime_settings),
+        wasmi_runtime: Some(wasmi_settings),
+        native_runtime: Some(native_runtime_settings),
+        resources: Some(resource_settings),
+        user_node_capabilities: None,
+        opentelemetry_export: None,
+    };
+
+    toml::to_string_pretty(&node_settings).expect("Could not serialize default node settings!")
 }
