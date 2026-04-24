@@ -1,6 +1,6 @@
 # Building Applications
 
-An application is defined using a Starlark-based application description:
+An Application is defined using a Starlark-based Application description:
 
 ```star
 # Load Actor / Resource Descriptions
@@ -70,7 +70,7 @@ In the call to `edgeless_actor`, the developers need to assign a logical id, lin
 * `"scaling_mode": {}`: can be set to one of:
   * `singleton`: There will be only one physical instance of the actor.
   * `scalable`: Also requires `"min_instances": "10"` and `"max_instances": "25"` and allows the orchestrator to dynamically scale the number of instances based on the load.
-  * `all_nodes`: Tries to place an instance of the actor on all nodes fitting the constraints.
+  * `all_nodes`: Tries to place an instance of the actor on all nodes matching the constraints.
 
 There are various annotations limiting the placement of the logical instances:
 * `"node_ids_allowed": "uuid,uuid"`: Limits the instances to the listed node uuids.
@@ -129,7 +129,7 @@ source.port_o >> any([destination.port_i, destination_2.port_i])
 ```
 
 Map the output to all of the instances of the destinations.
-Each message will only be sent to a single instance.
+Each message will only be sent to a single instance of the destinations.
 
 ### Multicast
 
