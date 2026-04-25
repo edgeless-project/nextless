@@ -91,7 +91,7 @@ Use any installed or connected editor to edit the Actor's main file:
 nano example_actor_1/src/lib.rs
 ```
 
-Update the `http_request` handlers as follows:
+Update the `http_request` handler as follows:
 
 ```diff
 fn handle_call_http_request(_src: InstanceId, req: Self::EFT_HTTP_REQUEST) -> Self::EFT_HTTP_RESPONSE {
