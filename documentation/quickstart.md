@@ -66,3 +66,61 @@ curl -w "\n" -H "Host: demo.localhost" http://127.0.0.1:7035/hello
 
 You should receive the response `Handler not configured`.  
 Additionally, you should see log output from the node.
+
+# Stop the Application
+
+The `edgeless_cli workflow start` command returns the Application UUID.  
+Alternatively, you can fetch it using the following command:
+
+```bash
+edgeless_cli workflow list
+```
+
+Use this UUID to stop the Application:
+
+```bash
+edgeless_cli workflow stop 960b7431-aa33-4c8a-b07f-8efb0c0ccca1
+```
+
+# Update the Actor and Restart the Application
+
+Update the generated Actor to include a handler for the path `/hello`.  
+Use any installed or connected editor to edit the Actors main file:
+
+```bash
+nano example_actor_1/src/lib.rs
+```
+
+Update the `http_request` handlers as follows:
+
+```diff
+fn handle_call_http_request(_src: InstanceId, req: Self::EFT_HTTP_REQUEST) -> Self::EFT_HTTP_RESPONSE {
+    log::info!("HTTP request received! Path: {}", req.path);
++        if req.path == "/hello" {
++            return edgeless_function_types::http::EdgelessHTTPResponse {
++                status: 200,
++                body: Some(Vec::<u8>::from("World")),
++                headers: std::collections::HashMap::<String, String>::new(),
++            };
++        }
+    edgeless_function_types::http::EdgelessHTTPResponse {
+        status: 404,
+        body: Some(Vec::<u8>::from("Handler not configured.")),
+```
+
+Rebuild the Actor and restart the Application:
+
+```bash
+edgeless_cli function build example_actor_1/example_actor_1.star
+edgeless_cli workflow start example_app_1/example_app_1.star
+```
+
+# Test the Updated Application
+
+Send another request to the deployed Application:
+
+```bash
+curl -w "\n" -H "Host: demo.localhost" http://127.0.0.1:7035/hello
+```
+
+This should now return the string `world`.
