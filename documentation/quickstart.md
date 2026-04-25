@@ -123,4 +123,4 @@ Send another request to the deployed Application:
 curl -w "\n" -H "Host: demo.localhost" http://127.0.0.1:7035/hello
 ```
 
-This should now return the string `world`.
+This should now return the string `World`.
